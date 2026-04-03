@@ -1,0 +1,104 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper: check if user is authenticated
+    function isAuth() {
+      return request.auth != null;
+    }
+
+    // Helper: check if user has a coach document
+    function isCoach() {
+      return isAuth() && exists(/databases/$(database)/documents/coaches/$(request.auth.uid));
+    }
+
+    // Helper: check if user is admin
+    function isAdmin() {
+      return isAuth() && get(/databases/$(database)/documents/coaches/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // Coaches collection — coaches can read all, only admins can create/update roles
+    match /coaches/{coachId} {
+      allow read: if isAuth();
+      allow create: if isAuth() && request.auth.uid == coachId;
+      allow update: if isAuth() && (request.auth.uid == coachId || isAdmin());
+      allow delete: if isAdmin();
+    }
+
+    // Swimmers — all coaches can read and write
+    match /swimmers/{swimmerId} {
+      allow read, write: if isCoach();
+
+      // Notes subcollection — all coaches can read and write
+      match /notes/{noteId} {
+        allow read, write: if isCoach();
+      }
+
+      // Times subcollection
+      match /times/{timeId} {
+        allow read, write: if isCoach();
+      }
+
+      // Medical info subcollection — stricter: only admin can write
+      match /medical/{medId} {
+        allow read: if isCoach();
+        allow write: if isAdmin();
+      }
+    }
+
+    // Attendance — all coaches can read and write
+    match /attendance/{recordId} {
+      allow read, write: if isCoach();
+    }
+
+    // Audio sessions — all coaches can read and write
+    match /audio_sessions/{sessionId} {
+      allow read, write: if isCoach();
+
+      match /drafts/{draftId} {
+        allow read, write: if isCoach();
+      }
+    }
+
+    // Video sessions
+    match /video_sessions/{sessionId} {
+      allow read, write: if isCoach();
+    }
+
+    // Practice plans
+    match /practice_plans/{planId} {
+      allow read, write: if isCoach();
+    }
+
+    // Messages — coaches only
+    match /messages/{messageId} {
+      allow read: if isCoach() && request.auth.uid in resource.data.recipientIds || resource.data.senderId == request.auth.uid;
+      allow create: if isCoach();
+      allow update: if isCoach();
+    }
+
+    // Import jobs — admin only
+    match /import_jobs/{jobId} {
+      allow read: if isCoach();
+      allow write: if isAdmin();
+    }
+
+    // Dashboard aggregations — read by coaches, written by Cloud Functions
+    match /aggregations/{docId} {
+      allow read: if isCoach();
+      allow write: if false; // Only Cloud Functions write these
+    }
+
+    // Spike test data — open during development (remove before production)
+    match /spike_swimmers/{doc} {
+      allow read, write: if isAuth();
+    }
+    match /spike_notes/{doc} {
+      allow read, write: if isAuth();
+    }
+    match /spike_audio_sessions/{doc} {
+      allow read, write: if isAuth();
+    }
+  }
+}
