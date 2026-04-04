@@ -1,11 +1,5 @@
 import { useState } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  StyleSheet,
-} from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { router, Stack } from 'expo-router';
 import { colors, spacing, fontSize, borderRadius, fontFamily } from '../src/config/theme';
 import { GROUPS, type Group } from '../src/config/constants';
@@ -35,6 +29,18 @@ const CARDS: AnalyticsCard[] = [
     description: 'Group-level progress reports and comparisons',
     route: '/analytics/group-report',
     accent: colors.purpleLight,
+  },
+  {
+    title: 'SPLIT COMPARISON',
+    description: 'Compare 50-by-50 splits across multiple races',
+    route: '/analytics/splits',
+    accent: colors.success,
+  },
+  {
+    title: 'PR PROGRESSION',
+    description: 'Track time progression per swimmer and event',
+    route: '/analytics/progression',
+    accent: colors.info,
   },
 ];
 

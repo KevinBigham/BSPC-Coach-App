@@ -66,6 +66,7 @@ export interface SwimTime {
   event: string;
   course: Course;
   time: number; // hundredths of seconds (e.g., 6523 = 1:05.23)
+  splits?: number[]; // split times in hundredths per 50 (e.g., [3012, 3511])
   timeDisplay: string;
   isPR: boolean;
   meetName?: string;
@@ -412,6 +413,30 @@ export interface SeasonPlan {
   totalWeeks: number;
   coachId: string;
   coachName: string;
+  createdAt: FirebaseTimestamp;
+  updatedAt: FirebaseTimestamp;
+}
+
+// Notification Rule types
+export type NotificationTrigger =
+  | 'attendance_streak'
+  | 'missed_practice'
+  | 'pr_achieved'
+  | 'time_standard_met'
+  | 'birthday'
+  | 'custom';
+
+export interface NotificationRule {
+  id?: string;
+  name: string;
+  trigger: NotificationTrigger;
+  enabled: boolean;
+  config: {
+    threshold?: number; // e.g., streak count, days missed
+    group?: Group;
+    message?: string;
+  };
+  coachId: string;
   createdAt: FirebaseTimestamp;
   updatedAt: FirebaseTimestamp;
 }

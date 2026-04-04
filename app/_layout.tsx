@@ -408,6 +408,26 @@ function RootNavigator() {
           }}
         />
         <Stack.Screen
+          name="analytics/splits"
+          options={{
+            headerShown: true,
+            title: 'SPLIT COMPARISON',
+            headerStyle: { backgroundColor: colors.bgElevated },
+            headerTintColor: colors.accent,
+            headerTitleStyle: { fontFamily: fontFamily.heading, fontSize: 22, color: colors.text },
+          }}
+        />
+        <Stack.Screen
+          name="analytics/progression"
+          options={{
+            headerShown: true,
+            title: 'PR PROGRESSION',
+            headerStyle: { backgroundColor: colors.bgElevated },
+            headerTintColor: colors.accent,
+            headerTitleStyle: { fontFamily: fontFamily.heading, fontSize: 22, color: colors.text },
+          }}
+        />
+        <Stack.Screen
           name="practice/library"
           options={{
             headerShown: true,
