@@ -63,12 +63,11 @@ function RootNavigator() {
   useEffect(() => {
     if (loading) return;
 
-    const inAuthGroup = segments[0] === '(tabs)';
-    const onLogin = segments[0] === 'login';
+    const onAuthScreen = segments[0] === 'login' || segments[0] === 'forgot-password';
 
-    if (!user && !onLogin) {
+    if (!user && !onAuthScreen) {
       router.replace('/login');
-    } else if (user && !inAuthGroup) {
+    } else if (user && onAuthScreen) {
       router.replace('/(tabs)');
     }
   }, [user, loading, segments]);
