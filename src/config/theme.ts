@@ -5,8 +5,8 @@ export const colors = {
   // Dark Backgrounds
   bgDeep: '#08080f',
   bgBase: '#0a0a12',
-  bgElevated: '#0f1018',
-  bgSurface: '#12121f',
+  bgElevated: '#131320',
+  bgSurface: '#161628',
 
   // BSPC Identity
   purple: '#4A0E78',
@@ -17,19 +17,19 @@ export const colors = {
   // Arcade Accents
   gold: '#FFD700',
   goldDark: '#CCB000',
-  accent: '#B388FF',       // light purple — active states, links, tab highlights
-  success: '#CCB000',      // dark gold — success, streaks, attendance confirmed
+  accent: '#B388FF', // light purple — active states, links, tab highlights
+  success: '#CCB000', // dark gold — success, streaks, attendance confirmed
 
   // Semantic
   background: '#0a0a12',
-  surface: '#0f1018',
-  surfaceElevated: '#12121f',
-  text: '#e8e8f0',
-  textSecondary: '#7a7a8e',
+  surface: '#131320',
+  surfaceElevated: '#161628',
+  text: '#f0f0f8',
+  textSecondary: '#a0a0b8',
   textInverse: '#0a0a12',
-  border: '#1c1c2a',
-  borderLight: '#14141f',
-  borderAccent: '#2a2a3d',
+  border: '#2a2a40',
+  borderLight: '#1e1e32',
+  borderAccent: '#3a3a55',
 
   // Status
   successLight: 'rgba(204, 176, 0, 0.12)',
@@ -49,7 +49,7 @@ export const colors = {
   groupDiamond: '#8B5CF6',
 
   // Legacy aliases (dark-adapted)
-  white: '#e8e8f0',
+  white: '#f0f0f8',
   black: '#0a0a12',
   lightPurple: 'rgba(74, 14, 120, 0.3)',
   yellow: '#ffd700',
