@@ -115,11 +115,14 @@ export interface AttendanceAggregation {
 }
 
 export interface SwimmerAggregation {
-  prsByEvent: Record<string, {
-    time: number;
-    timeDisplay: string;
-    date: FirebaseTimestamp;
-  }>;
+  prsByEvent: Record<
+    string,
+    {
+      time: number;
+      timeDisplay: string;
+      date: FirebaseTimestamp;
+    }
+  >;
   noteCount: number;
   lastNoteDate: FirebaseTimestamp;
   updatedAt: FirebaseTimestamp;
@@ -204,7 +207,14 @@ export interface VideoSession {
   updatedAt: FirebaseTimestamp;
 }
 
-export type VideoAnalysisPhase = 'stroke' | 'turn' | 'start' | 'underwater' | 'breakout' | 'finish' | 'general';
+export type VideoAnalysisPhase =
+  | 'stroke'
+  | 'turn'
+  | 'start'
+  | 'underwater'
+  | 'breakout'
+  | 'finish'
+  | 'general';
 
 export interface VideoAnalysisDraft {
   id?: string;
@@ -364,6 +374,46 @@ export interface ParentInvite {
   redeemedAt?: FirebaseTimestamp;
   expiresAt: FirebaseTimestamp;
   createdAt: FirebaseTimestamp;
+}
+
+// Season Planning types
+export type SeasonPhaseType = 'base' | 'build1' | 'build2' | 'peak' | 'taper' | 'race' | 'recovery';
+
+export interface SeasonPhase {
+  name: string;
+  type: SeasonPhaseType;
+  startDate: string; // "YYYY-MM-DD"
+  endDate: string;
+  weeklyYardage: number;
+  focusAreas: string[];
+  notes?: string;
+}
+
+export interface WeekPlan {
+  id?: string;
+  weekNumber: number;
+  startDate: string; // "YYYY-MM-DD"
+  endDate: string;
+  phase: SeasonPhaseType;
+  targetYardage: number;
+  actualYardage?: number;
+  practiceCount: number;
+  notes?: string;
+  practicePlanIds: string[];
+}
+
+export interface SeasonPlan {
+  id?: string;
+  name: string;
+  group: Group;
+  startDate: string; // "YYYY-MM-DD"
+  endDate: string;
+  phases: SeasonPhase[];
+  totalWeeks: number;
+  coachId: string;
+  coachName: string;
+  createdAt: FirebaseTimestamp;
+  updatedAt: FirebaseTimestamp;
 }
 
 export interface ImportJob {

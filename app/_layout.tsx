@@ -427,6 +427,36 @@ function RootNavigator() {
             headerTitleStyle: { fontFamily: fontFamily.heading, fontSize: 22, color: colors.text },
           }}
         />
+        <Stack.Screen
+          name="season/index"
+          options={{
+            headerShown: true,
+            title: 'SEASON PLANS',
+            headerStyle: { backgroundColor: colors.bgElevated },
+            headerTintColor: colors.accent,
+            headerTitleStyle: { fontFamily: fontFamily.heading, fontSize: 22, color: colors.text },
+          }}
+        />
+        <Stack.Screen
+          name="season/plan"
+          options={{
+            headerShown: true,
+            title: 'SEASON PLAN',
+            headerStyle: { backgroundColor: colors.bgElevated },
+            headerTintColor: colors.accent,
+            headerTitleStyle: { fontFamily: fontFamily.heading, fontSize: 22, color: colors.text },
+          }}
+        />
+        <Stack.Screen
+          name="season/week"
+          options={{
+            headerShown: true,
+            title: 'WEEK DETAIL',
+            headerStyle: { backgroundColor: colors.bgElevated },
+            headerTintColor: colors.accent,
+            headerTitleStyle: { fontFamily: fontFamily.heading, fontSize: 22, color: colors.text },
+          }}
+        />
       </Stack>
     </>
   );

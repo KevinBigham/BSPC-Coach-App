@@ -3,7 +3,7 @@ import { Animated, StyleSheet, ViewStyle } from 'react-native';
 import { colors } from '../config/theme';
 
 interface SkeletonProps {
-  width: number | string;
+  width: number | `${number}%`;
   height: number;
   borderRadius?: number;
   style?: ViewStyle;
@@ -37,7 +37,7 @@ export function Skeleton({ width, height, borderRadius = 8, style }: SkeletonPro
 }
 
 /** Common skeleton patterns for reuse across screens */
-export function SkeletonLine({ width = '100%' }: { width?: number | string }) {
+export function SkeletonLine({ width = '100%' }: { width?: number | `${number}%` }) {
   return <Skeleton width={width} height={14} borderRadius={4} style={styles.line} />;
 }
 
