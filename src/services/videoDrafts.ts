@@ -1,12 +1,7 @@
-import {
-  doc,
-  updateDoc,
-  addDoc,
-  collection,
-  serverTimestamp,
-} from 'firebase/firestore';
+import { doc, updateDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import type { NoteTag } from '../config/constants';
+import type { FirebaseTimestamp } from '../types/firestore.types';
 
 export interface VideoDraft {
   id: string;
@@ -20,15 +15,15 @@ export interface VideoDraft {
   confidence: number;
   approved?: boolean;
   reviewedBy?: string;
-  reviewedAt?: any;
-  createdAt: any;
+  reviewedAt?: FirebaseTimestamp;
+  createdAt: FirebaseTimestamp;
 }
 
 export async function approveVideoDraft(
   sessionId: string,
   draft: VideoDraft,
   coachUid: string,
-  coachName: string
+  coachName: string,
 ): Promise<void> {
   // Mark draft as approved
   await updateDoc(doc(db, 'video_sessions', sessionId, 'drafts', draft.id), {
@@ -60,7 +55,7 @@ export async function approveVideoDraft(
 export async function rejectVideoDraft(
   sessionId: string,
   draftId: string,
-  coachUid: string
+  coachUid: string,
 ): Promise<void> {
   await updateDoc(doc(db, 'video_sessions', sessionId, 'drafts', draftId), {
     approved: false,

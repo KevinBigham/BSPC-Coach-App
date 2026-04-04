@@ -79,8 +79,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               error: null,
             });
           }
-        } catch (err: any) {
-          setState({ user, coach: null, loading: false, error: err.message });
+        } catch (err: unknown) {
+          setState({
+            user,
+            coach: null,
+            loading: false,
+            error: err instanceof Error ? err.message : 'Auth error',
+          });
         }
       } else {
         setState({ user: null, coach: null, loading: false, error: null });
@@ -93,11 +98,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setState((s) => ({ ...s, loading: true, error: null }));
     try {
       await signInWithEmailAndPassword(auth, email, password);
-    } catch (err: any) {
+    } catch (err: unknown) {
       let message = 'Sign in failed';
-      if (err.code === 'auth/invalid-credential') message = 'Invalid email or password';
-      else if (err.code === 'auth/too-many-requests') message = 'Too many attempts. Try again later';
-      else if (err.code === 'auth/network-request-failed') message = 'Network error. Check your connection';
+      const code = err instanceof Error && 'code' in err ? (err as { code: string }).code : '';
+      if (code === 'auth/invalid-credential') message = 'Invalid email or password';
+      else if (code === 'auth/too-many-requests') message = 'Too many attempts. Try again later';
+      else if (code === 'auth/network-request-failed')
+        message = 'Network error. Check your connection';
       setState((s) => ({ ...s, loading: false, error: message }));
       throw new Error(message);
     }

@@ -189,21 +189,14 @@ export function parseSDIF(content: string): SDIFParseResult {
 }
 
 function titleCase(str: string): string {
-  return str
-    .toLowerCase()
-    .replace(/\b\w/g, (c) => c.toUpperCase());
+  return str.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-export function matchSwimmers(
-  records: SDIFRecord[],
-  swimmers: SwimmerWithId[]
-): MatchResult[] {
+export function matchSwimmers(records: SDIFRecord[], swimmers: SwimmerWithId[]): MatchResult[] {
   return records.map((record) => {
     // 1. Exact match on USA Swimming ID
     if (record.usaSwimmingId) {
-      const exact = swimmers.find(
-        (s) => s.usaSwimmingId === record.usaSwimmingId
-      );
+      const exact = swimmers.find((s) => s.usaSwimmingId === record.usaSwimmingId);
       if (exact) {
         return { record, matchedSwimmer: exact, confidence: 'exact' as const };
       }
@@ -213,7 +206,7 @@ export function matchSwimmers(
     const nameMatch = swimmers.find(
       (s) =>
         s.firstName.toLowerCase() === record.firstName.toLowerCase() &&
-        s.lastName.toLowerCase() === record.lastName.toLowerCase()
+        s.lastName.toLowerCase() === record.lastName.toLowerCase(),
     );
     if (nameMatch) {
       return { record, matchedSwimmer: nameMatch, confidence: 'name' as const };
@@ -225,7 +218,7 @@ export function matchSwimmers(
 
 export async function importMeetResults(
   matches: MatchResult[],
-  coachUid: string
+  coachUid: string,
 ): Promise<ImportResult> {
   const result: ImportResult = { imported: 0, prs: 0, skipped: 0, errors: [] };
 
@@ -263,11 +256,9 @@ export async function importMeetResults(
         const rec = match.record;
         // Check if PR
         const sameTimes = existingTimes.filter(
-          (t) => t.event === rec.event && t.course === rec.course
+          (t) => t.event === rec.event && t.course === rec.course,
         );
-        const isPR =
-          sameTimes.length === 0 ||
-          sameTimes.every((t) => rec.time < t.time);
+        const isPR = sameTimes.length === 0 || sameTimes.every((t) => rec.time < t.time);
 
         const newRef = doc(collection(db, 'swimmers', swimmerId, 'times'));
         batch.set(newRef, {
@@ -290,10 +281,7 @@ export async function importMeetResults(
         if (isPR && sameTimes.length > 0) {
           for (const old of sameTimes) {
             if (old.isPR) {
-              batch.update(
-                doc(db, 'swimmers', swimmerId, 'times', old.id),
-                { isPR: false }
-              );
+              batch.update(doc(db, 'swimmers', swimmerId, 'times', old.id), { isPR: false });
             }
           }
         }
@@ -301,8 +289,10 @@ export async function importMeetResults(
 
       try {
         await batch.commit();
-      } catch (err: any) {
-        result.errors.push(`Batch write failed for swimmer ${swimmerId}: ${err.message}`);
+      } catch (err: unknown) {
+        result.errors.push(
+          `Batch write failed for swimmer ${swimmerId}: ${err instanceof Error ? err.message : String(err)}`,
+        );
       }
     }
   }

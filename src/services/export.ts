@@ -18,7 +18,16 @@ function csvRow(values: string[]): string {
 }
 
 export function exportRosterCSV(swimmers: SwimmerWithId[]): string {
-  const headers = ['First Name', 'Last Name', 'Display Name', 'Group', 'Gender', 'Active', 'USA Swimming ID', 'Date of Birth'];
+  const headers = [
+    'First Name',
+    'Last Name',
+    'Display Name',
+    'Group',
+    'Gender',
+    'Active',
+    'USA Swimming ID',
+    'Date of Birth',
+  ];
   const rows = swimmers.map((s) =>
     csvRow([
       s.firstName,
@@ -31,7 +40,7 @@ export function exportRosterCSV(swimmers: SwimmerWithId[]): string {
       s.dateOfBirth instanceof Date
         ? s.dateOfBirth.toISOString().split('T')[0]
         : String(s.dateOfBirth || ''),
-    ])
+    ]),
   );
   return [csvRow(headers), ...rows].join('\n');
 }
@@ -39,12 +48,19 @@ export function exportRosterCSV(swimmers: SwimmerWithId[]): string {
 export function exportAttendanceCSV(records: AttendanceWithId[]): string {
   const headers = ['Swimmer', 'Group', 'Date', 'Arrived', 'Departed', 'Status', 'Note', 'Coach'];
   const rows = records.map((r) => {
-    const arrived = r.arrivedAt instanceof Date
-      ? r.arrivedAt.toLocaleTimeString()
-      : (r.arrivedAt as any)?.toDate?.()?.toLocaleTimeString() || '';
-    const departed = r.departedAt instanceof Date
-      ? r.departedAt.toLocaleTimeString()
-      : (r.departedAt as any)?.toDate?.()?.toLocaleTimeString() || '';
+    const arrived =
+      r.arrivedAt instanceof Date
+        ? r.arrivedAt.toLocaleTimeString()
+        : typeof (r.arrivedAt as Record<string, unknown>)?.toDate === 'function'
+          ? (r.arrivedAt as unknown as { toDate: () => Date }).toDate().toLocaleTimeString()
+          : '';
+    const departed =
+      r.departedAt instanceof Date
+        ? r.departedAt.toLocaleTimeString()
+        : r.departedAt &&
+            typeof (r.departedAt as unknown as Record<string, unknown>).toDate === 'function'
+          ? (r.departedAt as unknown as { toDate: () => Date }).toDate().toLocaleTimeString()
+          : '';
     return csvRow([
       r.swimmerName,
       r.group,
@@ -62,9 +78,12 @@ export function exportAttendanceCSV(records: AttendanceWithId[]): string {
 export function exportTimesCSV(times: TimeWithId[]): string {
   const headers = ['Event', 'Course', 'Time', 'Display', 'PR', 'Meet', 'Source', 'Date'];
   const rows = times.map((t) => {
-    const date = t.createdAt instanceof Date
-      ? t.createdAt.toISOString().split('T')[0]
-      : (t.createdAt as any)?.toDate?.()?.toISOString().split('T')[0] || '';
+    const date =
+      t.createdAt instanceof Date
+        ? t.createdAt.toISOString().split('T')[0]
+        : typeof (t.createdAt as Record<string, unknown>)?.toDate === 'function'
+          ? (t.createdAt as unknown as { toDate: () => Date }).toDate().toISOString().split('T')[0]
+          : '';
     return csvRow([
       t.event,
       t.course,

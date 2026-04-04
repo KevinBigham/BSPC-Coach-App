@@ -14,6 +14,7 @@ import {
 import { db } from '../config/firebase';
 import type { Group } from '../config/constants';
 import type { NoteTag } from '../config/constants';
+import type { FirebaseTimestamp } from '../types/firestore.types';
 
 export interface GroupNote {
   id?: string;
@@ -23,7 +24,7 @@ export interface GroupNote {
   practiceDate: string;
   coachId: string;
   coachName: string;
-  createdAt: any;
+  createdAt: FirebaseTimestamp;
 }
 
 type GroupNoteWithId = GroupNote & { id: string };
@@ -31,7 +32,7 @@ type GroupNoteWithId = GroupNote & { id: string };
 export function subscribeGroupNotes(
   group: Group | null,
   callback: (notes: GroupNoteWithId[]) => void,
-  max: number = 30
+  max: number = 30,
 ): Unsubscribe {
   const constraints = group
     ? [where('group', '==', group), orderBy('createdAt', 'desc'), firestoreLimit(max)]
@@ -39,9 +40,7 @@ export function subscribeGroupNotes(
 
   const q = query(collection(db, 'group_notes'), ...constraints);
   return onSnapshot(q, (snapshot) => {
-    callback(
-      snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as GroupNoteWithId))
-    );
+    callback(snapshot.docs.map((d) => ({ id: d.id, ...d.data() }) as GroupNoteWithId));
   });
 }
 
@@ -51,7 +50,7 @@ export async function addGroupNote(
   group: Group,
   coachId: string,
   coachName: string,
-  practiceDate: string
+  practiceDate: string,
 ): Promise<string> {
   const docRef = await addDoc(collection(db, 'group_notes'), {
     content,

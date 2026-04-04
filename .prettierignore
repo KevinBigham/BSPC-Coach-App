@@ -1,0 +1,6 @@
+node_modules/
+dist/
+.expo/
+functions/lib/
+parent-portal/.next/
+web-build/

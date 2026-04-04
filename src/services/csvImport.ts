@@ -1,4 +1,12 @@
-import { collection, query, where, getDocs, writeBatch, doc, serverTimestamp } from 'firebase/firestore';
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+  writeBatch,
+  doc,
+  serverTimestamp,
+} from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { GROUPS, type Group } from '../config/constants';
 
@@ -30,7 +38,11 @@ export interface ImportResult {
  * Expected header: firstName,lastName,group,gender,dateOfBirth,usaSwimmingId,parentName,parentPhone,parentEmail
  */
 export function parseCSV(content: string): ParsedRow[] {
-  const lines = content.trim().split('\n').map((l) => l.trim()).filter(Boolean);
+  const lines = content
+    .trim()
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean);
   if (lines.length < 2) return [];
 
   const headers = lines[0].split(',').map((h) => h.trim().toLowerCase().replace(/['"]/g, ''));
@@ -97,9 +109,7 @@ export function validateRows(rows: ParsedRow[]): ValidationResult {
     }
 
     // Normalize group
-    const matchedGroup = GROUPS.find(
-      (g) => g.toLowerCase() === row.group.toLowerCase()
-    );
+    const matchedGroup = GROUPS.find((g) => g.toLowerCase() === row.group.toLowerCase());
     if (row.group && !matchedGroup) {
       errors.push(`Row ${line}: Invalid group "${row.group}" (valid: ${GROUPS.join(', ')})`);
       return;
@@ -123,16 +133,15 @@ export function validateRows(rows: ParsedRow[]): ValidationResult {
 }
 
 /** Imports validated swimmers into Firestore, skipping duplicates */
-export async function importSwimmers(
-  rows: ParsedRow[],
-  coachUid: string
-): Promise<ImportResult> {
+export async function importSwimmers(rows: ParsedRow[], coachUid: string): Promise<ImportResult> {
   // Fetch existing swimmers for duplicate detection
   const existing = await getDocs(query(collection(db, 'swimmers')));
   const existingKeys = new Set<string>();
   existing.forEach((d) => {
     const data = d.data();
-    existingKeys.add(`${data.firstName?.toLowerCase()}|${data.lastName?.toLowerCase()}|${data.group?.toLowerCase()}`);
+    existingKeys.add(
+      `${data.firstName?.toLowerCase()}|${data.lastName?.toLowerCase()}|${data.group?.toLowerCase()}`,
+    );
   });
 
   let created = 0;
@@ -166,7 +175,14 @@ export async function importSwimmers(
         techniqueFocusAreas: [],
         goals: [],
         parentContacts: row.parentName
-          ? [{ name: row.parentName, phone: row.parentPhone || '', email: row.parentEmail || '', relationship: 'Parent' }]
+          ? [
+              {
+                name: row.parentName,
+                phone: row.parentPhone || '',
+                email: row.parentEmail || '',
+                relationship: 'Parent',
+              },
+            ]
           : [],
         meetSchedule: [],
         createdAt: serverTimestamp(),
@@ -179,8 +195,8 @@ export async function importSwimmers(
 
     try {
       await batch.commit();
-    } catch (err: any) {
-      errors.push(`Batch error: ${err.message}`);
+    } catch (err: unknown) {
+      errors.push(`Batch error: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 

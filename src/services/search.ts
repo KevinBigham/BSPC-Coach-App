@@ -7,7 +7,12 @@ import {
   getDocs,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
-import type { Swimmer, SwimmerNote, CalendarEvent } from '../types/firestore.types';
+import type {
+  Swimmer,
+  SwimmerNote,
+  CalendarEvent,
+  FirebaseTimestamp,
+} from '../types/firestore.types';
 import type { Meet } from '../types/meet.types';
 
 type SwimmerWithId = Swimmer & { id: string };
@@ -19,13 +24,10 @@ export interface NoteSearchResult {
   tags: string[];
   coachName: string;
   practiceDate: string;
-  createdAt: any;
+  createdAt: FirebaseTimestamp;
 }
 
-export function searchSwimmers(
-  term: string,
-  swimmers: SwimmerWithId[]
-): SwimmerWithId[] {
+export function searchSwimmers(term: string, swimmers: SwimmerWithId[]): SwimmerWithId[] {
   if (!term.trim()) return [];
   const lower = term.toLowerCase();
 
@@ -45,11 +47,9 @@ export function searchSwimmers(
   // Sort: starts-with matches first, then contains
   results.sort((a, b) => {
     const aStarts =
-      a.firstName.toLowerCase().startsWith(lower) ||
-      a.lastName.toLowerCase().startsWith(lower);
+      a.firstName.toLowerCase().startsWith(lower) || a.lastName.toLowerCase().startsWith(lower);
     const bStarts =
-      b.firstName.toLowerCase().startsWith(lower) ||
-      b.lastName.toLowerCase().startsWith(lower);
+      b.firstName.toLowerCase().startsWith(lower) || b.lastName.toLowerCase().startsWith(lower);
     if (aStarts && !bStarts) return -1;
     if (!aStarts && bStarts) return 1;
     return a.displayName.localeCompare(b.displayName);
@@ -58,18 +58,11 @@ export function searchSwimmers(
   return results;
 }
 
-export async function searchNotes(
-  term: string,
-  max: number = 100
-): Promise<NoteSearchResult[]> {
+export async function searchNotes(term: string, max: number = 100): Promise<NoteSearchResult[]> {
   if (!term.trim()) return [];
   const lower = term.toLowerCase();
 
-  const q = query(
-    collectionGroup(db, 'notes'),
-    orderBy('createdAt', 'desc'),
-    firestoreLimit(max)
-  );
+  const q = query(collectionGroup(db, 'notes'), orderBy('createdAt', 'desc'), firestoreLimit(max));
 
   const snapshot = await getDocs(q);
   const results: NoteSearchResult[] = [];
@@ -110,18 +103,11 @@ export interface MeetSearchResult {
   status: string;
 }
 
-export async function searchMeets(
-  term: string,
-  max: number = 50,
-): Promise<MeetSearchResult[]> {
+export async function searchMeets(term: string, max: number = 50): Promise<MeetSearchResult[]> {
   if (!term.trim()) return [];
   const lower = term.toLowerCase();
 
-  const q = query(
-    collection(db, 'meets'),
-    orderBy('startDate', 'desc'),
-    firestoreLimit(max),
-  );
+  const q = query(collection(db, 'meets'), orderBy('startDate', 'desc'), firestoreLimit(max));
 
   const snapshot = await getDocs(q);
   return snapshot.docs
@@ -137,9 +123,7 @@ export async function searchMeets(
       };
     })
     .filter(
-      (m) =>
-        m.name.toLowerCase().includes(lower) ||
-        m.location.toLowerCase().includes(lower),
+      (m) => m.name.toLowerCase().includes(lower) || m.location.toLowerCase().includes(lower),
     );
 }
 

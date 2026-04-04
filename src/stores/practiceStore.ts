@@ -46,7 +46,10 @@ interface PracticeEditState {
   // Actions — plan lifecycle
   loadPlan: (plan: PracticePlan) => void;
   reset: () => void;
-  toPlan: (coachId: string, coachName: string) => Omit<PracticePlan, 'id' | 'createdAt' | 'updatedAt'>;
+  toPlan: (
+    coachId: string,
+    coachName: string,
+  ) => Omit<PracticePlan, 'id' | 'createdAt' | 'updatedAt'>;
 
   // Computed
   totalYardage: () => number;
@@ -84,91 +87,116 @@ export const usePracticeStore = create<PracticeEditState>((set, get) => ({
   setIsTemplate: (isTemplate) => set({ isTemplate }),
   setDate: (date) => set({ date }),
 
-  addSet: (category) => set((state) => {
-    const newSet: PracticePlanSet = {
-      order: state.sets.length,
-      name: category,
-      category,
-      description: '',
-      items: [{ ...DEFAULT_ITEM }],
-    };
-    const sets = [...state.sets, newSet];
-    return { sets, ...pushHistory({ ...state, sets }) };
-  }),
+  addSet: (category) =>
+    set((state) => {
+      const newSet: PracticePlanSet = {
+        order: state.sets.length,
+        name: category,
+        category,
+        description: '',
+        items: [{ ...DEFAULT_ITEM }],
+      };
+      const sets = [...state.sets, newSet];
+      return { sets, ...pushHistory({ ...state, sets }) };
+    }),
 
-  removeSet: (index) => set((state) => {
-    const sets = state.sets.filter((_, i) => i !== index).map((s, i) => ({ ...s, order: i }));
-    return { sets, ...pushHistory({ ...state, sets }) };
-  }),
+  removeSet: (index) =>
+    set((state) => {
+      const sets = state.sets.filter((_, i) => i !== index).map((s, i) => ({ ...s, order: i }));
+      return { sets, ...pushHistory({ ...state, sets }) };
+    }),
 
-  updateSetName: (index, name) => set((state) => {
-    const sets = [...state.sets];
-    sets[index] = { ...sets[index], name };
-    return { sets };
-  }),
+  updateSetName: (index, name) =>
+    set((state) => {
+      const sets = [...state.sets];
+      sets[index] = { ...sets[index], name };
+      return { sets };
+    }),
 
-  updateSetDescription: (index, description) => set((state) => {
-    const sets = [...state.sets];
-    sets[index] = { ...sets[index], description };
-    return { sets };
-  }),
+  updateSetDescription: (index, description) =>
+    set((state) => {
+      const sets = [...state.sets];
+      sets[index] = { ...sets[index], description };
+      return { sets };
+    }),
 
-  reorderSets: (fromIndex, toIndex) => set((state) => {
-    const sets = [...state.sets];
-    const [moved] = sets.splice(fromIndex, 1);
-    sets.splice(toIndex, 0, moved);
-    const reordered = sets.map((s, i) => ({ ...s, order: i }));
-    return { sets: reordered, ...pushHistory({ ...state, sets: reordered }) };
-  }),
+  reorderSets: (fromIndex, toIndex) =>
+    set((state) => {
+      const sets = [...state.sets];
+      const [moved] = sets.splice(fromIndex, 1);
+      sets.splice(toIndex, 0, moved);
+      const reordered = sets.map((s, i) => ({ ...s, order: i }));
+      return { sets: reordered, ...pushHistory({ ...state, sets: reordered }) };
+    }),
 
-  addItem: (setIndex) => set((state) => {
-    const sets = [...state.sets];
-    const items = [...sets[setIndex].items, { ...DEFAULT_ITEM, order: sets[setIndex].items.length }];
-    sets[setIndex] = { ...sets[setIndex], items };
-    return { sets, ...pushHistory({ ...state, sets }) };
-  }),
+  addItem: (setIndex) =>
+    set((state) => {
+      const sets = [...state.sets];
+      const items = [
+        ...sets[setIndex].items,
+        { ...DEFAULT_ITEM, order: sets[setIndex].items.length },
+      ];
+      sets[setIndex] = { ...sets[setIndex], items };
+      return { sets, ...pushHistory({ ...state, sets }) };
+    }),
 
-  removeItem: (setIndex, itemIndex) => set((state) => {
-    const sets = [...state.sets];
-    const items = sets[setIndex].items.filter((_, i) => i !== itemIndex).map((item, i) => ({ ...item, order: i }));
-    sets[setIndex] = { ...sets[setIndex], items };
-    return { sets, ...pushHistory({ ...state, sets }) };
-  }),
+  removeItem: (setIndex, itemIndex) =>
+    set((state) => {
+      const sets = [...state.sets];
+      const items = sets[setIndex].items
+        .filter((_, i) => i !== itemIndex)
+        .map((item, i) => ({ ...item, order: i }));
+      sets[setIndex] = { ...sets[setIndex], items };
+      return { sets, ...pushHistory({ ...state, sets }) };
+    }),
 
-  updateItem: (setIndex, itemIndex, data) => set((state) => {
-    const sets = [...state.sets];
-    const items = [...sets[setIndex].items];
-    items[itemIndex] = { ...items[itemIndex], ...data };
-    sets[setIndex] = { ...sets[setIndex], items };
-    return { sets };
-  }),
+  updateItem: (setIndex, itemIndex, data) =>
+    set((state) => {
+      const sets = [...state.sets];
+      const items = [...sets[setIndex].items];
+      items[itemIndex] = { ...items[itemIndex], ...data };
+      sets[setIndex] = { ...sets[setIndex], items };
+      return { sets };
+    }),
 
-  reorderItems: (setIndex, fromIndex, toIndex) => set((state) => {
-    const sets = [...state.sets];
-    const items = [...sets[setIndex].items];
-    const [moved] = items.splice(fromIndex, 1);
-    items.splice(toIndex, 0, moved);
-    sets[setIndex] = { ...sets[setIndex], items: items.map((item, i) => ({ ...item, order: i })) };
-    return { sets, ...pushHistory({ ...state, sets }) };
-  }),
+  reorderItems: (setIndex, fromIndex, toIndex) =>
+    set((state) => {
+      const sets = [...state.sets];
+      const items = [...sets[setIndex].items];
+      const [moved] = items.splice(fromIndex, 1);
+      items.splice(toIndex, 0, moved);
+      sets[setIndex] = {
+        ...sets[setIndex],
+        items: items.map((item, i) => ({ ...item, order: i })),
+      };
+      return { sets, ...pushHistory({ ...state, sets }) };
+    }),
 
-  undo: () => set((state) => {
-    if (state._historyIndex <= 0) return {};
-    const newIndex = state._historyIndex - 1;
-    return { sets: JSON.parse(JSON.stringify(state._history[newIndex])), _historyIndex: newIndex };
-  }),
+  undo: () =>
+    set((state) => {
+      if (state._historyIndex <= 0) return {};
+      const newIndex = state._historyIndex - 1;
+      return {
+        sets: JSON.parse(JSON.stringify(state._history[newIndex])),
+        _historyIndex: newIndex,
+      };
+    }),
 
-  redo: () => set((state) => {
-    if (state._historyIndex >= state._history.length - 1) return {};
-    const newIndex = state._historyIndex + 1;
-    return { sets: JSON.parse(JSON.stringify(state._history[newIndex])), _historyIndex: newIndex };
-  }),
+  redo: () =>
+    set((state) => {
+      if (state._historyIndex >= state._history.length - 1) return {};
+      const newIndex = state._historyIndex + 1;
+      return {
+        sets: JSON.parse(JSON.stringify(state._history[newIndex])),
+        _historyIndex: newIndex,
+      };
+    }),
 
   canUndo: () => get()._historyIndex > 0,
   canRedo: () => get()._historyIndex < get()._history.length - 1,
 
   loadPlan: (plan) => {
-    const sets = plan.sets.map((s) => ({ ...s, category: (s as any).category || 'Main Set' }));
+    const sets = plan.sets.map((s) => ({ ...s, category: s.category || 'Main Set' }));
     set({
       title: plan.title,
       description: plan.description || '',
@@ -181,16 +209,17 @@ export const usePracticeStore = create<PracticeEditState>((set, get) => ({
     });
   },
 
-  reset: () => set({
-    title: '',
-    description: '',
-    group: null,
-    isTemplate: false,
-    date: null,
-    sets: [],
-    _history: [[]],
-    _historyIndex: 0,
-  }),
+  reset: () =>
+    set({
+      title: '',
+      description: '',
+      group: null,
+      isTemplate: false,
+      date: null,
+      sets: [],
+      _history: [[]],
+      _historyIndex: 0,
+    }),
 
   toPlan: (coachId, coachName) => {
     const state = get();
@@ -209,8 +238,9 @@ export const usePracticeStore = create<PracticeEditState>((set, get) => ({
   },
 
   totalYardage: () => {
-    return get().sets.reduce((sum, s) =>
-      sum + s.items.reduce((itemSum, item) => itemSum + item.reps * item.distance, 0), 0
+    return get().sets.reduce(
+      (sum, s) => sum + s.items.reduce((itemSum, item) => itemSum + item.reps * item.distance, 0),
+      0,
     );
   },
 }));
