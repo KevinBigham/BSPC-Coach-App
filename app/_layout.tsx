@@ -4,11 +4,25 @@ import { StatusBar } from 'expo-status-bar';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
 import { useFonts as useTeko, Teko_500Medium, Teko_700Bold } from '@expo-google-fonts/teko';
-import { useFonts as useJetBrains, JetBrainsMono_400Regular, JetBrainsMono_700Bold } from '@expo-google-fonts/jetbrains-mono';
-import { useFonts as usePressStart, PressStart2P_400Regular } from '@expo-google-fonts/press-start-2p';
-import { useFonts as useInter, Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
+import {
+  useFonts as useJetBrains,
+  JetBrainsMono_400Regular,
+  JetBrainsMono_700Bold,
+} from '@expo-google-fonts/jetbrains-mono';
+import {
+  useFonts as usePressStart,
+  PressStart2P_400Regular,
+} from '@expo-google-fonts/press-start-2p';
+import {
+  useFonts as useInter,
+  Inter_400Regular,
+  Inter_500Medium,
+  Inter_600SemiBold,
+  Inter_700Bold,
+} from '@expo-google-fonts/inter';
 import { AuthProvider, useAuth } from '../src/contexts/AuthContext';
 import { ToastProvider, useToast } from '../src/contexts/ToastContext';
+import { ErrorBoundary } from '../src/components/ErrorBoundary';
 import { setGlobalToast } from '../src/utils/errorHandler';
 import { useSwimmersStore } from '../src/stores/swimmersStore';
 import { useAttendanceStore } from '../src/stores/attendanceStore';
@@ -20,7 +34,9 @@ SplashScreen.preventAutoHideAsync();
 
 function GlobalToastWire() {
   const { showToast } = useToast();
-  useEffect(() => { setGlobalToast(showToast); }, [showToast]);
+  useEffect(() => {
+    setGlobalToast(showToast);
+  }, [showToast]);
   return null;
 }
 
@@ -420,7 +436,12 @@ export default function RootLayout() {
   const [tekoLoaded] = useTeko({ Teko_500Medium, Teko_700Bold });
   const [jbLoaded] = useJetBrains({ JetBrainsMono_400Regular, JetBrainsMono_700Bold });
   const [psLoaded] = usePressStart({ PressStart2P_400Regular });
-  const [interLoaded] = useInter({ Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold });
+  const [interLoaded] = useInter({
+    Inter_400Regular,
+    Inter_500Medium,
+    Inter_600SemiBold,
+    Inter_700Bold,
+  });
   const fontsLoaded = tekoLoaded && jbLoaded && psLoaded && interLoaded;
 
   useEffect(() => {
@@ -430,12 +451,14 @@ export default function RootLayout() {
   if (!fontsLoaded) return null;
 
   return (
-    <AuthProvider>
-      <ToastProvider>
-        <GlobalToastWire />
-        <RootNavigator />
-      </ToastProvider>
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <ToastProvider>
+          <GlobalToastWire />
+          <RootNavigator />
+        </ToastProvider>
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }
 

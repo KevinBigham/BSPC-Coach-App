@@ -1,5 +1,11 @@
 // Mock expo-router
 jest.mock('expo-router', () => ({
+  router: {
+    push: jest.fn(),
+    replace: jest.fn(),
+    back: jest.fn(),
+    canGoBack: () => false,
+  },
   useRouter: () => ({
     push: jest.fn(),
     replace: jest.fn(),
@@ -51,6 +57,7 @@ jest.mock('react-native-reanimated', () => {
 
 // Mock lucide-react-native (returns simple View for all icons)
 jest.mock('lucide-react-native', () => {
+  const React = require('react');
   const { View } = require('react-native');
   return new Proxy(
     {},
@@ -58,7 +65,7 @@ jest.mock('lucide-react-native', () => {
       get: (_target: unknown, prop: string) => {
         if (prop === '__esModule') return true;
         return (props: Record<string, unknown>) =>
-          View({ ...props, testID: `icon-${String(prop)}` });
+          React.createElement(View, { ...props, testID: `icon-${String(prop)}` });
       },
     },
   );

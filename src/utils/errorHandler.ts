@@ -39,3 +39,33 @@ export async function withErrorHandling<T>(
     return null;
   }
 }
+
+const DEFAULT_RETRY_DELAYS = [1000, 2000, 4000];
+
+/**
+ * Retry an async function with exponential backoff.
+ * Retries on failure up to `delays.length` times before throwing.
+ */
+export async function withRetry<T>(
+  fn: () => Promise<T>,
+  options: { context?: string; delays?: number[] } = {},
+): Promise<T> {
+  const delays = options.delays ?? DEFAULT_RETRY_DELAYS;
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt <= delays.length; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error;
+      if (attempt < delays.length) {
+        await new Promise((resolve) => setTimeout(resolve, delays[attempt]));
+      }
+    }
+  }
+
+  if (options.context) {
+    handleError(lastError, options.context);
+  }
+  throw lastError;
+}
