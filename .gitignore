@@ -33,9 +33,14 @@ yarn-error.*
 # local env files
 .env
 .env*.local
+functions/.env
+parent-portal/.env
 
 # typescript
 *.tsbuildinfo
+
+# service accounts & signing
+google-service-account.json
 
 # generated native folders
 /ios
