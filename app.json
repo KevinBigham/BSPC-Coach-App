@@ -2,7 +2,11 @@
   "expo": {
     "name": "BSPC Coach",
     "slug": "bspc-coach",
-    "version": "1.0.0",
+    "version": "1.1.0",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "owner": "bspowercats",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
@@ -32,6 +36,9 @@
     "plugins": [
       "expo-router",
       "expo-font"
-    ]
+    ],
+    "updates": {
+      "url": "https://u.expo.dev/FILL_AFTER_EAS_INIT"
+    }
   }
 }

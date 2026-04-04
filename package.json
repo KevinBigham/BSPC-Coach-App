@@ -1,6 +1,6 @@
 {
   "name": "bspc-coach",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "main": "index.ts",
   "scripts": {
     "start": "expo start",
@@ -11,7 +11,10 @@
     "lint": "eslint . --ext .ts,.tsx",
     "lint:fix": "eslint . --ext .ts,.tsx --fix",
     "format": "prettier --write 'src/**/*.{ts,tsx}' 'app/**/*.{ts,tsx}'",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "build:dev": "eas build --profile development --platform all",
+    "build:preview": "eas build --profile preview --platform all",
+    "build:prod": "eas build --profile production --platform all"
   },
   "lint-staged": {
     "*.{ts,tsx}": ["eslint --fix", "prettier --write"]
