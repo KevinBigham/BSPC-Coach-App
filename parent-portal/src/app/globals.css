@@ -1,0 +1,84 @@
+@import "tailwindcss";
+
+:root {
+  --bg-deep: #08080f;
+  --bg-base: #0a0a12;
+  --bg-elevated: #0f1018;
+  --bg-surface: #12121f;
+  --purple: #4A0E78;
+  --purple-dark: #350A58;
+  --purple-light: #7B3FA0;
+  --gold: #FFD700;
+  --gold-dark: #CCB000;
+  --accent: #B388FF;
+  --text: #e8e8f0;
+  --text-secondary: #7a7a8e;
+  --border: #1c1c2a;
+  --border-light: #14141f;
+  --error: #f43f5e;
+}
+
+body {
+  background-color: var(--bg-base);
+  color: var(--text);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+/* Arcade Prime Time dark theme */
+.card {
+  background-color: var(--bg-deep);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.5rem;
+}
+
+.pixel-label {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 8px;
+  letter-spacing: 1px;
+  color: var(--gold);
+}
+
+.stat-number {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.heading {
+  font-family: 'Teko', sans-serif;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: var(--text);
+}
+
+/* Button styles */
+.btn-primary {
+  background-color: var(--purple);
+  color: var(--text);
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.btn-primary:hover {
+  opacity: 0.85;
+}
+
+.btn-secondary {
+  background-color: transparent;
+  color: var(--accent);
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  font-weight: 600;
+  border: 2px solid var(--purple);
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.btn-secondary:hover {
+  background-color: rgba(74, 14, 120, 0.3);
+}

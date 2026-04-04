@@ -1,4 +1,4 @@
-import type { Group, Course, NoteTag } from '../config/constants';
+import type { Group, Course, NoteTag, SetCategory } from '../config/constants';
 
 // Firebase Timestamp placeholder — will be replaced with actual Firebase Timestamp type
 // once @react-native-firebase is installed
@@ -87,6 +87,8 @@ export interface SwimmerNote {
   createdAt: FirebaseTimestamp;
 }
 
+export type AttendanceStatus = 'normal' | 'excused' | 'sick' | 'injured' | 'left_early';
+
 export interface AttendanceRecord {
   id?: string;
   swimmerId: string;
@@ -95,6 +97,8 @@ export interface AttendanceRecord {
   practiceDate: string; // "YYYY-MM-DD"
   arrivedAt: FirebaseTimestamp;
   departedAt?: FirebaseTimestamp;
+  status?: AttendanceStatus;
+  note?: string;
   markedBy: string;
   coachName: string;
   createdAt: FirebaseTimestamp;
@@ -200,6 +204,24 @@ export interface VideoSession {
   updatedAt: FirebaseTimestamp;
 }
 
+export type VideoAnalysisPhase = 'stroke' | 'turn' | 'start' | 'underwater' | 'breakout' | 'finish' | 'general';
+
+export interface VideoAnalysisDraft {
+  id?: string;
+  swimmerId: string;
+  swimmerName: string;
+  observation: string;
+  diagnosis: string;
+  drillRecommendation: string;
+  phase: VideoAnalysisPhase;
+  tags: NoteTag[];
+  confidence: number;
+  approved?: boolean;
+  reviewedBy?: string;
+  reviewedAt?: FirebaseTimestamp;
+  createdAt: FirebaseTimestamp;
+}
+
 export interface PracticePlanItem {
   order: number;
   reps: number;
@@ -213,6 +235,7 @@ export interface PracticePlanItem {
 export interface PracticePlanSet {
   order: number;
   name: string;
+  category: SetCategory;
   description?: string;
   items: PracticePlanItem[];
 }
@@ -233,6 +256,17 @@ export interface PracticePlan {
   updatedAt: FirebaseTimestamp;
 }
 
+export interface GroupNote {
+  id?: string;
+  content: string;
+  tags: NoteTag[];
+  group: Group;
+  practiceDate: string;
+  coachId: string;
+  coachName: string;
+  createdAt: FirebaseTimestamp;
+}
+
 export interface Message {
   id?: string;
   content: string;
@@ -240,6 +274,95 @@ export interface Message {
   senderName: string;
   recipientIds: string[];
   readBy: Record<string, FirebaseTimestamp>;
+  createdAt: FirebaseTimestamp;
+}
+
+export interface Notification {
+  id?: string;
+  coachId: string;
+  title: string;
+  body: string;
+  type: 'daily_digest' | 'ai_drafts_ready' | 'standard_achieved' | 'general';
+  data?: Record<string, string>;
+  read: boolean;
+  createdAt: FirebaseTimestamp;
+}
+
+export type StandardLevel = 'B' | 'BB' | 'A' | 'AA' | 'AAA' | 'AAAA';
+
+export interface SwimmerGoal {
+  id?: string;
+  event: string;
+  course: Course;
+  targetStandard?: StandardLevel;
+  targetTime?: number; // hundredths
+  targetTimeDisplay?: string;
+  currentTime?: number;
+  currentTimeDisplay?: string;
+  notes?: string;
+  achieved: boolean;
+  achievedAt?: FirebaseTimestamp;
+  createdAt: FirebaseTimestamp;
+  updatedAt: FirebaseTimestamp;
+}
+
+export type CalendarEventType = 'practice' | 'meet' | 'team_event' | 'fundraiser' | 'social';
+
+export interface CalendarEvent {
+  id?: string;
+  title: string;
+  description?: string;
+  type: CalendarEventType;
+  startDate: string; // "YYYY-MM-DD"
+  startTime?: string; // "HH:MM"
+  endDate?: string;
+  endTime?: string;
+  location?: string;
+  groups: Group[]; // empty = all groups
+  recurring?: {
+    frequency: 'weekly' | 'biweekly' | 'monthly';
+    dayOfWeek?: number; // 0=Sun, 1=Mon, etc.
+    until?: string; // "YYYY-MM-DD"
+  };
+  coachId: string;
+  coachName: string;
+  createdAt: FirebaseTimestamp;
+  updatedAt: FirebaseTimestamp;
+}
+
+export type RSVPStatus = 'going' | 'maybe' | 'not_going';
+
+export interface RSVP {
+  id?: string;
+  eventId: string;
+  swimmerId: string;
+  swimmerName: string;
+  status: RSVPStatus;
+  parentName?: string;
+  note?: string;
+  updatedAt: FirebaseTimestamp;
+}
+
+export interface Parent {
+  uid: string;
+  email: string;
+  displayName?: string;
+  linkedSwimmerIds: string[];
+  createdAt: FirebaseTimestamp;
+  updatedAt: FirebaseTimestamp;
+}
+
+export interface ParentInvite {
+  id?: string;
+  code: string;
+  swimmerId: string;
+  swimmerName: string;
+  coachId: string;
+  coachName: string;
+  redeemed: boolean;
+  redeemedBy?: string;
+  redeemedAt?: FirebaseTimestamp;
+  expiresAt: FirebaseTimestamp;
   createdAt: FirebaseTimestamp;
 }
 

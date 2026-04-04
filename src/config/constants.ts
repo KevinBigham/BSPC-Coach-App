@@ -56,6 +56,58 @@ export const NOTE_TAGS = [
 
 export type NoteTag = (typeof NOTE_TAGS)[number];
 
+export const SET_CATEGORIES = ['Warmup', 'Pre-Set', 'Main Set', 'Cooldown'] as const;
+export type SetCategory = (typeof SET_CATEGORIES)[number];
+
+export const BUILDER_STROKES = [
+  'Freestyle', 'Backstroke', 'Breaststroke', 'Butterfly', 'IM',
+  'Choice', 'Kick', 'Pull', 'Drill', 'Scull',
+] as const;
+export type BuilderStroke = (typeof BUILDER_STROKES)[number];
+
+export const COMMON_DISTANCES = [25, 50, 75, 100, 150, 200, 250, 300, 400, 500] as const;
+
+export const COMMON_INTERVALS = ['0:30', '0:35', '0:40', '0:45', '0:50', '1:00', '1:05', '1:10', '1:15', '1:20', '1:30', '1:40', '1:45', '2:00', '2:30', '3:00'] as const;
+
+export const STANDARD_LEVELS = ['B', 'BB', 'A', 'AA', 'AAA', 'AAAA'] as const;
+export type StandardLevel = (typeof STANDARD_LEVELS)[number];
+
+export const AGE_GROUPS = ['10&U', '11-12', '13-14', '15-16', '17-18'] as const;
+export type AgeGroup = (typeof AGE_GROUPS)[number];
+
+export const CALENDAR_EVENT_TYPES = ['practice', 'meet', 'team_event', 'fundraiser', 'social'] as const;
+export type CalendarEventType = (typeof CALENDAR_EVENT_TYPES)[number];
+
+export const DAYS_OF_WEEK = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
+
+export const MEET_STATUSES = ['upcoming', 'in_progress', 'completed', 'cancelled'] as const;
+export type MeetStatus = (typeof MEET_STATUSES)[number];
+
+export const RELAY_EVENTS = [
+  '200 Free Relay',
+  '400 Free Relay',
+  '800 Free Relay',
+  '200 Medley Relay',
+  '400 Medley Relay',
+] as const;
+export type RelayEvent = (typeof RELAY_EVENTS)[number];
+
+export const MEDLEY_RELAY_ORDER = ['Backstroke', 'Breaststroke', 'Butterfly', 'Freestyle'] as const;
+
+export const STANDARD_MEET_EVENTS = [
+  { name: '200 Medley Relay', isRelay: true },
+  { name: '200 Free', isRelay: false },
+  { name: '200 IM', isRelay: false },
+  { name: '50 Free', isRelay: false },
+  { name: '100 Fly', isRelay: false },
+  { name: '100 Free', isRelay: false },
+  { name: '500 Free', isRelay: false },
+  { name: '200 Free Relay', isRelay: true },
+  { name: '100 Back', isRelay: false },
+  { name: '100 Breast', isRelay: false },
+  { name: '400 Free Relay', isRelay: true },
+] as const;
+
 export const AUDIO_KEYWORD_BOOST = [
   'freestyle', 'backstroke', 'butterfly', 'breaststroke',
   'IM', 'medley', 'flip turn', 'open turn', 'streamline',

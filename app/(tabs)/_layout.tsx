@@ -1,5 +1,6 @@
 import { Tabs } from 'expo-router';
 import { Platform } from 'react-native';
+import { Home, ClipboardCheck, Dumbbell, Trophy, MoreHorizontal } from 'lucide-react-native';
 import { colors, fontFamily, fontSize } from '../../src/config/theme';
 
 export default function TabLayout() {
@@ -27,40 +28,54 @@ export default function TabLayout() {
         name="index"
         options={{
           title: 'DASHBOARD',
-          tabBarIcon: () => null,
           tabBarLabel: 'Home',
+          tabBarIcon: ({ color, size }) => <Home size={size} color={color} strokeWidth={2} />,
         }}
       />
       <Tabs.Screen
         name="attendance"
         options={{
           title: 'ATTENDANCE',
-          tabBarIcon: () => null,
           tabBarLabel: 'Attendance',
-        }}
-      />
-      <Tabs.Screen
-        name="roster"
-        options={{
-          title: 'ROSTER',
-          tabBarIcon: () => null,
-          tabBarLabel: 'Roster',
+          tabBarIcon: ({ color, size }) => <ClipboardCheck size={size} color={color} strokeWidth={2} />,
         }}
       />
       <Tabs.Screen
         name="practice"
         options={{
           title: 'PRACTICE',
-          tabBarIcon: () => null,
           tabBarLabel: 'Practice',
+          tabBarIcon: ({ color, size }) => <Dumbbell size={size} color={color} strokeWidth={2} />,
+        }}
+      />
+      <Tabs.Screen
+        name="meets"
+        options={{
+          title: 'MEETS',
+          tabBarLabel: 'Meets',
+          tabBarIcon: ({ color, size }) => <Trophy size={size} color={color} strokeWidth={2} />,
+        }}
+      />
+      <Tabs.Screen
+        name="more"
+        options={{
+          title: 'MORE',
+          tabBarLabel: 'More',
+          tabBarIcon: ({ color, size }) => <MoreHorizontal size={size} color={color} strokeWidth={2} />,
+        }}
+      />
+      <Tabs.Screen
+        name="roster"
+        options={{
+          title: 'ROSTER',
+          href: null,
         }}
       />
       <Tabs.Screen
         name="settings"
         options={{
           title: 'SETTINGS',
-          tabBarIcon: () => null,
-          tabBarLabel: 'Settings',
+          href: null,
         }}
       />
     </Tabs>

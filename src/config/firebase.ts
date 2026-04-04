@@ -6,6 +6,7 @@ import { initializeApp } from 'firebase/app';
 import { getFirestore, enableIndexedDbPersistence } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { getStorage } from 'firebase/storage';
+import { getFunctions } from 'firebase/functions';
 
 // TODO: Replace with actual Firebase config from Firebase Console
 // These values come from Firebase Console > Project Settings > General > Your apps
@@ -23,6 +24,7 @@ const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
 export const auth = getAuth(app);
 export const storage = getStorage(app);
+export const functions = getFunctions(app);
 
 // Enable offline persistence for web (native SDKs have it enabled by default)
 // This is the JS SDK approach for the Phase 0 spike

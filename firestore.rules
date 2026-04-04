@@ -61,9 +61,13 @@ service cloud.firestore {
       }
     }
 
-    // Video sessions
+    // Video sessions — all coaches can read and write
     match /video_sessions/{sessionId} {
       allow read, write: if isCoach();
+
+      match /drafts/{draftId} {
+        allow read, write: if isCoach();
+      }
     }
 
     // Practice plans
@@ -84,21 +88,42 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // Group notes — practice-level observations not tied to a specific swimmer
+    match /group_notes/{noteId} {
+      allow read, write: if isCoach();
+    }
+
     // Dashboard aggregations — read by coaches, written by Cloud Functions
     match /aggregations/{docId} {
       allow read: if isCoach();
       allow write: if false; // Only Cloud Functions write these
     }
 
-    // Spike test data — open during development (remove before production)
-    match /spike_swimmers/{doc} {
-      allow read, write: if isAuth();
+    // Calendar events — all coaches can read and write
+    match /calendar_events/{eventId} {
+      allow read, write: if isCoach();
     }
-    match /spike_notes/{doc} {
-      allow read, write: if isAuth();
+
+    // Meets — all coaches can read and write
+    match /meets/{meetId} {
+      allow read, write: if isCoach();
     }
-    match /spike_audio_sessions/{doc} {
-      allow read, write: if isAuth();
+
+    // Parent invites — coaches create, parents read
+    match /parent_invites/{inviteId} {
+      allow read: if isAuth();
+      allow write: if isCoach();
+    }
+
+    // Parents — created by Cloud Functions, read by auth users
+    match /parents/{parentId} {
+      allow read: if isAuth() && request.auth.uid == parentId;
+      allow write: if false; // Only Cloud Functions write these
+    }
+
+    // Swimmer goals subcollection
+    match /swimmers/{swimmerId}/goals/{goalId} {
+      allow read, write: if isCoach();
     }
   }
 }

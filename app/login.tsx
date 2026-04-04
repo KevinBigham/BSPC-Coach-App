@@ -9,6 +9,7 @@ import {
   Platform,
   ActivityIndicator,
 } from 'react-native';
+import { router } from 'expo-router';
 import { colors, spacing, fontSize, borderRadius, fontFamily } from '../src/config/theme';
 import { useAuth } from '../src/contexts/AuthContext';
 
@@ -94,6 +95,10 @@ export default function LoginScreen() {
             )}
           </TouchableOpacity>
         </View>
+
+        <TouchableOpacity onPress={() => router.push('/forgot-password')}>
+          <Text style={styles.forgotLink}>Forgot Password?</Text>
+        </TouchableOpacity>
 
         <Text style={styles.footerText}>
           Contact your admin for account access
@@ -202,11 +207,18 @@ const styles = StyleSheet.create({
     fontSize: 20,
     letterSpacing: 2,
   },
+  forgotLink: {
+    fontFamily: fontFamily.bodySemi,
+    color: colors.accent,
+    fontSize: fontSize.sm,
+    textAlign: 'center',
+    marginTop: spacing.lg,
+  },
   footerText: {
     fontFamily: fontFamily.body,
     color: colors.textSecondary,
     fontSize: fontSize.sm,
     textAlign: 'center',
-    marginTop: spacing.xl,
+    marginTop: spacing.md,
   },
 });
