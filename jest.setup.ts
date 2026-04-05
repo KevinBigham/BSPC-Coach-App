@@ -115,6 +115,16 @@ jest.mock('expo-sharing', () => ({
   isAvailableAsync: jest.fn().mockResolvedValue(true),
 }));
 
+// Mock @sentry/react-native
+jest.mock('@sentry/react-native', () => ({
+  init: jest.fn(),
+  addBreadcrumb: jest.fn(),
+  captureException: jest.fn(),
+  captureMessage: jest.fn(),
+  setUser: jest.fn(),
+  withScope: jest.fn(),
+}));
+
 // Silence React Native warnings in tests
 const originalWarn = console.warn;
 console.warn = (...args: unknown[]) => {

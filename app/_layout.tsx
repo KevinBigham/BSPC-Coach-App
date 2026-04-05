@@ -1,5 +1,8 @@
 import { useEffect } from 'react';
+import { initSentry } from '../src/config/sentry';
 import { Stack, useRouter, useSegments } from 'expo-router';
+
+initSentry();
 import { StatusBar } from 'expo-status-bar';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';

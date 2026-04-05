@@ -102,11 +102,28 @@ service cloud.firestore {
     // Calendar events — all coaches can read and write
     match /calendar_events/{eventId} {
       allow read, write: if isCoach();
+
+      match /rsvps/{rsvpId} {
+        allow read, write: if isAuth();
+      }
     }
 
     // Meets — all coaches can read and write
     match /meets/{meetId} {
       allow read, write: if isCoach();
+
+      match /entries/{entryId} {
+        allow read, write: if isCoach();
+      }
+      match /relays/{relayId} {
+        allow read, write: if isCoach();
+      }
+      match /live_events/{eventId} {
+        allow read, write: if isCoach();
+      }
+      match /splits/{splitId} {
+        allow read, write: if isCoach();
+      }
     }
 
     // Parent invites — coaches create, parents read
@@ -123,6 +140,36 @@ service cloud.firestore {
 
     // Swimmer goals subcollection
     match /swimmers/{swimmerId}/goals/{goalId} {
+      allow read, write: if isCoach();
+    }
+
+    // Season plans
+    match /season_plans/{planId} {
+      allow read, write: if isCoach();
+
+      match /weeks/{weekId} {
+        allow read, write: if isCoach();
+      }
+    }
+
+    // Notifications — written by Cloud Functions, read by owning coach
+    match /notifications/{notifId} {
+      allow read: if isCoach() && resource.data.coachId == request.auth.uid;
+      allow write: if false;
+    }
+
+    // Notification rules — coaches manage their own rules
+    match /notification_rules/{ruleId} {
+      allow read, write: if isCoach();
+    }
+
+    // Coach chat
+    match /coach_chat/{messageId} {
+      allow read, write: if isCoach();
+    }
+
+    // Workout library
+    match /workout_library/{workoutId} {
       allow read, write: if isCoach();
     }
   }

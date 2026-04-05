@@ -51,8 +51,20 @@ function emit(entry: LogEntry): void {
     }
   }
 
-  // In production, Sentry breadcrumbs would be added here:
-  // Sentry.addBreadcrumb({ category: 'log', message: entry.message, level: entry.level, data: entry.data });
+  // In production, send breadcrumbs to Sentry
+  if (!__DEV__) {
+    try {
+      const Sentry = require('@sentry/react-native');
+      Sentry.addBreadcrumb({
+        category: 'log',
+        message: entry.message,
+        level: entry.level,
+        data: entry.data,
+      });
+    } catch {
+      // Sentry not available
+    }
+  }
 }
 
 export const logger = {
