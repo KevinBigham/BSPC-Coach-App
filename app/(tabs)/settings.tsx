@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Alert, ScrollView, Switch } from 'react-native';
 import { router } from 'expo-router';
+import Constants from 'expo-constants';
 import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../src/config/firebase';
 import { useAuth } from '../../src/contexts/AuthContext';
@@ -15,7 +16,9 @@ export default function SettingsScreen() {
   const [pushStatus, setPushStatus] = useState<string>('unknown');
 
   useEffect(() => {
-    getNotificationPermissionStatus().then(setPushStatus).catch(() => setPushStatus('error'));
+    getNotificationPermissionStatus()
+      .then(setPushStatus)
+      .catch(() => setPushStatus('error'));
   }, []);
 
   const handleSignOut = () => {
@@ -47,9 +50,7 @@ export default function SettingsScreen() {
       {/* Profile Card */}
       <View style={styles.card}>
         <View style={styles.avatar}>
-          <Text style={styles.avatarText}>
-            {coach?.displayName?.[0]?.toUpperCase() || 'C'}
-          </Text>
+          <Text style={styles.avatarText}>{coach?.displayName?.[0]?.toUpperCase() || 'C'}</Text>
         </View>
         <Text style={styles.name}>{coach?.displayName?.toUpperCase()}</Text>
         <Text style={styles.email}>{coach?.email}</Text>
@@ -63,7 +64,12 @@ export default function SettingsScreen() {
         <Text style={styles.sectionTitle}>NOTIFICATIONS</Text>
         <View style={styles.pushStatusRow}>
           <Text style={styles.pushStatusLabel}>Push Notifications</Text>
-          <Text style={[styles.pushStatusValue, { color: pushStatus === 'granted' ? colors.success : colors.warning }]}>
+          <Text
+            style={[
+              styles.pushStatusValue,
+              { color: pushStatus === 'granted' ? colors.success : colors.warning },
+            ]}
+          >
             {pushStatus === 'granted' ? 'ENABLED' : pushStatus === 'denied' ? 'DENIED' : 'NOT SET'}
           </Text>
         </View>
@@ -96,10 +102,7 @@ export default function SettingsScreen() {
       {isAdmin && (
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>ADMIN</Text>
-          <TouchableOpacity
-            style={styles.adminBtn}
-            onPress={() => router.push('/admin')}
-          >
+          <TouchableOpacity style={styles.adminBtn} onPress={() => router.push('/admin')}>
             <Text style={styles.adminBtnText}>MANAGE COACHES</Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -122,7 +125,7 @@ export default function SettingsScreen() {
         <Text style={styles.signOutText}>SIGN OUT</Text>
       </TouchableOpacity>
 
-      <Text style={styles.version}>V1.0.0</Text>
+      <Text style={styles.version}>V{Constants.expoConfig?.version ?? '1.0.0'}</Text>
     </ScrollView>
   );
 }
@@ -156,22 +159,103 @@ function NotificationToggle({
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bgBase },
   content: { padding: spacing.lg, gap: spacing.lg },
-  card: { backgroundColor: colors.bgDeep, borderRadius: borderRadius.lg, padding: spacing.xl, alignItems: 'center', borderWidth: 1, borderColor: colors.border },
-  avatar: { width: 64, height: 64, borderRadius: 32, backgroundColor: colors.purple, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.md },
+  card: {
+    backgroundColor: colors.bgDeep,
+    borderRadius: borderRadius.lg,
+    padding: spacing.xl,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  avatar: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: colors.purple,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.md,
+  },
   avatarText: { fontFamily: fontFamily.heading, color: colors.gold, fontSize: fontSize.xxl },
   name: { fontFamily: fontFamily.heading, fontSize: 26, color: colors.text, letterSpacing: 2 },
-  email: { fontFamily: fontFamily.body, fontSize: fontSize.sm, color: colors.textSecondary, marginTop: spacing.xs },
-  roleBadge: { marginTop: spacing.md, backgroundColor: 'rgba(255, 215, 0, 0.1)', paddingHorizontal: spacing.lg, paddingVertical: spacing.xs, borderRadius: borderRadius.xs, borderWidth: 1, borderColor: colors.gold },
+  email: {
+    fontFamily: fontFamily.body,
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    marginTop: spacing.xs,
+  },
+  roleBadge: {
+    marginTop: spacing.md,
+    backgroundColor: 'rgba(255, 215, 0, 0.1)',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.xs,
+    borderWidth: 1,
+    borderColor: colors.gold,
+  },
   roleText: { fontFamily: fontFamily.pixel, fontSize: fontSize.pixel, color: colors.gold },
-  sectionTitle: { fontFamily: fontFamily.heading, fontSize: fontSize.xl, color: colors.text, letterSpacing: 1, marginBottom: spacing.md, alignSelf: 'flex-start' },
-  pushStatusRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%', paddingVertical: spacing.sm, marginBottom: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.border },
-  pushStatusLabel: { fontFamily: fontFamily.body, fontSize: fontSize.sm, color: colors.textSecondary },
+  sectionTitle: {
+    fontFamily: fontFamily.heading,
+    fontSize: fontSize.xl,
+    color: colors.text,
+    letterSpacing: 1,
+    marginBottom: spacing.md,
+    alignSelf: 'flex-start',
+  },
+  pushStatusRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
+    paddingVertical: spacing.sm,
+    marginBottom: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  pushStatusLabel: {
+    fontFamily: fontFamily.body,
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+  },
   pushStatusValue: { fontFamily: fontFamily.pixel, fontSize: fontSize.pixel, letterSpacing: 1 },
-  settingRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%', paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.borderLight },
+  settingRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderLight,
+  },
   settingLabel: { fontFamily: fontFamily.body, fontSize: fontSize.md, color: colors.text },
-  adminBtn: { backgroundColor: colors.bgBase, borderRadius: borderRadius.sm, padding: spacing.lg, alignItems: 'center', borderWidth: 1, borderColor: colors.purple, width: '100%' },
-  adminBtnText: { fontFamily: fontFamily.bodySemi, color: colors.accent, fontSize: fontSize.md, letterSpacing: 1 },
-  signOutButton: { backgroundColor: colors.bgDeep, borderRadius: borderRadius.lg, padding: spacing.lg, alignItems: 'center', borderWidth: 1, borderColor: colors.error },
+  adminBtn: {
+    backgroundColor: colors.bgBase,
+    borderRadius: borderRadius.sm,
+    padding: spacing.lg,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.purple,
+    width: '100%',
+  },
+  adminBtnText: {
+    fontFamily: fontFamily.bodySemi,
+    color: colors.accent,
+    fontSize: fontSize.md,
+    letterSpacing: 1,
+  },
+  signOutButton: {
+    backgroundColor: colors.bgDeep,
+    borderRadius: borderRadius.lg,
+    padding: spacing.lg,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.error,
+  },
   signOutText: { fontFamily: fontFamily.bodySemi, color: colors.error, fontSize: fontSize.md },
-  version: { fontFamily: fontFamily.pixel, fontSize: fontSize.pixel, textAlign: 'center', color: colors.textSecondary },
+  version: {
+    fontFamily: fontFamily.pixel,
+    fontSize: fontSize.pixel,
+    textAlign: 'center',
+    color: colors.textSecondary,
+  },
 });

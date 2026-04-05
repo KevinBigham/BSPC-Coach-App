@@ -1,22 +1,49 @@
-import { useState, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { TrendingDown } from 'lucide-react-native';
 import { colors, spacing, fontSize, borderRadius, fontFamily } from '../../src/config/theme';
 import { EVENTS } from '../../src/config/constants';
 import { useSwimmersStore } from '../../src/stores/swimmersStore';
+import { subscribeTimes } from '../../src/services/times';
+import { formatShortDate } from '../../src/utils/date';
 import ProgressionChart, { type ProgressionDataPoint } from '../../src/components/ProgressionChart';
+import type { SwimTime } from '../../src/types/firestore.types';
+
+type TimeWithId = SwimTime & { id: string };
 
 export default function ProgressionScreen() {
   const swimmers = useSwimmersStore((s) => s.swimmers);
   const [selectedSwimmerId, setSelectedSwimmerId] = useState<string | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<string>(EVENTS[1]); // default 50 Free
+  const [allTimes, setAllTimes] = useState<TimeWithId[]>([]);
 
   const selectedSwimmer = swimmers.find((s) => s.id === selectedSwimmerId);
 
-  // Placeholder: in production, query swim times for selected swimmer + event sorted by date
+  useEffect(() => {
+    if (!selectedSwimmerId) {
+      setAllTimes([]);
+      return;
+    }
+    return subscribeTimes(selectedSwimmerId, setAllTimes);
+  }, [selectedSwimmerId]);
+
   const progressionData: ProgressionDataPoint[] = useMemo(() => {
-    return [];
-  }, [selectedSwimmerId, selectedEvent]);
+    const toDate = (ts: unknown): Date => {
+      if (ts && typeof ts === 'object' && 'toDate' in ts)
+        return (ts as { toDate: () => Date }).toDate();
+      if (ts instanceof Date) return ts;
+      return new Date(0);
+    };
+
+    return allTimes
+      .filter((t) => t.event === selectedEvent)
+      .sort((a, b) => toDate(a.createdAt).getTime() - toDate(b.createdAt).getTime())
+      .map((t) => ({
+        date: formatShortDate(toDate(t.createdAt)),
+        time: t.time,
+        eventName: t.event,
+      }));
+  }, [allTimes, selectedEvent]);
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>

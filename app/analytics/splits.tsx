@@ -1,10 +1,15 @@
-import { useState, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { Layers } from 'lucide-react-native';
 import { colors, spacing, fontSize, borderRadius, fontFamily } from '../../src/config/theme';
 import { EVENTS } from '../../src/config/constants';
 import { useSwimmersStore } from '../../src/stores/swimmersStore';
+import { subscribeTimes } from '../../src/services/times';
+import { formatShortDate } from '../../src/utils/date';
 import SplitComparisonChart, { type RaceData } from '../../src/components/SplitComparisonChart';
+import type { SwimTime } from '../../src/types/firestore.types';
+
+type TimeWithId = SwimTime & { id: string };
 
 const MAX_COMPARE = 3;
 
@@ -12,15 +17,36 @@ export default function SplitComparisonScreen() {
   const swimmers = useSwimmersStore((s) => s.swimmers);
   const [selectedSwimmerId, setSelectedSwimmerId] = useState<string | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<string>(EVENTS[1]); // default 50 Free
+  const [allTimes, setAllTimes] = useState<TimeWithId[]>([]);
 
-  // Placeholder: in production, query swim times with splits from Firestore
-  // For now, show the UI structure with placeholder messaging
   const selectedSwimmer = swimmers.find((s) => s.id === selectedSwimmerId);
 
+  useEffect(() => {
+    if (!selectedSwimmerId) {
+      setAllTimes([]);
+      return;
+    }
+    return subscribeTimes(selectedSwimmerId, setAllTimes);
+  }, [selectedSwimmerId]);
+
   const raceData: RaceData[] = useMemo(() => {
-    // In production, filter swim times for selected swimmer + event that have splits
-    return [];
-  }, [selectedSwimmerId, selectedEvent]);
+    const toDate = (ts: unknown): Date => {
+      if (ts && typeof ts === 'object' && 'toDate' in ts)
+        return (ts as { toDate: () => Date }).toDate();
+      if (ts instanceof Date) return ts;
+      return new Date(0);
+    };
+
+    return allTimes
+      .filter((t) => t.event === selectedEvent && t.splits && t.splits.length > 0)
+      .sort((a, b) => toDate(a.createdAt).getTime() - toDate(b.createdAt).getTime())
+      .slice(-MAX_COMPARE)
+      .map((t) => ({
+        name: t.meetName || formatShortDate(toDate(t.createdAt)),
+        splits: t.splits!,
+        totalTime: t.time,
+      }));
+  }, [allTimes, selectedEvent]);
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>

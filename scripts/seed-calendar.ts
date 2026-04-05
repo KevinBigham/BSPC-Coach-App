@@ -127,7 +127,7 @@ const MEETS: MeetEvent[] = [
 
 // ── Seed function ──────────────────────────────────────────────
 async function seedCalendar() {
-  const eventsCol = collection(db, 'events');
+  const eventsCol = collection(db, 'calendar_events');
   let totalEvents = 0;
 
   // Firestore batches max 500 writes each
