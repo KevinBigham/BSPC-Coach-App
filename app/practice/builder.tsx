@@ -12,11 +12,19 @@ import {
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '../../src/contexts/AuthContext';
-import { colors, spacing, fontSize, borderRadius, fontFamily, groupColors } from '../../src/config/theme';
+import {
+  colors,
+  spacing,
+  fontSize,
+  borderRadius,
+  fontFamily,
+  groupColors,
+} from '../../src/config/theme';
 import { GROUPS, SET_CATEGORIES, type Group, type SetCategory } from '../../src/config/constants';
 import { usePracticeStore } from '../../src/stores/practiceStore';
 import { addPracticePlan, updatePracticePlan } from '../../src/services/practicePlans';
 import SetBlock from '../../src/components/SetBlock';
+import { exportPracticePlanDocx } from '../../src/services/docxExport';
 
 export default function PracticeBuilderScreen() {
   const { coach } = useAuth();
@@ -54,24 +62,48 @@ export default function PracticeBuilderScreen() {
   };
 
   return (
-    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
       {/* Top Bar */}
       <View style={styles.topBar}>
-        <TouchableOpacity onPress={() => { store.reset(); router.back(); }}>
+        <TouchableOpacity
+          onPress={() => {
+            store.reset();
+            router.back();
+          }}
+        >
           <Text style={styles.cancelText}>CANCEL</Text>
         </TouchableOpacity>
         <View style={styles.yardageBug}>
           <Text style={styles.yardageNum}>{totalYardage}</Text>
           <Text style={styles.yardageLabel}>YARDS</Text>
         </View>
-        <TouchableOpacity onPress={handleSave} disabled={saving}>
-          <Text style={[styles.saveText, saving && { opacity: 0.5 }]}>
-            {saving ? 'SAVING...' : 'SAVE'}
-          </Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', gap: spacing.md }}>
+          <TouchableOpacity
+            onPress={() => {
+              const plan = store.toPlan(coach?.uid || '', coach?.displayName || 'Coach');
+              exportPracticePlanDocx(plan as any).catch((err) =>
+                Alert.alert('Export Error', err.message),
+              );
+            }}
+          >
+            <Text style={styles.exportText}>DOCX</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={handleSave} disabled={saving}>
+            <Text style={[styles.saveText, saving && { opacity: 0.5 }]}>
+              {saving ? 'SAVING...' : 'SAVE'}
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+      >
         {/* Title */}
         <TextInput
           style={styles.titleInput}
@@ -94,12 +126,18 @@ export default function PracticeBuilderScreen() {
 
         {/* Group + Template Toggle */}
         <View style={styles.metaRow}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.groupChips}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.groupChips}
+          >
             <TouchableOpacity
               style={[styles.groupChip, !store.group && styles.groupChipActive]}
               onPress={() => store.setGroup(null)}
             >
-              <Text style={[styles.groupChipText, !store.group && styles.groupChipTextActive]}>All</Text>
+              <Text style={[styles.groupChipText, !store.group && styles.groupChipTextActive]}>
+                All
+              </Text>
             </TouchableOpacity>
             {GROUPS.map((g) => (
               <TouchableOpacity
@@ -107,7 +145,11 @@ export default function PracticeBuilderScreen() {
                 style={[styles.groupChip, store.group === g && styles.groupChipActive]}
                 onPress={() => store.setGroup(g)}
               >
-                <Text style={[styles.groupChipText, store.group === g && styles.groupChipTextActive]}>{g}</Text>
+                <Text
+                  style={[styles.groupChipText, store.group === g && styles.groupChipTextActive]}
+                >
+                  {g}
+                </Text>
               </TouchableOpacity>
             ))}
           </ScrollView>
@@ -171,7 +213,10 @@ export default function PracticeBuilderScreen() {
                 <Text style={styles.categoryOptionText}>{cat}</Text>
               </TouchableOpacity>
             ))}
-            <TouchableOpacity style={styles.categoryCancel} onPress={() => setShowCategoryPicker(false)}>
+            <TouchableOpacity
+              style={styles.categoryCancel}
+              onPress={() => setShowCategoryPicker(false)}
+            >
               <Text style={styles.categoryCancelText}>CANCEL</Text>
             </TouchableOpacity>
           </View>
@@ -207,46 +252,192 @@ export default function PracticeBuilderScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bgBase },
   // Top Bar
-  topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: spacing.lg, backgroundColor: colors.bgDeep, borderBottomWidth: 2, borderBottomColor: colors.purple },
-  cancelText: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.sm, color: colors.textSecondary },
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: spacing.lg,
+    backgroundColor: colors.bgDeep,
+    borderBottomWidth: 2,
+    borderBottomColor: colors.purple,
+  },
+  cancelText: {
+    fontFamily: fontFamily.bodySemi,
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+  },
   yardageBug: { alignItems: 'center' },
   yardageNum: { fontFamily: fontFamily.stat, fontSize: fontSize.xxl, color: colors.accent },
-  yardageLabel: { fontFamily: fontFamily.pixel, fontSize: fontSize.pixel, color: colors.gold, letterSpacing: 1 },
-  saveText: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.sm, color: colors.accent, letterSpacing: 1 },
+  yardageLabel: {
+    fontFamily: fontFamily.pixel,
+    fontSize: fontSize.pixel,
+    color: colors.gold,
+    letterSpacing: 1,
+  },
+  saveText: {
+    fontFamily: fontFamily.bodySemi,
+    fontSize: fontSize.sm,
+    color: colors.accent,
+    letterSpacing: 1,
+  },
+  exportText: {
+    fontFamily: fontFamily.bodySemi,
+    fontSize: fontSize.sm,
+    color: colors.gold,
+    letterSpacing: 1,
+  },
   // Scroll
   scroll: { flex: 1 },
   scrollContent: { padding: spacing.lg, paddingBottom: 100 },
   // Title
-  titleInput: { fontFamily: fontFamily.heading, fontSize: 26, color: colors.text, backgroundColor: colors.bgDeep, borderRadius: borderRadius.md, padding: spacing.lg, borderWidth: 1, borderColor: colors.border, marginBottom: spacing.sm, letterSpacing: 1 },
-  descInput: { fontFamily: fontFamily.body, fontSize: fontSize.md, color: colors.text, backgroundColor: colors.bgDeep, borderRadius: borderRadius.sm, padding: spacing.md, borderWidth: 1, borderColor: colors.border, marginBottom: spacing.md, minHeight: 44 },
+  titleInput: {
+    fontFamily: fontFamily.heading,
+    fontSize: 26,
+    color: colors.text,
+    backgroundColor: colors.bgDeep,
+    borderRadius: borderRadius.md,
+    padding: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginBottom: spacing.sm,
+    letterSpacing: 1,
+  },
+  descInput: {
+    fontFamily: fontFamily.body,
+    fontSize: fontSize.md,
+    color: colors.text,
+    backgroundColor: colors.bgDeep,
+    borderRadius: borderRadius.sm,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginBottom: spacing.md,
+    minHeight: 44,
+  },
   // Meta
   metaRow: { marginBottom: spacing.sm },
   groupChips: { gap: spacing.xs },
-  groupChip: { paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderRadius: borderRadius.sm, backgroundColor: colors.bgDeep, borderWidth: 1, borderColor: colors.border },
+  groupChip: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.sm,
+    backgroundColor: colors.bgDeep,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
   groupChipActive: { backgroundColor: colors.purple, borderColor: colors.purpleLight },
-  groupChipText: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.sm, color: colors.textSecondary },
+  groupChipText: {
+    fontFamily: fontFamily.bodySemi,
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+  },
   groupChipTextActive: { color: colors.text },
   toggleRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg },
-  toggleBtn: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: borderRadius.sm, backgroundColor: colors.bgDeep, borderWidth: 1, borderColor: colors.border },
+  toggleBtn: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.sm,
+    backgroundColor: colors.bgDeep,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
   toggleBtnActive: { backgroundColor: colors.purple, borderColor: colors.purpleLight },
-  toggleBtnText: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.xs, color: colors.textSecondary, letterSpacing: 1 },
+  toggleBtnText: {
+    fontFamily: fontFamily.bodySemi,
+    fontSize: fontSize.xs,
+    color: colors.textSecondary,
+    letterSpacing: 1,
+  },
   toggleBtnTextActive: { color: colors.text },
-  undoBtn: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: borderRadius.sm, borderWidth: 1, borderColor: colors.border },
-  undoBtnText: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.xs, color: colors.accent, letterSpacing: 1 },
+  undoBtn: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  undoBtnText: {
+    fontFamily: fontFamily.bodySemi,
+    fontSize: fontSize.xs,
+    color: colors.accent,
+    letterSpacing: 1,
+  },
   // Add Set
-  addSetBtn: { padding: spacing.lg, borderRadius: borderRadius.md, borderWidth: 2, borderColor: colors.purple, borderStyle: 'dashed', alignItems: 'center', marginBottom: spacing.lg },
-  addSetText: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.md, color: colors.accent, letterSpacing: 1 },
+  addSetBtn: {
+    padding: spacing.lg,
+    borderRadius: borderRadius.md,
+    borderWidth: 2,
+    borderColor: colors.purple,
+    borderStyle: 'dashed',
+    alignItems: 'center',
+    marginBottom: spacing.lg,
+  },
+  addSetText: {
+    fontFamily: fontFamily.bodySemi,
+    fontSize: fontSize.md,
+    color: colors.accent,
+    letterSpacing: 1,
+  },
   // Category Picker
-  categoryPicker: { backgroundColor: colors.bgDeep, borderRadius: borderRadius.md, padding: spacing.lg, borderWidth: 1, borderColor: colors.border, marginBottom: spacing.lg },
-  categoryPickerTitle: { fontFamily: fontFamily.heading, fontSize: fontSize.xl, color: colors.text, letterSpacing: 1, marginBottom: spacing.md },
-  categoryOption: { padding: spacing.md, borderRadius: borderRadius.sm, backgroundColor: colors.bgSurface, marginBottom: spacing.sm, borderWidth: 1, borderColor: colors.border },
-  categoryOptionText: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.md, color: colors.text, textAlign: 'center' },
+  categoryPicker: {
+    backgroundColor: colors.bgDeep,
+    borderRadius: borderRadius.md,
+    padding: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginBottom: spacing.lg,
+  },
+  categoryPickerTitle: {
+    fontFamily: fontFamily.heading,
+    fontSize: fontSize.xl,
+    color: colors.text,
+    letterSpacing: 1,
+    marginBottom: spacing.md,
+  },
+  categoryOption: {
+    padding: spacing.md,
+    borderRadius: borderRadius.sm,
+    backgroundColor: colors.bgSurface,
+    marginBottom: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  categoryOptionText: {
+    fontFamily: fontFamily.bodySemi,
+    fontSize: fontSize.md,
+    color: colors.text,
+    textAlign: 'center',
+  },
   categoryCancel: { padding: spacing.sm, alignItems: 'center', marginTop: spacing.xs },
-  categoryCancelText: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.sm, color: colors.textSecondary },
+  categoryCancelText: {
+    fontFamily: fontFamily.bodySemi,
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+  },
   // Quick Start
   quickStart: { alignItems: 'center', paddingVertical: spacing.xxxl },
-  quickStartTitle: { fontFamily: fontFamily.heading, fontSize: fontSize.xl, color: colors.text, marginBottom: spacing.xs },
-  quickStartSub: { fontFamily: fontFamily.body, fontSize: fontSize.sm, color: colors.textSecondary, marginBottom: spacing.lg },
-  quickStartBtn: { backgroundColor: colors.purple, paddingHorizontal: spacing.xl, paddingVertical: spacing.md, borderRadius: borderRadius.md },
-  quickStartBtnText: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.sm, color: colors.text, letterSpacing: 1 },
+  quickStartTitle: {
+    fontFamily: fontFamily.heading,
+    fontSize: fontSize.xl,
+    color: colors.text,
+    marginBottom: spacing.xs,
+  },
+  quickStartSub: {
+    fontFamily: fontFamily.body,
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    marginBottom: spacing.lg,
+  },
+  quickStartBtn: {
+    backgroundColor: colors.purple,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.md,
+  },
+  quickStartBtnText: {
+    fontFamily: fontFamily.bodySemi,
+    fontSize: fontSize.sm,
+    color: colors.text,
+    letterSpacing: 1,
+  },
 });

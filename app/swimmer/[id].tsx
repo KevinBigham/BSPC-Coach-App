@@ -40,6 +40,7 @@ import { NOTE_TAGS, EVENTS, COURSES, type NoteTag, type Course } from '../../src
 import { formatRelativeTime, formatShortDate } from '../../src/utils/date';
 import { formatTimeDisplay } from '../../src/utils/time';
 import { exportTimesCSV, shareCSV } from '../../src/services/export';
+import { exportSwimmerReportDocx } from '../../src/services/docxExport';
 import { subscribeGoals } from '../../src/services/goals';
 import { getAchievedStandard, calculateAge, getAgeGroup } from '../../src/data/timeStandards';
 import StandardBadge from '../../src/components/StandardBadge';
@@ -272,6 +273,16 @@ export default function SwimmerProfileScreen() {
               onPress={() => router.push(`/swimmer/edit?id=${id}`)}
             >
               <Text style={styles.editBtnText}>EDIT</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.inviteBtn}
+              onPress={() => {
+                exportSwimmerReportDocx(swimmer, times, attendance).catch((err) =>
+                  Alert.alert('Export Error', err.message),
+                );
+              }}
+            >
+              <Text style={styles.inviteBtnText}>REPORT</Text>
             </TouchableOpacity>
           </View>
         </View>

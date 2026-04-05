@@ -6,14 +6,29 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { Stack } from 'expo-router';
-import { getGroupProgressReport, formatDropPercent, type GroupProgressReport } from '../../src/services/analytics';
+import {
+  getGroupProgressReport,
+  formatDropPercent,
+  type GroupProgressReport,
+} from '../../src/services/analytics';
 import BarChart from '../../src/components/charts/BarChart';
-import { colors, spacing, fontSize, borderRadius, fontFamily, groupColors } from '../../src/config/theme';
+import {
+  colors,
+  spacing,
+  fontSize,
+  borderRadius,
+  fontFamily,
+  groupColors,
+} from '../../src/config/theme';
 import { GROUPS, type Group } from '../../src/config/constants';
+import { exportGroupReportDocx } from '../../src/services/docxExport';
+import { useSwimmersStore } from '../../src/stores/swimmersStore';
 
 export default function GroupReportScreen() {
+  const swimmers = useSwimmersStore((s) => s.swimmers);
   const [reports, setReports] = useState<GroupProgressReport[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
@@ -31,9 +46,7 @@ export default function GroupReportScreen() {
     })();
   }, []);
 
-  const selectedReport = selectedGroup
-    ? reports.find((r) => r.group === selectedGroup)
-    : null;
+  const selectedReport = selectedGroup ? reports.find((r) => r.group === selectedGroup) : null;
 
   // Comparison chart data
   const comparisonData = reports.map((r) => ({
@@ -57,6 +70,32 @@ export default function GroupReportScreen() {
           headerStyle: { backgroundColor: colors.bgElevated },
           headerTintColor: colors.accent,
           headerTitleStyle: { fontFamily: fontFamily.heading, fontSize: 22, color: colors.text },
+          headerRight: () =>
+            selectedGroup ? (
+              <TouchableOpacity
+                onPress={() => {
+                  const report = reports.find((r) => r.group === selectedGroup);
+                  if (!report) return;
+                  const groupSwimmers = swimmers.filter((s) => s.group === selectedGroup);
+                  exportGroupReportDocx(selectedGroup, groupSwimmers, {
+                    totalPractices: report.swimmerCount,
+                    averageAttendance: report.swimmerCount,
+                    attendancePercent: report.avgAttendancePercent,
+                  }).catch((err) => Alert.alert('Export Error', err.message));
+                }}
+                style={{ marginRight: spacing.sm }}
+              >
+                <Text
+                  style={{
+                    fontFamily: fontFamily.bodySemi,
+                    fontSize: fontSize.sm,
+                    color: colors.gold,
+                  }}
+                >
+                  EXPORT
+                </Text>
+              </TouchableOpacity>
+            ) : null,
         }}
       />
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -90,16 +129,18 @@ export default function GroupReportScreen() {
             {reports.map((report) => (
               <TouchableOpacity
                 key={report.group}
-                style={[
-                  styles.groupCard,
-                  selectedGroup === report.group && styles.groupCardActive,
-                ]}
-                onPress={() => setSelectedGroup(
-                  selectedGroup === report.group ? null : report.group as Group,
-                )}
+                style={[styles.groupCard, selectedGroup === report.group && styles.groupCardActive]}
+                onPress={() =>
+                  setSelectedGroup(selectedGroup === report.group ? null : (report.group as Group))
+                }
               >
                 <View style={styles.groupHeader}>
-                  <View style={[styles.groupBadge, { backgroundColor: groupColors[report.group] || colors.accent }]}>
+                  <View
+                    style={[
+                      styles.groupBadge,
+                      { backgroundColor: groupColors[report.group] || colors.accent },
+                    ]}
+                  >
                     <Text style={styles.groupBadgeText}>{report.group[0]}</Text>
                   </View>
                   <View style={{ flex: 1 }}>
@@ -142,9 +183,7 @@ export default function GroupReportScreen() {
               </TouchableOpacity>
             ))}
 
-            {reports.length === 0 && (
-              <Text style={styles.emptyText}>No group data available</Text>
-            )}
+            {reports.length === 0 && <Text style={styles.emptyText}>No group data available</Text>}
           </>
         )}
       </ScrollView>
