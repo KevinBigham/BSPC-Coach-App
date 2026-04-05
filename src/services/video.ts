@@ -9,9 +9,10 @@ import {
   doc,
   serverTimestamp,
   limit as firestoreLimit,
+  deleteDoc,
   type Unsubscribe,
 } from 'firebase/firestore';
-import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
+import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
 import { db, storage } from '../config/firebase';
 import type {
   VideoSession,
@@ -153,4 +154,15 @@ export function getVideoStatusColor(status: VideoSessionStatus): string {
     case 'failed':
       return '#f43f5e';
   }
+}
+
+export async function deleteVideoSession(sessionId: string, storagePath?: string): Promise<void> {
+  if (storagePath) {
+    try {
+      await deleteObject(ref(storage, storagePath));
+    } catch {
+      // File may already be deleted
+    }
+  }
+  await deleteDoc(doc(db, 'video_sessions', sessionId));
 }

@@ -9,6 +9,7 @@ import {
   Alert,
   ActivityIndicator,
   Modal,
+  Image,
 } from 'react-native';
 import { useLocalSearchParams, Stack, router } from 'expo-router';
 import {
@@ -27,7 +28,14 @@ import {
 import { db } from '../../src/config/firebase';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { subscribeSwimmerAttendance } from '../../src/services/attendance';
-import { colors, spacing, fontSize, borderRadius, fontFamily, groupColors } from '../../src/config/theme';
+import {
+  colors,
+  spacing,
+  fontSize,
+  borderRadius,
+  fontFamily,
+  groupColors,
+} from '../../src/config/theme';
 import { NOTE_TAGS, EVENTS, COURSES, type NoteTag, type Course } from '../../src/config/constants';
 import { formatRelativeTime, formatShortDate } from '../../src/utils/date';
 import { formatTimeDisplay } from '../../src/utils/time';
@@ -39,7 +47,14 @@ import GoalCard from '../../src/components/GoalCard';
 import SwimmerTimeline from '../../src/components/SwimmerTimeline';
 import SwimmerVideoClips from '../../src/components/SwimmerVideoClips';
 import VideoComparison from '../../src/components/VideoComparison';
-import type { Swimmer, SwimmerNote, SwimTime, AttendanceRecord, AttendanceStatus, SwimmerGoal } from '../../src/types/firestore.types';
+import type {
+  Swimmer,
+  SwimmerNote,
+  SwimTime,
+  AttendanceRecord,
+  AttendanceStatus,
+  SwimmerGoal,
+} from '../../src/types/firestore.types';
 
 type Tab = 'overview' | 'notes' | 'times' | 'attendance' | 'timeline';
 
@@ -82,11 +97,11 @@ export default function SwimmerProfileScreen() {
     const q = query(
       collection(db, 'swimmers', id, 'notes'),
       orderBy('createdAt', 'desc'),
-      limit(50)
+      limit(50),
     );
     return onSnapshot(q, (snapshot) => {
       setNotes(
-        snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as SwimmerNote & { id: string }))
+        snapshot.docs.map((d) => ({ id: d.id, ...d.data() }) as SwimmerNote & { id: string }),
       );
     });
   }, [id]);
@@ -96,12 +111,10 @@ export default function SwimmerProfileScreen() {
     const q = query(
       collection(db, 'swimmers', id, 'times'),
       orderBy('createdAt', 'desc'),
-      limit(50)
+      limit(50),
     );
     return onSnapshot(q, (snapshot) => {
-      setTimes(
-        snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as SwimTime & { id: string }))
-      );
+      setTimes(snapshot.docs.map((d) => ({ id: d.id, ...d.data() }) as SwimTime & { id: string }));
     });
   }, [id]);
 
@@ -117,7 +130,7 @@ export default function SwimmerProfileScreen() {
 
   const toggleTag = (tag: NoteTag) => {
     setSelectedTags((prev) =>
-      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
+      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag],
     );
   };
 
@@ -198,16 +211,36 @@ export default function SwimmerProfileScreen() {
       <View style={styles.container}>
         {/* Scorebug Header */}
         <View style={styles.headerCard}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>
-              {swimmer.firstName[0]}{swimmer.lastName[0]}
-            </Text>
-          </View>
+          {swimmer.profilePhotoUrl ? (
+            <Image source={{ uri: swimmer.profilePhotoUrl }} style={styles.avatarImage} />
+          ) : (
+            <View style={styles.avatar}>
+              <Text style={styles.avatarText}>
+                {swimmer.firstName[0]}
+                {swimmer.lastName[0]}
+              </Text>
+            </View>
+          )}
           <View style={styles.headerInfo}>
             <Text style={styles.headerName}>{swimmer.displayName.toUpperCase()}</Text>
             <View style={styles.headerMeta}>
-              <View style={[styles.groupBadge, { borderColor: groupColors[swimmer.group] || colors.purple, backgroundColor: 'rgba(0,0,0,0.3)' }]}>
-                <Text style={[styles.groupBadgeText, { color: groupColors[swimmer.group] || colors.accent }]}>{swimmer.group}</Text>
+              <View
+                style={[
+                  styles.groupBadge,
+                  {
+                    borderColor: groupColors[swimmer.group] || colors.purple,
+                    backgroundColor: 'rgba(0,0,0,0.3)',
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.groupBadgeText,
+                    { color: groupColors[swimmer.group] || colors.accent },
+                  ]}
+                >
+                  {swimmer.group}
+                </Text>
               </View>
               <Text style={styles.headerGender}>{swimmer.gender === 'M' ? 'Male' : 'Female'}</Text>
               {swimmer.usaSwimmingId && (
@@ -226,7 +259,11 @@ export default function SwimmerProfileScreen() {
             )}
             <TouchableOpacity
               style={styles.inviteBtn}
-              onPress={() => router.push(`/swimmer/invite-parent?swimmerId=${id}&swimmerName=${encodeURIComponent(`${swimmer.firstName} ${swimmer.lastName}`)}`)}
+              onPress={() =>
+                router.push(
+                  `/swimmer/invite-parent?swimmerId=${id}&swimmerName=${encodeURIComponent(`${swimmer.firstName} ${swimmer.lastName}`)}`,
+                )
+              }
             >
               <Text style={styles.inviteBtnText}>INVITE</Text>
             </TouchableOpacity>
@@ -265,7 +302,15 @@ export default function SwimmerProfileScreen() {
         {/* Tab Content */}
         <ScrollView style={styles.tabContent} contentContainerStyle={styles.tabContentInner}>
           {activeTab === 'overview' && (
-            <OverviewTab swimmer={swimmer} noteCount={notes.length} timeCount={times.length} times={times} attendanceCount={attendance.length} goals={goals} swimmerId={id!} />
+            <OverviewTab
+              swimmer={swimmer}
+              noteCount={notes.length}
+              timeCount={times.length}
+              times={times}
+              attendanceCount={attendance.length}
+              goals={goals}
+              swimmerId={id!}
+            />
           )}
           {activeTab === 'notes' && (
             <NotesTab
@@ -289,9 +334,7 @@ export default function SwimmerProfileScreen() {
               swimmer={swimmer}
             />
           )}
-          {activeTab === 'attendance' && (
-            <AttendanceTab records={attendance} />
-          )}
+          {activeTab === 'attendance' && <AttendanceTab records={attendance} />}
           {activeTab === 'timeline' && id && (
             <View style={{ gap: spacing.lg }}>
               <SwimmerTimeline swimmerId={id} />
@@ -327,9 +370,10 @@ function OverviewTab({
   swimmerId: string;
 }) {
   // Compute age group for standards
-  const dob = swimmer.dateOfBirth instanceof Date
-    ? swimmer.dateOfBirth
-    : (swimmer.dateOfBirth as any)?.toDate?.() || null;
+  const dob =
+    swimmer.dateOfBirth instanceof Date
+      ? swimmer.dateOfBirth
+      : (swimmer.dateOfBirth as any)?.toDate?.() || null;
   const age = dob ? calculateAge(dob) : null;
   const ageGroup = age !== null ? getAgeGroup(age) : null;
   const activeGoals = goals.filter((g) => !g.achieved);
@@ -376,12 +420,7 @@ function OverviewTab({
           </View>
           {activeGoals.length > 0 ? (
             activeGoals.map((goal) => (
-              <GoalCard
-                key={goal.id}
-                goal={goal}
-                gender={swimmer.gender}
-                ageGroup={ageGroup}
-              />
+              <GoalCard key={goal.id} goal={goal} gender={swimmer.gender} ageGroup={ageGroup} />
             ))
           ) : (
             <Text style={styles.emptyText}>No active goals — set them in Standards</Text>
@@ -423,7 +462,9 @@ function OverviewTab({
         <Text style={styles.overviewCardTitle}>GOALS</Text>
         {swimmer.goals?.length > 0 ? (
           swimmer.goals.map((g, i) => (
-            <Text key={i} style={styles.listItem}>• {g}</Text>
+            <Text key={i} style={styles.listItem}>
+              • {g}
+            </Text>
           ))
         ) : (
           <Text style={styles.emptyText}>No goals set yet — tap EDIT to add</Text>
@@ -435,7 +476,9 @@ function OverviewTab({
           <Text style={styles.overviewCardTitle}>STRENGTHS</Text>
           {swimmer.strengths?.length > 0 ? (
             swimmer.strengths.map((s, i) => (
-              <Text key={i} style={styles.listItem}>• {s}</Text>
+              <Text key={i} style={styles.listItem}>
+                • {s}
+              </Text>
             ))
           ) : (
             <Text style={styles.emptyText}>None yet</Text>
@@ -445,7 +488,9 @@ function OverviewTab({
           <Text style={styles.overviewCardTitle}>WEAKNESSES</Text>
           {swimmer.weaknesses?.length > 0 ? (
             swimmer.weaknesses.map((w, i) => (
-              <Text key={i} style={styles.listItem}>• {w}</Text>
+              <Text key={i} style={styles.listItem}>
+                • {w}
+              </Text>
             ))
           ) : (
             <Text style={styles.emptyText}>None yet — tap EDIT to add</Text>
@@ -457,7 +502,9 @@ function OverviewTab({
         <Text style={styles.overviewCardTitle}>FOCUS AREAS</Text>
         {swimmer.techniqueFocusAreas?.length > 0 ? (
           swimmer.techniqueFocusAreas.map((t, i) => (
-            <Text key={i} style={styles.listItem}>• {t}</Text>
+            <Text key={i} style={styles.listItem}>
+              • {t}
+            </Text>
           ))
         ) : (
           <Text style={styles.emptyText}>None yet</Text>
@@ -559,7 +606,12 @@ function AttendanceTab({ records }: { records: (AttendanceRecord & { id: string 
             <Text style={styles.heatLegendText}>Present</Text>
           </View>
           <View style={styles.heatLegendItem}>
-            <View style={[styles.heatLegendDot, { backgroundColor: colors.bgBase, borderWidth: 1, borderColor: colors.border }]} />
+            <View
+              style={[
+                styles.heatLegendDot,
+                { backgroundColor: colors.bgBase, borderWidth: 1, borderColor: colors.border },
+              ]}
+            />
             <Text style={styles.heatLegendText}>No record</Text>
           </View>
         </View>
@@ -572,12 +624,14 @@ function AttendanceTab({ records }: { records: (AttendanceRecord & { id: string 
           <Text style={styles.emptyText}>No attendance records yet</Text>
         ) : (
           records.map((rec) => {
-            const arrivedAt = rec.arrivedAt instanceof Date
-              ? rec.arrivedAt
-              : (rec.arrivedAt as any)?.toDate?.() || null;
-            const departedAt = rec.departedAt instanceof Date
-              ? rec.departedAt
-              : (rec.departedAt as any)?.toDate?.() || null;
+            const arrivedAt =
+              rec.arrivedAt instanceof Date
+                ? rec.arrivedAt
+                : (rec.arrivedAt as any)?.toDate?.() || null;
+            const departedAt =
+              rec.departedAt instanceof Date
+                ? rec.departedAt
+                : (rec.departedAt as any)?.toDate?.() || null;
             const status = rec.status || 'normal';
             const statusColor = STATUS_COLORS[status] || colors.textSecondary;
 
@@ -588,7 +642,9 @@ function AttendanceTab({ records }: { records: (AttendanceRecord & { id: string 
                   {arrivedAt && (
                     <Text style={styles.attendanceTime}>
                       {arrivedAt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
-                      {departedAt ? ` — ${departedAt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : ''}
+                      {departedAt
+                        ? ` — ${departedAt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`
+                        : ''}
                     </Text>
                   )}
                 </View>
@@ -599,7 +655,9 @@ function AttendanceTab({ records }: { records: (AttendanceRecord & { id: string 
                     </Text>
                   </View>
                   {rec.note && (
-                    <Text style={styles.attendanceNote} numberOfLines={1}>{rec.note}</Text>
+                    <Text style={styles.attendanceNote} numberOfLines={1}>
+                      {rec.note}
+                    </Text>
                   )}
                 </View>
               </View>
@@ -663,7 +721,10 @@ function NotesTab({
           </View>
         </ScrollView>
         <TouchableOpacity
-          style={[styles.addNoteButton, (!noteText.trim() || saving) && styles.addNoteButtonDisabled]}
+          style={[
+            styles.addNoteButton,
+            (!noteText.trim() || saving) && styles.addNoteButtonDisabled,
+          ]}
           onPress={onAddNote}
           disabled={!noteText.trim() || saving}
         >
@@ -678,10 +739,7 @@ function NotesTab({
             <View style={styles.noteHeaderRight}>
               <Text style={styles.noteDate}>{String(note.practiceDate)}</Text>
               {note.coachId === currentCoachId && (
-                <TouchableOpacity
-                  onPress={() => onDeleteNote(note.id)}
-                  style={styles.deleteBtn}
-                >
+                <TouchableOpacity onPress={() => onDeleteNote(note.id)} style={styles.deleteBtn}>
                   <Text style={styles.deleteBtnText}>✕</Text>
                 </TouchableOpacity>
               )}
@@ -732,9 +790,10 @@ function TimesTab({
   const [showAddTime, setShowAddTime] = useState(false);
 
   // Compute age group for standard badges
-  const dob = swimmer.dateOfBirth instanceof Date
-    ? swimmer.dateOfBirth
-    : (swimmer.dateOfBirth as any)?.toDate?.() || null;
+  const dob =
+    swimmer.dateOfBirth instanceof Date
+      ? swimmer.dateOfBirth
+      : (swimmer.dateOfBirth as any)?.toDate?.() || null;
   const age = dob ? calculateAge(dob) : null;
   const ageGroup = age !== null ? getAgeGroup(age) : null;
 
@@ -776,29 +835,34 @@ function TimesTab({
           >
             <View>
               <Text style={styles.timeEvent}>{time.event}</Text>
-              <Text style={styles.timeMeet}>{time.meetName || 'Practice'} {time.course}</Text>
+              <Text style={styles.timeMeet}>
+                {time.meetName || 'Practice'} {time.course}
+              </Text>
             </View>
             <View style={styles.timeRight}>
-              <Text style={[styles.timeValue, time.isPR && styles.timePR]}>
-                {time.timeDisplay}
-              </Text>
+              <Text style={[styles.timeValue, time.isPR && styles.timePR]}>{time.timeDisplay}</Text>
               {time.isPR && (
                 <View style={styles.prBadgeContainer}>
                   <Text style={styles.prBadge}>PR</Text>
                 </View>
               )}
-              {ageGroup && (() => {
-                const standard = getAchievedStandard(time.course as any, swimmer.gender, ageGroup, time.event, time.time);
-                return standard ? <StandardBadge level={standard} size="sm" /> : null;
-              })()}
+              {ageGroup &&
+                (() => {
+                  const standard = getAchievedStandard(
+                    time.course as any,
+                    swimmer.gender,
+                    ageGroup,
+                    time.event,
+                    time.time,
+                  );
+                  return standard ? <StandardBadge level={standard} size="sm" /> : null;
+                })()}
             </View>
           </TouchableOpacity>
         ))
       )}
 
-      {times.length > 0 && (
-        <Text style={styles.longPressHint}>Long press a time to delete</Text>
-      )}
+      {times.length > 0 && <Text style={styles.longPressHint}>Long press a time to delete</Text>}
 
       {showAddTime && (
         <AddTimeModal
@@ -853,9 +917,7 @@ function AddTimeModal({
     const timeDisplay = `${displayMin}${displaySec}.${displayHund}`;
 
     // Check if PR (faster = lower hundredths for same event+course)
-    const sameTimes = existingTimes.filter(
-      (t) => t.event === event && t.course === course
-    );
+    const sameTimes = existingTimes.filter((t) => t.event === event && t.course === course);
     const isPR = sameTimes.length === 0 || sameTimes.every((t) => totalHundredths < t.time);
 
     setSaving(true);
@@ -876,7 +938,12 @@ function AddTimeModal({
       // If this is a new PR, un-PR the old ones
       if (isPR && sameTimes.length > 0) {
         const timesRef = collection(db, 'swimmers', swimmerId, 'times');
-        const q = query(timesRef, where('event', '==', event), where('course', '==', course), where('isPR', '==', true));
+        const q = query(
+          timesRef,
+          where('event', '==', event),
+          where('course', '==', course),
+          where('isPR', '==', true),
+        );
         const snap = await getDocs(q);
         const { updateDoc: updateDocFn } = await import('firebase/firestore');
         for (const d of snap.docs) {
@@ -923,7 +990,11 @@ function AddTimeModal({
                   style={[styles.courseChip, course === c && styles.courseChipActive]}
                   onPress={() => setCourse(c)}
                 >
-                  <Text style={[styles.courseChipText, course === c && styles.courseChipTextActive]}>{c}</Text>
+                  <Text
+                    style={[styles.courseChipText, course === c && styles.courseChipTextActive]}
+                  >
+                    {c}
+                  </Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -999,31 +1070,125 @@ function AddTimeModal({
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bgBase },
-  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.bgBase },
+  centered: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.bgBase,
+  },
   errorText: { fontFamily: fontFamily.heading, fontSize: fontSize.xl, color: colors.error },
 
   // Header Scorebug
-  headerCard: { backgroundColor: '#12081f', padding: spacing.xl, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 2, borderBottomColor: colors.purple },
-  avatar: { width: 56, height: 56, borderRadius: 28, backgroundColor: colors.gold, alignItems: 'center', justifyContent: 'center', marginRight: spacing.lg },
+  headerCard: {
+    backgroundColor: '#12081f',
+    padding: spacing.xl,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderBottomWidth: 2,
+    borderBottomColor: colors.purple,
+  },
+  avatar: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: colors.gold,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing.lg,
+  },
+  avatarImage: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    borderWidth: 2,
+    borderColor: colors.gold,
+    marginRight: spacing.lg,
+  },
   avatarText: { fontFamily: fontFamily.heading, color: colors.bgDeep, fontSize: fontSize.xl },
   headerInfo: { flex: 1 },
-  headerName: { fontFamily: fontFamily.heading, fontSize: fontSize.xxl, color: colors.text, letterSpacing: 2 },
-  headerMeta: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.xs },
-  groupBadge: { paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: borderRadius.xs, borderWidth: 1 },
+  headerName: {
+    fontFamily: fontFamily.heading,
+    fontSize: fontSize.xxl,
+    color: colors.text,
+    letterSpacing: 2,
+  },
+  headerMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginTop: spacing.xs,
+  },
+  groupBadge: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: borderRadius.xs,
+    borderWidth: 1,
+  },
   groupBadgeText: { fontFamily: fontFamily.pixel, fontSize: fontSize.pixel },
   headerGender: { fontFamily: fontFamily.body, color: colors.textSecondary, fontSize: fontSize.sm },
-  headerUsaId: { fontFamily: fontFamily.statMono, color: colors.textSecondary, fontSize: fontSize.xs },
+  headerUsaId: {
+    fontFamily: fontFamily.statMono,
+    color: colors.textSecondary,
+    fontSize: fontSize.xs,
+  },
   headerButtons: { flexDirection: 'column', gap: spacing.xs },
-  inviteBtn: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: borderRadius.sm, borderWidth: 1, borderColor: colors.gold, alignItems: 'center' },
-  inviteBtnText: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.xs, color: colors.gold, letterSpacing: 1 },
-  editBtn: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: borderRadius.sm, borderWidth: 1, borderColor: colors.accent, alignItems: 'center' },
-  editBtnText: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.xs, color: colors.accent, letterSpacing: 1 },
-  medicalBtn: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: borderRadius.sm, borderWidth: 1, borderColor: colors.error, alignItems: 'center' },
-  medicalBtnText: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.xs, color: colors.error, letterSpacing: 1 },
+  inviteBtn: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.sm,
+    borderWidth: 1,
+    borderColor: colors.gold,
+    alignItems: 'center',
+  },
+  inviteBtnText: {
+    fontFamily: fontFamily.bodySemi,
+    fontSize: fontSize.xs,
+    color: colors.gold,
+    letterSpacing: 1,
+  },
+  editBtn: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.sm,
+    borderWidth: 1,
+    borderColor: colors.accent,
+    alignItems: 'center',
+  },
+  editBtnText: {
+    fontFamily: fontFamily.bodySemi,
+    fontSize: fontSize.xs,
+    color: colors.accent,
+    letterSpacing: 1,
+  },
+  medicalBtn: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.sm,
+    borderWidth: 1,
+    borderColor: colors.error,
+    alignItems: 'center',
+  },
+  medicalBtnText: {
+    fontFamily: fontFamily.bodySemi,
+    fontSize: fontSize.xs,
+    color: colors.error,
+    letterSpacing: 1,
+  },
 
   // Tabs
-  tabBar: { flexDirection: 'row', backgroundColor: colors.bgElevated, borderBottomWidth: 1, borderBottomColor: colors.border },
-  tab: { flex: 1, paddingVertical: spacing.md, alignItems: 'center', borderBottomWidth: 2, borderBottomColor: 'transparent' },
+  tabBar: {
+    flexDirection: 'row',
+    backgroundColor: colors.bgElevated,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
   tabActive: { borderBottomColor: colors.accent },
   tabText: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.xs, color: colors.textSecondary },
   tabTextActive: { color: colors.accent },
@@ -1033,30 +1198,105 @@ const styles = StyleSheet.create({
   // Overview
   overviewContainer: { gap: spacing.md },
   overviewRow: { flexDirection: 'row', gap: spacing.md },
-  overviewStat: { flex: 1, backgroundColor: colors.bgDeep, borderRadius: borderRadius.lg, padding: spacing.lg, alignItems: 'center', borderWidth: 1, borderColor: colors.border },
+  overviewStat: {
+    flex: 1,
+    backgroundColor: colors.bgDeep,
+    borderRadius: borderRadius.lg,
+    padding: spacing.lg,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
   overviewStatNum: { fontFamily: fontFamily.stat, fontSize: fontSize.xxxl, color: colors.accent },
-  overviewStatLabel: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.xs, color: colors.textSecondary, letterSpacing: 1 },
-  overviewCard: { backgroundColor: colors.bgDeep, borderRadius: borderRadius.lg, padding: spacing.lg, borderWidth: 1, borderColor: colors.border },
-  overviewCardTitle: { fontFamily: fontFamily.heading, fontSize: 20, color: colors.text, letterSpacing: 1, marginBottom: spacing.sm },
-  listItem: { fontFamily: fontFamily.body, fontSize: fontSize.sm, color: colors.text, paddingVertical: 2 },
-  contactRow: { paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.borderLight },
+  overviewStatLabel: {
+    fontFamily: fontFamily.bodySemi,
+    fontSize: fontSize.xs,
+    color: colors.textSecondary,
+    letterSpacing: 1,
+  },
+  overviewCard: {
+    backgroundColor: colors.bgDeep,
+    borderRadius: borderRadius.lg,
+    padding: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  overviewCardTitle: {
+    fontFamily: fontFamily.heading,
+    fontSize: 20,
+    color: colors.text,
+    letterSpacing: 1,
+    marginBottom: spacing.sm,
+  },
+  listItem: {
+    fontFamily: fontFamily.body,
+    fontSize: fontSize.sm,
+    color: colors.text,
+    paddingVertical: 2,
+  },
+  contactRow: {
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderLight,
+  },
   contactName: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.md, color: colors.text },
-  contactDetail: { fontFamily: fontFamily.body, fontSize: fontSize.sm, color: colors.textSecondary, marginTop: 2 },
+  contactDetail: {
+    fontFamily: fontFamily.body,
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
 
   // Goals & Standards
-  goalsSectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm },
-  viewStandardsBtn: { paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderRadius: borderRadius.sm, borderWidth: 1, borderColor: colors.gold },
-  viewStandardsBtnText: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.xs, color: colors.gold, letterSpacing: 1 },
+  goalsSectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  viewStandardsBtn: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.sm,
+    borderWidth: 1,
+    borderColor: colors.gold,
+  },
+  viewStandardsBtnText: {
+    fontFamily: fontFamily.bodySemi,
+    fontSize: fontSize.xs,
+    color: colors.gold,
+    letterSpacing: 1,
+  },
 
   // PR Board
   prSection: { marginBottom: spacing.md },
-  prStrokeLabel: { fontFamily: fontFamily.pixel, fontSize: fontSize.pixel, color: colors.accent, letterSpacing: 1, marginBottom: spacing.xs },
-  prRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: spacing.xs, borderBottomWidth: 1, borderBottomColor: colors.borderLight },
+  prStrokeLabel: {
+    fontFamily: fontFamily.pixel,
+    fontSize: fontSize.pixel,
+    color: colors.accent,
+    letterSpacing: 1,
+    marginBottom: spacing.xs,
+  },
+  prRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: spacing.xs,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderLight,
+  },
   prEvent: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.sm, color: colors.text },
   prTimeContainer: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   prTime: { fontFamily: fontFamily.stat, fontSize: fontSize.lg, color: colors.gold },
   prCourse: { fontFamily: fontFamily.statMono, fontSize: fontSize.xs, color: colors.textSecondary },
-  prBadgeSmall: { backgroundColor: 'rgba(255, 215, 0, 0.12)', paddingHorizontal: 4, paddingVertical: 1, borderWidth: 1, borderColor: colors.gold, borderRadius: borderRadius.xs },
+  prBadgeSmall: {
+    backgroundColor: 'rgba(255, 215, 0, 0.12)',
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderWidth: 1,
+    borderColor: colors.gold,
+    borderRadius: borderRadius.xs,
+  },
   prBadgeSmallText: { fontFamily: fontFamily.pixel, fontSize: 6, color: colors.gold },
 
   // Attendance Tab
@@ -1066,92 +1306,324 @@ const styles = StyleSheet.create({
   heatLegend: { flexDirection: 'row', gap: spacing.lg },
   heatLegendItem: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   heatLegendDot: { width: 10, height: 10, borderRadius: 2 },
-  heatLegendText: { fontFamily: fontFamily.body, fontSize: fontSize.xs, color: colors.textSecondary },
-  attendanceRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.borderLight },
+  heatLegendText: {
+    fontFamily: fontFamily.body,
+    fontSize: fontSize.xs,
+    color: colors.textSecondary,
+  },
+  attendanceRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderLight,
+  },
   attendanceDateCol: { flex: 1 },
   attendanceDate: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.sm, color: colors.text },
-  attendanceTime: { fontFamily: fontFamily.statMono, fontSize: fontSize.xs, color: colors.textSecondary, marginTop: 2 },
+  attendanceTime: {
+    fontFamily: fontFamily.statMono,
+    fontSize: fontSize.xs,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
   attendanceStatusCol: { alignItems: 'flex-end' },
-  statusBadge: { paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: borderRadius.xs, borderWidth: 1, backgroundColor: 'rgba(0,0,0,0.3)' },
+  statusBadge: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: borderRadius.xs,
+    borderWidth: 1,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+  },
   statusBadgeText: { fontFamily: fontFamily.pixel, fontSize: fontSize.pixel },
-  attendanceNote: { fontFamily: fontFamily.body, fontSize: fontSize.xs, color: colors.textSecondary, marginTop: 2, maxWidth: 150 },
+  attendanceNote: {
+    fontFamily: fontFamily.body,
+    fontSize: fontSize.xs,
+    color: colors.textSecondary,
+    marginTop: 2,
+    maxWidth: 150,
+  },
 
   // Notes
-  noteForm: { backgroundColor: colors.bgDeep, borderRadius: borderRadius.lg, padding: spacing.lg, marginBottom: spacing.lg, borderWidth: 1, borderColor: colors.border },
-  noteInput: { borderWidth: 1, borderColor: colors.border, borderRadius: borderRadius.sm, padding: spacing.md, fontSize: fontSize.md, fontFamily: fontFamily.body, color: colors.text, backgroundColor: colors.bgBase, minHeight: 80, textAlignVertical: 'top' },
+  noteForm: {
+    backgroundColor: colors.bgDeep,
+    borderRadius: borderRadius.lg,
+    padding: spacing.lg,
+    marginBottom: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  noteInput: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: borderRadius.sm,
+    padding: spacing.md,
+    fontSize: fontSize.md,
+    fontFamily: fontFamily.body,
+    color: colors.text,
+    backgroundColor: colors.bgBase,
+    minHeight: 80,
+    textAlignVertical: 'top',
+  },
   tagScroll: { marginTop: spacing.sm },
   tagRow: { flexDirection: 'row', gap: spacing.xs },
-  tag: { paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, borderRadius: borderRadius.sm, backgroundColor: colors.bgBase, borderWidth: 1, borderColor: colors.border },
+  tag: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.sm,
+    backgroundColor: colors.bgBase,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
   tagActive: { backgroundColor: colors.purple, borderColor: colors.purpleLight },
   tagText: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.xs, color: colors.textSecondary },
   tagTextActive: { color: colors.text },
-  addNoteButton: { backgroundColor: colors.purple, padding: spacing.md, borderRadius: borderRadius.sm, alignItems: 'center', marginTop: spacing.md },
+  addNoteButton: {
+    backgroundColor: colors.purple,
+    padding: spacing.md,
+    borderRadius: borderRadius.sm,
+    alignItems: 'center',
+    marginTop: spacing.md,
+  },
   addNoteButtonDisabled: { opacity: 0.5 },
   addNoteButtonText: { fontFamily: fontFamily.bodySemi, color: colors.text, fontSize: fontSize.md },
-  noteCard: { backgroundColor: colors.bgDeep, borderRadius: borderRadius.md, padding: spacing.lg, marginBottom: spacing.sm, borderWidth: 1, borderColor: colors.border },
-  noteHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm },
+  noteCard: {
+    backgroundColor: colors.bgDeep,
+    borderRadius: borderRadius.md,
+    padding: spacing.lg,
+    marginBottom: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  noteHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
   noteHeaderRight: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   noteCoach: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.sm, color: colors.accent },
   noteDate: { fontFamily: fontFamily.statMono, fontSize: fontSize.xs, color: colors.textSecondary },
   deleteBtn: { padding: spacing.xs },
   deleteBtnText: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.sm, color: colors.error },
-  noteContent: { fontFamily: fontFamily.body, fontSize: fontSize.md, color: colors.text, lineHeight: 22 },
+  noteContent: {
+    fontFamily: fontFamily.body,
+    fontSize: fontSize.md,
+    color: colors.text,
+    lineHeight: 22,
+  },
   noteTagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.sm },
-  noteTag: { backgroundColor: 'rgba(74, 14, 120, 0.3)', paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: borderRadius.xs, borderWidth: 1, borderColor: colors.purple },
-  noteTagText: { fontFamily: fontFamily.pixel, fontSize: fontSize.pixel, color: colors.purpleLight },
-  noteSource: { fontFamily: fontFamily.pixel, fontSize: fontSize.pixel, color: colors.accent, marginTop: spacing.sm },
+  noteTag: {
+    backgroundColor: 'rgba(74, 14, 120, 0.3)',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: borderRadius.xs,
+    borderWidth: 1,
+    borderColor: colors.purple,
+  },
+  noteTagText: {
+    fontFamily: fontFamily.pixel,
+    fontSize: fontSize.pixel,
+    color: colors.purpleLight,
+  },
+  noteSource: {
+    fontFamily: fontFamily.pixel,
+    fontSize: fontSize.pixel,
+    color: colors.accent,
+    marginTop: spacing.sm,
+  },
 
   // Times
   timesHeaderRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg },
-  addTimeBtn: { flex: 1, backgroundColor: colors.purple, padding: spacing.md, borderRadius: borderRadius.sm, alignItems: 'center' },
-  addTimeBtnText: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.md, color: colors.text, letterSpacing: 1 },
-  exportTimesBtn: { backgroundColor: colors.bgDeep, padding: spacing.md, borderRadius: borderRadius.sm, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.accent },
-  exportTimesBtnText: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.xs, color: colors.accent, letterSpacing: 1 },
+  addTimeBtn: {
+    flex: 1,
+    backgroundColor: colors.purple,
+    padding: spacing.md,
+    borderRadius: borderRadius.sm,
+    alignItems: 'center',
+  },
+  addTimeBtnText: {
+    fontFamily: fontFamily.bodySemi,
+    fontSize: fontSize.md,
+    color: colors.text,
+    letterSpacing: 1,
+  },
+  exportTimesBtn: {
+    backgroundColor: colors.bgDeep,
+    padding: spacing.md,
+    borderRadius: borderRadius.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.accent,
+  },
+  exportTimesBtnText: {
+    fontFamily: fontFamily.bodySemi,
+    fontSize: fontSize.xs,
+    color: colors.accent,
+    letterSpacing: 1,
+  },
   emptyTimesContainer: { paddingVertical: spacing.xxl, alignItems: 'center' },
-  emptyText: { fontFamily: fontFamily.body, color: colors.textSecondary, fontSize: fontSize.sm, textAlign: 'center', paddingVertical: spacing.lg },
-  timeRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: colors.bgDeep, padding: spacing.lg, borderRadius: borderRadius.md, marginBottom: spacing.sm, borderWidth: 1, borderColor: colors.border },
+  emptyText: {
+    fontFamily: fontFamily.body,
+    color: colors.textSecondary,
+    fontSize: fontSize.sm,
+    textAlign: 'center',
+    paddingVertical: spacing.lg,
+  },
+  timeRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: colors.bgDeep,
+    padding: spacing.lg,
+    borderRadius: borderRadius.md,
+    marginBottom: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
   timeEvent: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.md, color: colors.text },
-  timeMeet: { fontFamily: fontFamily.body, fontSize: fontSize.xs, color: colors.textSecondary, marginTop: 2 },
+  timeMeet: {
+    fontFamily: fontFamily.body,
+    fontSize: fontSize.xs,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
   timeRight: { alignItems: 'flex-end' },
   timeValue: { fontFamily: fontFamily.stat, fontSize: fontSize.xl, color: colors.text },
   timePR: { color: colors.gold },
-  prBadgeContainer: { backgroundColor: 'rgba(255, 215, 0, 0.12)', paddingHorizontal: 6, paddingVertical: 2, borderWidth: 1, borderColor: colors.gold, borderRadius: borderRadius.xs, marginTop: 2 },
+  prBadgeContainer: {
+    backgroundColor: 'rgba(255, 215, 0, 0.12)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderWidth: 1,
+    borderColor: colors.gold,
+    borderRadius: borderRadius.xs,
+    marginTop: 2,
+  },
   prBadge: { fontFamily: fontFamily.pixel, fontSize: fontSize.pixel, color: colors.gold },
-  longPressHint: { fontFamily: fontFamily.body, fontSize: fontSize.xs, color: colors.textSecondary, textAlign: 'center', marginTop: spacing.sm, fontStyle: 'italic' },
+  longPressHint: {
+    fontFamily: fontFamily.body,
+    fontSize: fontSize.xs,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginTop: spacing.sm,
+    fontStyle: 'italic',
+  },
 
   // Add Time Modal
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)' },
   modalScroll: { flex: 1, marginTop: 60 },
   modalScrollContent: { flexGrow: 1, justifyContent: 'flex-end' },
-  modalContent: { backgroundColor: colors.bgElevated, borderTopLeftRadius: borderRadius.xl, borderTopRightRadius: borderRadius.xl, padding: spacing.xl, paddingBottom: spacing.xxxl },
-  modalTitle: { fontFamily: fontFamily.heading, fontSize: fontSize.xxl, color: colors.text, letterSpacing: 1, marginBottom: spacing.md },
-  modalLabel: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.xs, color: colors.textSecondary, marginTop: spacing.lg, marginBottom: spacing.sm, letterSpacing: 1 },
-  modalInput: { borderWidth: 1, borderColor: colors.border, borderRadius: borderRadius.sm, padding: spacing.md, fontSize: fontSize.md, fontFamily: fontFamily.body, color: colors.text, backgroundColor: colors.bgBase },
+  modalContent: {
+    backgroundColor: colors.bgElevated,
+    borderTopLeftRadius: borderRadius.xl,
+    borderTopRightRadius: borderRadius.xl,
+    padding: spacing.xl,
+    paddingBottom: spacing.xxxl,
+  },
+  modalTitle: {
+    fontFamily: fontFamily.heading,
+    fontSize: fontSize.xxl,
+    color: colors.text,
+    letterSpacing: 1,
+    marginBottom: spacing.md,
+  },
+  modalLabel: {
+    fontFamily: fontFamily.bodySemi,
+    fontSize: fontSize.xs,
+    color: colors.textSecondary,
+    marginTop: spacing.lg,
+    marginBottom: spacing.sm,
+    letterSpacing: 1,
+  },
+  modalInput: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: borderRadius.sm,
+    padding: spacing.md,
+    fontSize: fontSize.md,
+    fontFamily: fontFamily.body,
+    color: colors.text,
+    backgroundColor: colors.bgBase,
+  },
 
   // Event chips
   chipRow: { flexDirection: 'row', gap: spacing.xs },
-  chip: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: borderRadius.sm, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bgBase },
+  chip: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.bgBase,
+  },
   chipActive: { backgroundColor: colors.purple, borderColor: colors.purpleLight },
   chipText: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.xs, color: colors.textSecondary },
   chipTextActive: { color: colors.text },
 
   // Course
   courseRow: { flexDirection: 'row', gap: spacing.sm },
-  courseChip: { flex: 1, padding: spacing.md, borderRadius: borderRadius.sm, borderWidth: 1, borderColor: colors.border, alignItems: 'center', backgroundColor: colors.bgBase },
+  courseChip: {
+    flex: 1,
+    padding: spacing.md,
+    borderRadius: borderRadius.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    backgroundColor: colors.bgBase,
+  },
   courseChipActive: { backgroundColor: colors.purple, borderColor: colors.purpleLight },
-  courseChipText: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.md, color: colors.textSecondary },
+  courseChipText: {
+    fontFamily: fontFamily.bodySemi,
+    fontSize: fontSize.md,
+    color: colors.textSecondary,
+  },
   courseChipTextActive: { color: colors.text },
 
   // Time input
   timeInputRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
   timeInputGroup: { flexDirection: 'row', alignItems: 'center' },
-  timeInput: { width: 56, height: 56, backgroundColor: colors.bgBase, borderWidth: 1, borderColor: colors.border, borderRadius: borderRadius.sm, textAlign: 'center', fontFamily: fontFamily.stat, fontSize: fontSize.xl, color: colors.gold },
-  timeColon: { fontFamily: fontFamily.stat, fontSize: fontSize.xxl, color: colors.textSecondary, marginHorizontal: spacing.xs },
+  timeInput: {
+    width: 56,
+    height: 56,
+    backgroundColor: colors.bgBase,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: borderRadius.sm,
+    textAlign: 'center',
+    fontFamily: fontFamily.stat,
+    fontSize: fontSize.xl,
+    color: colors.gold,
+  },
+  timeColon: {
+    fontFamily: fontFamily.stat,
+    fontSize: fontSize.xxl,
+    color: colors.textSecondary,
+    marginHorizontal: spacing.xs,
+  },
 
   // Modal actions
   modalActions: { flexDirection: 'row', gap: spacing.md, marginTop: spacing.xl },
-  modalCancelBtn: { flex: 1, padding: spacing.md, borderRadius: borderRadius.sm, borderWidth: 1, borderColor: colors.border, alignItems: 'center' },
-  modalCancelText: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.md, color: colors.textSecondary },
-  modalSaveBtn: { flex: 1, padding: spacing.md, borderRadius: borderRadius.sm, backgroundColor: colors.purple, alignItems: 'center' },
+  modalCancelBtn: {
+    flex: 1,
+    padding: spacing.md,
+    borderRadius: borderRadius.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+  },
+  modalCancelText: {
+    fontFamily: fontFamily.bodySemi,
+    fontSize: fontSize.md,
+    color: colors.textSecondary,
+  },
+  modalSaveBtn: {
+    flex: 1,
+    padding: spacing.md,
+    borderRadius: borderRadius.sm,
+    backgroundColor: colors.purple,
+    alignItems: 'center',
+  },
   modalSaveText: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.md, color: colors.text },
 });

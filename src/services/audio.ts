@@ -6,12 +6,13 @@ import {
   onSnapshot,
   addDoc,
   updateDoc,
+  deleteDoc,
   doc,
   serverTimestamp,
   limit as firestoreLimit,
   type Unsubscribe,
 } from 'firebase/firestore';
-import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
+import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
 import { db, storage } from '../config/firebase';
 import type { AudioSession } from '../types/firestore.types';
 
@@ -20,18 +21,16 @@ type AudioSessionWithId = AudioSession & { id: string };
 export function subscribeAudioSessions(
   coachId: string,
   callback: (sessions: AudioSessionWithId[]) => void,
-  max: number = 20
+  max: number = 20,
 ): Unsubscribe {
   const q = query(
     collection(db, 'audio_sessions'),
     where('coachId', '==', coachId),
     orderBy('createdAt', 'desc'),
-    firestoreLimit(max)
+    firestoreLimit(max),
   );
   return onSnapshot(q, (snapshot) => {
-    callback(
-      snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as AudioSessionWithId))
-    );
+    callback(snapshot.docs.map((d) => ({ id: d.id, ...d.data() }) as AudioSessionWithId));
   });
 }
 
@@ -40,7 +39,7 @@ export async function createAudioSession(
   coachName: string,
   duration: number,
   practiceDate: string,
-  group?: string
+  group?: string,
 ): Promise<string> {
   const docRef = await addDoc(collection(db, 'audio_sessions'), {
     coachId,
@@ -60,7 +59,7 @@ export async function createAudioSession(
 
 export async function updateAudioSession(
   sessionId: string,
-  data: Partial<AudioSession>
+  data: Partial<AudioSession>,
 ): Promise<void> {
   await updateDoc(doc(db, 'audio_sessions', sessionId), {
     ...data,
@@ -72,7 +71,7 @@ export async function uploadAudio(
   uri: string,
   coachId: string,
   date: string,
-  onProgress?: (percent: number) => void
+  onProgress?: (percent: number) => void,
 ): Promise<{ storagePath: string; downloadUrl: string }> {
   const response = await fetch(uri);
   const blob = await response.blob();
@@ -93,7 +92,18 @@ export async function uploadAudio(
       async () => {
         const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
         resolve({ storagePath, downloadUrl });
-      }
+      },
     );
   });
+}
+
+export async function deleteAudioSession(sessionId: string, storagePath?: string): Promise<void> {
+  if (storagePath) {
+    try {
+      await deleteObject(ref(storage, storagePath));
+    } catch {
+      // File may already be deleted
+    }
+  }
+  await deleteDoc(doc(db, 'audio_sessions', sessionId));
 }

@@ -8,14 +8,24 @@ import {
   StyleSheet,
   Alert,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import { router, useLocalSearchParams, Stack } from 'expo-router';
 import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../src/config/firebase';
 import { useAuth } from '../../src/contexts/AuthContext';
-import { colors, spacing, fontSize, borderRadius, fontFamily, groupColors } from '../../src/config/theme';
+import {
+  colors,
+  spacing,
+  fontSize,
+  borderRadius,
+  fontFamily,
+  groupColors,
+} from '../../src/config/theme';
 import { GROUPS, type Group } from '../../src/config/constants';
+import * as ImagePicker from 'expo-image-picker';
 import type { Swimmer, ParentContact } from '../../src/types/firestore.types';
+import { uploadProfilePhoto, deleteProfilePhoto } from '../../src/services/profilePhoto';
 
 export default function EditSwimmerScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -37,6 +47,10 @@ export default function EditSwimmerScreen() {
   const [strengths, setStrengths] = useState('');
   const [focusAreas, setFocusAreas] = useState('');
 
+  // Photo
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [photoUploading, setPhotoUploading] = useState(false);
+
   // Parent contacts
   const [parentContacts, setParentContacts] = useState<ParentContact[]>([]);
 
@@ -57,7 +71,12 @@ export default function EditSwimmerScreen() {
           setGoals((s.goals || []).join('\n'));
           setStrengths((s.strengths || []).join('\n'));
           setFocusAreas((s.techniqueFocusAreas || []).join('\n'));
-          setParentContacts(s.parentContacts?.length ? s.parentContacts : [{ name: '', phone: '', email: '', relationship: 'Parent' }]);
+          setParentContacts(
+            s.parentContacts?.length
+              ? s.parentContacts
+              : [{ name: '', phone: '', email: '', relationship: 'Parent' }],
+          );
+          setPhotoUrl(s.profilePhotoUrl || null);
         }
       } catch (err: any) {
         Alert.alert('Error', err.message);
@@ -75,7 +94,10 @@ export default function EditSwimmerScreen() {
     setSaving(true);
     try {
       const toArray = (s: string) =>
-        s.split('\n').map((l) => l.trim()).filter(Boolean);
+        s
+          .split('\n')
+          .map((l) => l.trim())
+          .filter(Boolean);
 
       await updateDoc(doc(db, 'swimmers', id!), {
         firstName: firstName.trim(),
@@ -102,17 +124,51 @@ export default function EditSwimmerScreen() {
 
   const updateContact = (index: number, field: keyof ParentContact, value: string) => {
     setParentContacts((prev) =>
-      prev.map((pc, i) => (i === index ? { ...pc, [field]: value } : pc))
+      prev.map((pc, i) => (i === index ? { ...pc, [field]: value } : pc)),
     );
   };
 
   const addContact = () => {
-    setParentContacts((prev) => [...prev, { name: '', phone: '', email: '', relationship: 'Parent' }]);
+    setParentContacts((prev) => [
+      ...prev,
+      { name: '', phone: '', email: '', relationship: 'Parent' },
+    ]);
   };
 
   const removeContact = (index: number) => {
     if (parentContacts.length <= 1) return;
     setParentContacts((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handlePickPhoto = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      quality: 0.7,
+      allowsEditing: true,
+      aspect: [1, 1],
+    });
+    if (result.canceled || !result.assets[0]) return;
+    if (!id) return;
+    setPhotoUploading(true);
+    try {
+      const url = await uploadProfilePhoto(id, result.assets[0].uri);
+      setPhotoUrl(url);
+    } catch (err: any) {
+      Alert.alert('Error', err.message);
+    }
+    setPhotoUploading(false);
+  };
+
+  const handleRemovePhoto = async () => {
+    if (!id) return;
+    setPhotoUploading(true);
+    try {
+      await deleteProfilePhoto(id);
+      setPhotoUrl(null);
+    } catch (err: any) {
+      Alert.alert('Error', err.message);
+    }
+    setPhotoUploading(false);
   };
 
   if (loading) {
@@ -127,6 +183,38 @@ export default function EditSwimmerScreen() {
     <>
       <Stack.Screen options={{ title: 'EDIT SWIMMER' }} />
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+        {/* Profile Photo */}
+        <View style={[styles.card, { alignItems: 'center' }]}>
+          <Text style={styles.sectionTitle}>PHOTO</Text>
+          {photoUrl ? (
+            <Image source={{ uri: photoUrl }} style={styles.photo} />
+          ) : (
+            <View style={[styles.photo, styles.photoPlaceholder]}>
+              <Text style={styles.photoInitial}>{firstName?.[0]?.toUpperCase() || '?'}</Text>
+            </View>
+          )}
+          <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm }}>
+            <TouchableOpacity
+              style={styles.photoButton}
+              onPress={handlePickPhoto}
+              disabled={photoUploading}
+            >
+              <Text style={styles.photoButtonText}>
+                {photoUploading ? 'UPLOADING...' : 'CHANGE PHOTO'}
+              </Text>
+            </TouchableOpacity>
+            {photoUrl && (
+              <TouchableOpacity
+                style={[styles.photoButton, { borderColor: colors.error }]}
+                onPress={handleRemovePhoto}
+                disabled={photoUploading}
+              >
+                <Text style={[styles.photoButtonText, { color: colors.error }]}>REMOVE</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+
         {/* Basic Info */}
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>SWIMMER INFO</Text>
@@ -200,13 +288,18 @@ export default function EditSwimmerScreen() {
                 style={[
                   styles.groupChip,
                   {
-                    backgroundColor: group === g ? (groupColors[g] || colors.purple) : colors.bgBase,
+                    backgroundColor: group === g ? groupColors[g] || colors.purple : colors.bgBase,
                     borderColor: groupColors[g] || colors.border,
                   },
                 ]}
                 onPress={() => setGroup(g)}
               >
-                <Text style={[styles.groupChipText, { color: group === g ? colors.bgDeep : colors.text }]}>
+                <Text
+                  style={[
+                    styles.groupChipText,
+                    { color: group === g ? colors.bgDeep : colors.text },
+                  ]}
+                >
                   {g}
                 </Text>
               </TouchableOpacity>
@@ -335,9 +428,7 @@ export default function EditSwimmerScreen() {
           onPress={handleSave}
           disabled={saving}
         >
-          <Text style={styles.saveButtonText}>
-            {saving ? 'SAVING...' : 'SAVE CHANGES'}
-          </Text>
+          <Text style={styles.saveButtonText}>{saving ? 'SAVING...' : 'SAVE CHANGES'}</Text>
         </TouchableOpacity>
       </ScrollView>
     </>
@@ -346,30 +437,114 @@ export default function EditSwimmerScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bgBase },
-  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.bgBase },
+  centered: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.bgBase,
+  },
   content: { padding: spacing.lg, gap: spacing.lg, paddingBottom: spacing.xxxl },
-  card: { backgroundColor: colors.bgDeep, borderRadius: borderRadius.lg, padding: spacing.lg, borderWidth: 1, borderColor: colors.border },
-  sectionTitle: { fontFamily: fontFamily.heading, fontSize: fontSize.xl, color: colors.text, letterSpacing: 1, marginBottom: spacing.md },
-  label: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.xs, color: colors.textSecondary, marginTop: spacing.md, marginBottom: spacing.xs, letterSpacing: 1 },
-  input: { borderWidth: 1, borderColor: colors.border, borderRadius: borderRadius.sm, padding: spacing.md, fontSize: fontSize.md, fontFamily: fontFamily.body, color: colors.text, backgroundColor: colors.bgBase },
+  card: {
+    backgroundColor: colors.bgDeep,
+    borderRadius: borderRadius.lg,
+    padding: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  sectionTitle: {
+    fontFamily: fontFamily.heading,
+    fontSize: fontSize.xl,
+    color: colors.text,
+    letterSpacing: 1,
+    marginBottom: spacing.md,
+  },
+  label: {
+    fontFamily: fontFamily.bodySemi,
+    fontSize: fontSize.xs,
+    color: colors.textSecondary,
+    marginTop: spacing.md,
+    marginBottom: spacing.xs,
+    letterSpacing: 1,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: borderRadius.sm,
+    padding: spacing.md,
+    fontSize: fontSize.md,
+    fontFamily: fontFamily.body,
+    color: colors.text,
+    backgroundColor: colors.bgBase,
+  },
   multiline: { minHeight: 80, textAlignVertical: 'top' },
   toggleRow: { flexDirection: 'row', gap: spacing.sm },
-  toggleButton: { flex: 1, padding: spacing.md, borderRadius: borderRadius.sm, borderWidth: 1, borderColor: colors.border, alignItems: 'center', backgroundColor: colors.bgBase },
+  toggleButton: {
+    flex: 1,
+    padding: spacing.md,
+    borderRadius: borderRadius.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    backgroundColor: colors.bgBase,
+  },
   toggleActive: { backgroundColor: colors.purple, borderColor: colors.purpleLight },
   toggleActiveGold: { backgroundColor: colors.goldDark, borderColor: colors.gold },
   toggleActiveError: { backgroundColor: 'rgba(244,63,94,0.2)', borderColor: colors.error },
   toggleText: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.md, color: colors.text },
   groupGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  groupChip: { paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, borderRadius: borderRadius.sm, borderWidth: 2 },
+  groupChip: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.sm,
+    borderWidth: 2,
+  },
   groupChipText: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.sm },
   contactBlock: { marginBottom: spacing.sm },
   contactDivider: { height: 1, backgroundColor: colors.border, marginVertical: spacing.md },
   contactHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   contactNum: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.sm, color: colors.accent },
   removeText: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.sm, color: colors.error },
-  addContactBtn: { marginTop: spacing.md, padding: spacing.md, borderRadius: borderRadius.sm, borderWidth: 1, borderColor: colors.purple, borderStyle: 'dashed', alignItems: 'center' },
+  addContactBtn: {
+    marginTop: spacing.md,
+    padding: spacing.md,
+    borderRadius: borderRadius.sm,
+    borderWidth: 1,
+    borderColor: colors.purple,
+    borderStyle: 'dashed',
+    alignItems: 'center',
+  },
   addContactText: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.sm, color: colors.accent },
-  saveButton: { backgroundColor: colors.purple, padding: spacing.lg, borderRadius: borderRadius.lg, alignItems: 'center' },
+  saveButton: {
+    backgroundColor: colors.purple,
+    padding: spacing.lg,
+    borderRadius: borderRadius.lg,
+    alignItems: 'center',
+  },
   saveButtonDisabled: { opacity: 0.6 },
-  saveButtonText: { fontFamily: fontFamily.heading, color: colors.text, fontSize: fontSize.xl, letterSpacing: 2 },
+  saveButtonText: {
+    fontFamily: fontFamily.heading,
+    color: colors.text,
+    fontSize: fontSize.xl,
+    letterSpacing: 2,
+  },
+  photo: { width: 80, height: 80, borderRadius: 40, borderWidth: 2, borderColor: colors.accent },
+  photoPlaceholder: {
+    backgroundColor: colors.bgDeep,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  photoInitial: { fontFamily: fontFamily.heading, fontSize: 32, color: colors.accent },
+  photoButton: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.sm,
+    borderWidth: 1,
+    borderColor: colors.accent,
+  },
+  photoButtonText: {
+    fontFamily: fontFamily.pixel,
+    fontSize: fontSize.pixel,
+    color: colors.accent,
+    letterSpacing: 1,
+  },
 });
