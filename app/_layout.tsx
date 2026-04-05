@@ -28,7 +28,12 @@ import { useSwimmersStore } from '../src/stores/swimmersStore';
 import { useAttendanceStore } from '../src/stores/attendanceStore';
 import { registerForPushNotifications } from '../src/services/notifications';
 import { getTodayString } from '../src/utils/time';
+import NetInfo from '@react-native-community/netinfo';
 import { colors, fontFamily } from '../src/config/theme';
+import OfflineIndicator from '../src/components/OfflineIndicator';
+import { processQueue } from '../src/utils/offlineQueue';
+import { uploadAudio, updateAudioSession } from '../src/services/audio';
+import { uploadVideo, updateVideoSession } from '../src/services/video';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -58,6 +63,43 @@ function RootNavigator() {
       unsubSwimmers();
       unsubAttendance();
     };
+  }, [user]);
+
+  // Process offline upload queue when connectivity is restored
+  useEffect(() => {
+    if (!user) return;
+    return NetInfo.addEventListener((state) => {
+      if (state.isConnected) {
+        processQueue(
+          async (item) => {
+            const { storagePath } = await uploadAudio(
+              item.uri,
+              user.uid,
+              item.metadata.date as string,
+            );
+            if (item.metadata.sessionId) {
+              await updateAudioSession(item.metadata.sessionId as string, {
+                storagePath,
+                status: 'uploaded',
+              });
+            }
+          },
+          async (item) => {
+            const { storagePath } = await uploadVideo(
+              item.uri,
+              user.uid,
+              item.metadata.date as string,
+            );
+            if (item.metadata.sessionId) {
+              await updateVideoSession(item.metadata.sessionId as string, {
+                storagePath,
+                status: 'uploaded',
+              });
+            }
+          },
+        ).catch(() => {});
+      }
+    });
   }, [user]);
 
   useEffect(() => {
@@ -504,6 +546,7 @@ export default function RootLayout() {
       <AuthProvider>
         <ToastProvider>
           <GlobalToastWire />
+          <OfflineIndicator />
           <RootNavigator />
         </ToastProvider>
       </AuthProvider>

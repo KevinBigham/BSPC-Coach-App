@@ -30,6 +30,7 @@ import {
   groupColors,
 } from '../src/config/theme';
 import type { AudioSession } from '../src/types/firestore.types';
+import { enqueueUpload } from '../src/utils/offlineQueue';
 
 type RecordingState = 'idle' | 'recording' | 'stopped';
 
@@ -41,6 +42,7 @@ const STATUS_BADGE: Record<string, { label: string; color: string }> = {
   review: { label: 'REVIEW', color: colors.gold },
   posted: { label: 'POSTED', color: colors.success },
   failed: { label: 'FAILED', color: colors.error },
+  queued: { label: 'QUEUED', color: colors.warning },
 };
 
 export default function AudioScreen() {
@@ -181,7 +183,23 @@ export default function AudioScreen() {
     if (!uri) return;
 
     if (!isOnline) {
-      Alert.alert('Offline', 'Recording saved locally. Upload when you reconnect.');
+      const today = getTodayString();
+      const sessionId = await createAudioSession(
+        coach.uid,
+        coach.displayName || 'Unknown',
+        duration,
+        today,
+        selectedGroup || undefined,
+      );
+      await updateAudioSession(sessionId, { status: 'queued' as any });
+      await enqueueUpload({
+        type: 'audio',
+        uri,
+        metadata: { sessionId, coachId: coach.uid, date: today },
+      });
+      Alert.alert('Queued', 'Recording saved. It will upload when you reconnect.');
+      setRecordingState('idle');
+      setDuration(0);
       return;
     }
 
