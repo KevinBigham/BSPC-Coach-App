@@ -8,11 +8,19 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import { useLocalSearchParams, Stack } from 'expo-router';
+import { useLocalSearchParams, Stack, useRouter } from 'expo-router';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../../src/config/firebase';
-import { subscribeVideoDrafts, getVideoStatusLabel, getVideoStatusColor } from '../../src/services/video';
-import { approveVideoDraft, rejectVideoDraft, type VideoDraft } from '../../src/services/videoDrafts';
+import {
+  subscribeVideoDrafts,
+  getVideoStatusLabel,
+  getVideoStatusColor,
+} from '../../src/services/video';
+import {
+  approveVideoDraft,
+  rejectVideoDraft,
+  type VideoDraft,
+} from '../../src/services/videoDrafts';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { useToast } from '../../src/contexts/ToastContext';
 import { handleError } from '../../src/utils/errorHandler';
@@ -31,6 +39,7 @@ const PHASE_COLORS: Record<string, string> = {
 
 export default function VideoDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const router = useRouter();
   const { coach } = useAuth();
   const { showToast } = useToast();
   const [session, setSession] = useState<(VideoSession & { id: string }) | null>(null);
@@ -47,7 +56,10 @@ export default function VideoDetailScreen() {
       setLoading(false);
     });
     const unsubDrafts = subscribeVideoDrafts(id, (d) => setDrafts(d as VideoDraft[]));
-    return () => { unsubSession(); unsubDrafts(); };
+    return () => {
+      unsubSession();
+      unsubDrafts();
+    };
   }, [id]);
 
   const handleApprove = async (draft: VideoDraft) => {
@@ -59,7 +71,11 @@ export default function VideoDetailScreen() {
     } catch (err) {
       handleError(err, 'Approve draft');
     }
-    setProcessing((prev) => { const next = new Set(prev); next.delete(draft.id); return next; });
+    setProcessing((prev) => {
+      const next = new Set(prev);
+      next.delete(draft.id);
+      return next;
+    });
   };
 
   const handleReject = async (draft: VideoDraft) => {
@@ -76,7 +92,11 @@ export default function VideoDetailScreen() {
           } catch (err) {
             handleError(err, 'Reject draft');
           }
-          setProcessing((prev) => { const next = new Set(prev); next.delete(draft.id); return next; });
+          setProcessing((prev) => {
+            const next = new Set(prev);
+            next.delete(draft.id);
+            return next;
+          });
         },
       },
     ]);
@@ -116,12 +136,19 @@ export default function VideoDetailScreen() {
             </View>
           </View>
           <Text style={styles.infoMeta}>
-            {session.taggedSwimmerIds.length} swimmer{session.taggedSwimmerIds.length !== 1 ? 's' : ''} tagged
+            {session.taggedSwimmerIds.length} swimmer
+            {session.taggedSwimmerIds.length !== 1 ? 's' : ''} tagged
             {session.duration > 0 ? ` | ${session.duration}s` : ''}
             {session.group ? ` | ${session.group}` : ''}
           </Text>
-          {session.errorMessage && (
-            <Text style={styles.sessionError}>{session.errorMessage}</Text>
+          {session.errorMessage && <Text style={styles.sessionError}>{session.errorMessage}</Text>}
+          {session.taggedSwimmerIds.length > 0 && (
+            <TouchableOpacity
+              style={styles.compareButton}
+              onPress={() => router.push(`/video/compare?swimmerId=${session.taggedSwimmerIds[0]}`)}
+            >
+              <Text style={styles.compareButtonText}>COMPARE TECHNIQUE</Text>
+            </TouchableOpacity>
           )}
         </View>
 
@@ -129,16 +156,29 @@ export default function VideoDetailScreen() {
         <View style={styles.pipeline}>
           {(['uploading', 'analyzing', 'review', 'posted'] as const).map((step, i) => {
             const isActive = session.status === step;
-            const isPast = ['uploading', 'uploaded', 'extracting_frames', 'analyzing', 'review', 'posted']
-              .indexOf(session.status) > ['uploading', 'analyzing', 'review', 'posted'].indexOf(step);
+            const isPast =
+              [
+                'uploading',
+                'uploaded',
+                'extracting_frames',
+                'analyzing',
+                'review',
+                'posted',
+              ].indexOf(session.status) >
+              ['uploading', 'analyzing', 'review', 'posted'].indexOf(step);
             const color = isActive ? colors.gold : isPast ? colors.accent : colors.textSecondary;
             return (
               <View key={step} style={styles.pipelineStep}>
                 <View style={[styles.pipelineDot, { backgroundColor: color }]} />
-                <Text style={[styles.pipelineLabel, { color }]}>
-                  {step.toUpperCase()}
-                </Text>
-                {i < 3 && <View style={[styles.pipelineLine, { backgroundColor: isPast ? colors.accent : colors.border }]} />}
+                <Text style={[styles.pipelineLabel, { color }]}>{step.toUpperCase()}</Text>
+                {i < 3 && (
+                  <View
+                    style={[
+                      styles.pipelineLine,
+                      { backgroundColor: isPast ? colors.accent : colors.border },
+                    ]}
+                  />
+                )}
               </View>
             );
           })}
@@ -158,9 +198,7 @@ export default function VideoDetailScreen() {
         {/* Pending Drafts */}
         {pendingDrafts.length > 0 && (
           <>
-            <Text style={styles.sectionTitle}>
-              OBSERVATIONS ({pendingDrafts.length})
-            </Text>
+            <Text style={styles.sectionTitle}>OBSERVATIONS ({pendingDrafts.length})</Text>
             {pendingDrafts.map((draft) => {
               const phaseColor = PHASE_COLORS[draft.phase] || colors.textSecondary;
               const isProcessing = processing.has(draft.id);
@@ -226,7 +264,12 @@ export default function VideoDetailScreen() {
               <View key={draft.id} style={[styles.draftCard, { opacity: 0.6 }]}>
                 <View style={styles.draftHeader}>
                   <Text style={styles.draftSwimmer}>{draft.swimmerName}</Text>
-                  <Text style={[styles.reviewedLabel, { color: draft.approved ? colors.gold : colors.error }]}>
+                  <Text
+                    style={[
+                      styles.reviewedLabel,
+                      { color: draft.approved ? colors.gold : colors.error },
+                    ]}
+                  >
                     {draft.approved ? 'POSTED' : 'DISCARDED'}
                   </Text>
                 </View>
@@ -252,7 +295,12 @@ export default function VideoDetailScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bgBase },
   content: { padding: spacing.lg, paddingBottom: spacing.xxxl },
-  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.bgBase },
+  centered: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.bgBase,
+  },
   errorText: { fontFamily: fontFamily.heading, fontSize: fontSize.xl, color: colors.error },
 
   // Info Card
@@ -270,7 +318,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: spacing.xs,
   },
-  infoDate: { fontFamily: fontFamily.heading, fontSize: fontSize.xxl, color: colors.text, letterSpacing: 1 },
+  infoDate: {
+    fontFamily: fontFamily.heading,
+    fontSize: fontSize.xxl,
+    color: colors.text,
+    letterSpacing: 1,
+  },
   statusBadge: {
     paddingHorizontal: spacing.sm,
     paddingVertical: 2,
@@ -280,7 +333,12 @@ const styles = StyleSheet.create({
   },
   statusText: { fontFamily: fontFamily.pixel, fontSize: fontSize.pixel, letterSpacing: 1 },
   infoMeta: { fontFamily: fontFamily.body, fontSize: fontSize.sm, color: colors.textSecondary },
-  sessionError: { fontFamily: fontFamily.body, fontSize: fontSize.xs, color: colors.error, marginTop: spacing.sm },
+  sessionError: {
+    fontFamily: fontFamily.body,
+    fontSize: fontSize.xs,
+    color: colors.error,
+    marginTop: spacing.sm,
+  },
 
   // Pipeline
   pipeline: {
@@ -409,7 +467,11 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     alignItems: 'center',
   },
-  rejectBtnText: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.sm, color: colors.textSecondary },
+  rejectBtnText: {
+    fontFamily: fontFamily.bodySemi,
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+  },
   approveBtn: {
     flex: 2,
     padding: spacing.md,
@@ -425,5 +487,20 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     textAlign: 'center',
     paddingVertical: spacing.xxl,
+  },
+  compareButton: {
+    marginTop: spacing.md,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: borderRadius.sm,
+    borderWidth: 1,
+    borderColor: colors.accent,
+    alignSelf: 'flex-start',
+  },
+  compareButtonText: {
+    fontFamily: fontFamily.pixel,
+    fontSize: fontSize.pixel,
+    color: colors.accent,
+    letterSpacing: 1,
   },
 });

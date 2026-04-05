@@ -409,6 +409,16 @@ function RootNavigator() {
           }}
         />
         <Stack.Screen
+          name="video/compare"
+          options={{
+            headerShown: true,
+            title: 'COMPARE VIDEO',
+            headerStyle: { backgroundColor: colors.bgElevated },
+            headerTintColor: colors.accent,
+            headerTitleStyle: { fontFamily: fontFamily.heading, fontSize: 22, color: colors.text },
+          }}
+        />
+        <Stack.Screen
           name="analytics"
           options={{
             headerShown: true,
