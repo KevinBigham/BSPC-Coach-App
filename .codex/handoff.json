@@ -1,0 +1,122 @@
+{
+  "project": "BSPC Coach App",
+  "version": "1.2.0",
+  "github": "KevinBigham/BSPC-Coach-App",
+  "owner": "Kevin Bigham — high school teacher, head swim/dive coach at Blue Springs HS, founder of Blue Springs Power Cats swim team",
+  "working_style": "Kevin directs AI agents but doesn't write code. Terse updates at milestones, not play-by-play. Once direction is clear, assume-label-proceed. Match his energy. No emoji in UIs — use lucide-react icons. Tests expected on all code.",
+  "multi_agent_system": "4-agent workflow: ChatGPT (architect), Codex (builder), Claude Code (reviewer/ops), Kevin (director). Handoffs via JSON payloads and .codex/ docs.",
+  "stack": {
+    "framework": "React Native 0.81.5 + Expo SDK 54 + Expo Router 6",
+    "language": "TypeScript (strict mode)",
+    "state": "Zustand 5 (8 stores) + React Context (Auth, Toast)",
+    "backend": "Firebase JS SDK 12 (Firestore, Auth, Storage, Cloud Functions v2)",
+    "ai": "Google Cloud Vertex AI — Gemini 2.0 Flash via Cloud Functions",
+    "testing": "Jest 29 + jest-expo + @testing-library/react-native (602 tests, 55 suites)",
+    "error_tracking": "Sentry (@sentry/react-native) — production only",
+    "build": "EAS Build (dev/preview/production profiles)",
+    "ci_cd": "GitHub Actions — typecheck, lint, test, EAS build, functions deploy"
+  },
+  "firebase_project": {
+    "project_id": "bspc-coach",
+    "api_key": "AIzaSyCR_X-LQST_7xDpqWoUcVCzwmEc9Rctvs8",
+    "runtime": "Node.js 20",
+    "functions_region": "us-central1"
+  },
+  "app_stats": {
+    "screens": 49,
+    "services": 30,
+    "stores": 8,
+    "components": 22,
+    "utils": 8,
+    "cloud_functions": 7,
+    "test_suites": 55,
+    "tests_passing": 602,
+    "firestore_collections": 17,
+    "commit_count": 24,
+    "phases_completed": 16
+  },
+  "theme": {
+    "name": "Arcade Prime Time",
+    "description": "Dark broadcast studio aesthetic with retro arcade accents",
+    "fonts": ["Teko (headings)", "JetBrains Mono (stats)", "Inter (body)", "Press Start 2P (pixel labels)"],
+    "primary_colors": {
+      "purple": "#B388FF",
+      "gold": "#FFD700",
+      "bg_deep": "#0a0a12",
+      "bg_base": "#12121e"
+    },
+    "rule": "No emoji in UIs — use lucide-react-native icons only"
+  },
+  "key_collections": {
+    "coaches": "Auth-linked coach profiles with roles and notification prefs",
+    "swimmers": "Roster with subcollections: notes, times, goals, medical",
+    "attendance": "Daily check-in/check-out records with status",
+    "audio_sessions": "Recorded coaching audio with AI transcription drafts",
+    "video_sessions": "Uploaded video with AI technique analysis drafts",
+    "practice_plans": "Practice plans with sets/items, also serves as workout library",
+    "calendar_events": "Schedule events with RSVP subcollection",
+    "meets": "Competitions with subcollections: entries, relays, live_events, splits",
+    "season_plans": "Periodization plans with weeks subcollection",
+    "group_notes": "Practice-level coaching observations by group",
+    "notification_rules": "Custom alert triggers for attendance streaks, etc.",
+    "parent_invites": "Shareable invite codes for parent app linking"
+  },
+  "ai_features": {
+    "audio_transcription": "Record coaching audio → Cloud Function transcribes via Gemini → extracts per-swimmer observations → coach reviews/approves → posts to swimmer notes",
+    "video_analysis": "Upload poolside video → Cloud Function sends to Gemini → generates technique observations with diagnosis + drill recommendations → coach reviews → posts to swimmer notes",
+    "practice_generation": "Coach selects group + focus + yardage → Cloud Function generates structured plan via Gemini with age-appropriate sets and intervals",
+    "pipeline": "All AI results go through a draft review system (approve/reject) before posting to swimmer profiles"
+  },
+  "offline_support": {
+    "firestore_cache": "initializeFirestore with persistentLocalCache + persistentMultipleTabManager",
+    "upload_queue": "AsyncStorage-backed queue (src/utils/offlineQueue.ts) with 3 retries for audio/video uploads",
+    "indicator": "OfflineIndicator component shows amber banner when disconnected",
+    "queue_processor": "Mounted in _layout.tsx — processes queue on NetInfo connectivity restore"
+  },
+  "critical_patterns": {
+    "time_format": "All times stored as hundredths of seconds (6523 = 1:05.23)",
+    "firebase_timestamp": "Typed as Date but runtime is Firestore Timestamp — use toDate() helper",
+    "pr_detection": "Auto-detected in times.ts addTime() — old PRs un-flagged when new PR recorded",
+    "batch_limit": "All bulk writes chunk at 400 (Firestore limit is 500)",
+    "subscription_cleanup": "All services return unsubscribe functions; stores manage single subscription",
+    "relay_optimization": "Free relay order: 2nd, slowest, 3rd, fastest (anchor). Medley: greedy by best stroke times",
+    "path_note": "npx/npm commands need: export PATH=\"/opt/homebrew/bin:$PATH\""
+  },
+  "completed_phases": [
+    {"phase": "0-1", "description": "Full app foundation — 49 screens, 28 services, Arcade Prime Time theme"},
+    {"phase": "2", "description": "Developer tooling — ESLint, Prettier, Husky, zero any types"},
+    {"phase": "3", "description": "EAS Build setup — dev/preview/production profiles"},
+    {"phase": "4", "description": "Testing infrastructure — Jest, RNTL, Firebase mocks"},
+    {"phase": "5", "description": "Core test suite — 437 tests across 37 suites"},
+    {"phase": "6", "description": "CI/CD pipeline — GitHub Actions"},
+    {"phase": "7", "description": "Error handling — ErrorBoundary, ScreenErrorBoundary, logger, withRetry"},
+    {"phase": "8", "description": "Performance — Skeleton loaders, haptics utility"},
+    {"phase": "9A", "description": "Season planning with periodization"},
+    {"phase": "9B-D", "description": "Race analytics, doc export, notification rules"},
+    {"phase": "10", "description": "App Store prep — privacy policy, terms of service"},
+    {"phase": "11", "description": "Wire analytics to real Firestore data, fix calendar collection"},
+    {"phase": "12", "description": "Offline persistence + upload queue + OfflineIndicator"},
+    {"phase": "13", "description": "Video temporal comparison screen"},
+    {"phase": "14", "description": "Profile photos + media delete functions"},
+    {"phase": "15", "description": "Firestore rules hardening, Sentry, babel console strip, v1.2.0"},
+    {"phase": "16", "description": "DOCX export for practice plans and reports"}
+  ],
+  "future_directions": {
+    "parent_portal": "parent-portal/ directory exists but is not built out yet. Parents can redeem invite codes via Cloud Function. Need: parent-facing app with swimmer view, meet schedule, push notifications",
+    "lcm_scm_standards": "Only SCY time standards populated in src/data/timeStandards.ts — need LCM and SCM data",
+    "aggregations_pipeline": "Cloud Functions should populate the aggregations collection for dashboard stats (currently computed client-side)",
+    "e2e_tests": "No Detox/Maestro tests — could add for critical flows (check-in, recording, meet management)",
+    "deep_linking": "URL scheme bspc-coach:// registered but no handlers configured",
+    "eas_submit": "Apple/Google store credentials need filling in eas.json after enrollment",
+    "workout_sharing": "workoutLibrary service has rating/tagging but no cross-coach sharing",
+    "schedule_auto_pull": "Calendar was manually seeded from bspowercats.com — could automate",
+    "push_topics": "Basic FCM setup — could add group-based and event-based notification topics",
+    "attendance_trends": "Notification rules exist for streaks but trend detection could be richer",
+    "meet_live_mode": "Timer and live event tracking exist — could add spectator view and live results publishing"
+  },
+  "documentation": {
+    "full_overview": ".codex/FULL_APP_OVERVIEW.md — complete file map, service catalog, collection map",
+    "requirements": "Memory file: project_bspc_coach_app_requirements.md — original 50-question discovery",
+    "architecture": "Memory file: project_architecture_decision.md — Firebase stack decision rationale"
+  }
+}
