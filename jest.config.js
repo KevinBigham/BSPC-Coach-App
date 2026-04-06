@@ -10,6 +10,8 @@ module.exports = {
     'src/stores/**/*.{ts,tsx}',
     'src/utils/**/*.{ts,tsx}',
     'src/components/**/*.{ts,tsx}',
+    'src/data/**/*.{ts,tsx}',
+    'src/hooks/**/*.{ts,tsx}',
     '!src/**/*.d.ts',
     '!src/**/__tests__/**',
     '!src/**/__mocks__/**',

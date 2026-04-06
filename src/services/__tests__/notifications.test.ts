@@ -2,7 +2,16 @@ jest.mock('../../config/firebase', () => ({
   db: {},
   auth: { currentUser: { uid: 'test-uid' } },
   storage: {},
-  functions: {},
+  functions: { app: {} },
+}));
+
+const mockCallable = jest.fn().mockResolvedValue({ data: { success: true } });
+jest.mock('firebase/functions', () => ({
+  httpsCallable: jest.fn(() => mockCallable),
+}));
+
+jest.mock('../../utils/logger', () => ({
+  logger: { warn: jest.fn(), info: jest.fn(), error: jest.fn(), debug: jest.fn() },
 }));
 
 jest.mock('firebase/firestore', () => ({
@@ -40,6 +49,8 @@ import {
   getNotificationPermissionStatus,
   subscribeNotifications,
   markNotificationRead,
+  subscribeToGroupTopics,
+  unsubscribeFromAllTopics,
 } from '../notifications';
 
 const firestore = require('firebase/firestore');
@@ -106,5 +117,59 @@ describe('markNotificationRead', () => {
       expect.objectContaining({ path: 'notifications/notif-1' }),
       { read: true },
     );
+  });
+});
+
+describe('subscribeToGroupTopics', () => {
+  beforeEach(() => {
+    mockCallable.mockClear();
+  });
+
+  it('subscribes to group topics + broadcast_all', async () => {
+    await subscribeToGroupTopics('token-abc', ['Gold', 'Advanced'] as any);
+    expect(mockCallable).toHaveBeenCalledTimes(3);
+    expect(mockCallable).toHaveBeenCalledWith({
+      action: 'subscribe',
+      topic: 'group_Gold',
+      token: 'token-abc',
+    });
+    expect(mockCallable).toHaveBeenCalledWith({
+      action: 'subscribe',
+      topic: 'group_Advanced',
+      token: 'token-abc',
+    });
+    expect(mockCallable).toHaveBeenCalledWith({
+      action: 'subscribe',
+      topic: 'broadcast_all',
+      token: 'token-abc',
+    });
+  });
+
+  it('continues on individual topic failure', async () => {
+    mockCallable.mockRejectedValueOnce(new Error('network'));
+    await subscribeToGroupTopics('token-abc', ['Gold', 'Silver'] as any);
+    // Should still attempt all 3 topics (Gold fails, Silver + broadcast_all proceed)
+    expect(mockCallable).toHaveBeenCalledTimes(3);
+  });
+});
+
+describe('unsubscribeFromAllTopics', () => {
+  beforeEach(() => {
+    mockCallable.mockClear();
+  });
+
+  it('unsubscribes from group topics + broadcast_all', async () => {
+    await unsubscribeFromAllTopics('token-abc', ['Bronze'] as any);
+    expect(mockCallable).toHaveBeenCalledTimes(2);
+    expect(mockCallable).toHaveBeenCalledWith({
+      action: 'unsubscribe',
+      topic: 'group_Bronze',
+      token: 'token-abc',
+    });
+    expect(mockCallable).toHaveBeenCalledWith({
+      action: 'unsubscribe',
+      topic: 'broadcast_all',
+      token: 'token-abc',
+    });
   });
 });

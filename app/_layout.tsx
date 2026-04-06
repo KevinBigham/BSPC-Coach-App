@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { initSentry } from '../src/config/sentry';
 import { Stack, useRouter, useSegments } from 'expo-router';
+import * as Linking from 'expo-linking';
 
 initSentry();
 import { StatusBar } from 'expo-status-bar';
@@ -29,7 +30,10 @@ import { ErrorBoundary } from '../src/components/ErrorBoundary';
 import { setGlobalToast } from '../src/utils/errorHandler';
 import { useSwimmersStore } from '../src/stores/swimmersStore';
 import { useAttendanceStore } from '../src/stores/attendanceStore';
-import { registerForPushNotifications } from '../src/services/notifications';
+import {
+  registerForPushNotifications,
+  subscribeToGroupTopics,
+} from '../src/services/notifications';
 import { getTodayString } from '../src/utils/time';
 import NetInfo from '@react-native-community/netinfo';
 import { colors, fontFamily } from '../src/config/theme';
@@ -37,6 +41,8 @@ import OfflineIndicator from '../src/components/OfflineIndicator';
 import { processQueue } from '../src/utils/offlineQueue';
 import { uploadAudio, updateAudioSession } from '../src/services/audio';
 import { uploadVideo, updateVideoSession } from '../src/services/video';
+import { parseDeepLink } from '../src/utils/deepLinking';
+import { logger } from '../src/utils/logger';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -49,7 +55,7 @@ function GlobalToastWire() {
 }
 
 function RootNavigator() {
-  const { user, loading } = useAuth();
+  const { user, coach, loading } = useAuth();
   const router = useRouter();
   const segments = useSegments();
   const subscribeSwimmers = useSwimmersStore((s) => s.subscribe);
@@ -60,8 +66,14 @@ function RootNavigator() {
     if (!user) return;
     const unsubSwimmers = subscribeSwimmers();
     const unsubAttendance = subscribeAttendance(getTodayString());
-    // Register for push notifications (fire and forget)
-    registerForPushNotifications(user.uid).catch(() => {});
+    // Register for push notifications and subscribe to group topics
+    registerForPushNotifications(user.uid)
+      .then((token) => {
+        if (token && coach?.groups?.length) {
+          subscribeToGroupTopics(token, coach.groups).catch(() => {});
+        }
+      })
+      .catch(() => {});
     return () => {
       unsubSwimmers();
       unsubAttendance();
@@ -103,6 +115,28 @@ function RootNavigator() {
         ).catch(() => {});
       }
     });
+  }, [user]);
+
+  // Handle incoming deep links
+  useEffect(() => {
+    if (!user) return;
+
+    function handleUrl(event: { url: string }) {
+      const result = parseDeepLink(event.url);
+      if (result) {
+        logger.info('Deep link navigating to', { path: result.path });
+        router.push(result.path as any);
+      }
+    }
+
+    // Handle URL that launched the app
+    Linking.getInitialURL().then((url) => {
+      if (url) handleUrl({ url });
+    });
+
+    // Handle URLs while app is running
+    const sub = Linking.addEventListener('url', handleUrl);
+    return () => sub.remove();
   }, [user]);
 
   useEffect(() => {

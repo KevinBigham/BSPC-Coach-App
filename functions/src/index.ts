@@ -5,3 +5,8 @@ export { onNotificationCreated } from './triggers/onNotification';
 export { dailyDigest } from './scheduled/dailyDigest';
 export { generatePractice } from './callable/generatePractice';
 export { redeemInvite } from './callable/redeemInvite';
+export { manageTopicSubscription } from './callable/manageTopics';
+export { onAttendanceWritten } from './triggers/onAttendanceWritten';
+export { onTimesWritten } from './triggers/onTimesWritten';
+export { onNotesWritten } from './triggers/onNotesWritten';
+export { rebuildAggregations } from './scheduled/rebuildAggregations';

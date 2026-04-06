@@ -26,6 +26,10 @@ jobs:
         working-directory: functions
         run: npm ci
 
+      - name: Test functions
+        working-directory: functions
+        run: npm test
+
       - name: Build functions
         working-directory: functions
         run: npm run build
