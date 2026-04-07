@@ -34,14 +34,21 @@ describe('offlineQueue', () => {
     expect(queue).toEqual([]);
   });
 
-  it('enqueues an upload item', async () => {
-    await enqueueUpload({ type: 'audio', uri: 'file:///audio.m4a', metadata: { coachId: 'c1' } });
+  it('enqueues an upload item with idempotency key', async () => {
+    const key = await enqueueUpload({
+      type: 'audio',
+      uri: 'file:///audio.m4a',
+      metadata: { coachId: 'c1' },
+    });
+    expect(typeof key).toBe('string');
+    expect(key.length).toBeGreaterThan(0);
     const queue = await getQueue();
     expect(queue).toHaveLength(1);
     expect(queue[0].type).toBe('audio');
     expect(queue[0].uri).toBe('file:///audio.m4a');
     expect(queue[0].retryCount).toBe(0);
     expect(queue[0].id).toMatch(/^audio-/);
+    expect(queue[0].idempotencyKey).toBe(key);
     expect(queue[0].createdAt).toBeTruthy();
   });
 
@@ -106,5 +113,13 @@ describe('offlineQueue', () => {
   it('processQueue returns { processed: 0, failed: 0 } for empty queue', async () => {
     const result = await processQueue(jest.fn(), jest.fn());
     expect(result).toEqual({ processed: 0, failed: 0 });
+  });
+
+  it('generates unique idempotency keys for each enqueue', async () => {
+    const key1 = await enqueueUpload({ type: 'audio', uri: 'file:///a.m4a', metadata: {} });
+    const key2 = await enqueueUpload({ type: 'audio', uri: 'file:///b.m4a', metadata: {} });
+    expect(key1).not.toBe(key2);
+    const queue = await getQueue();
+    expect(queue[0].idempotencyKey).not.toBe(queue[1].idempotencyKey);
   });
 });

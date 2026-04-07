@@ -30,6 +30,18 @@ export interface ParentContact {
   relationship: string;
 }
 
+/** COPPA/SafeSport media consent status for a minor athlete */
+export interface MediaConsent {
+  /** Whether parent/guardian has granted verifiable consent for photo/video */
+  granted: boolean;
+  /** Date consent was granted or revoked */
+  date: FirebaseTimestamp;
+  /** Name of parent/guardian who provided consent */
+  grantedBy?: string;
+  /** Optional notes (e.g., "revoked 2026-03-01 via email") */
+  notes?: string;
+}
+
 export interface Swimmer {
   id?: string;
   firstName: string;
@@ -47,6 +59,8 @@ export interface Swimmer {
   goals: string[];
   parentContacts: ParentContact[];
   meetSchedule: string[];
+  /** COPPA/SafeSport media consent — controls video/photo tagging eligibility */
+  mediaConsent?: MediaConsent;
   createdAt: FirebaseTimestamp;
   updatedAt: FirebaseTimestamp;
   createdBy: string;

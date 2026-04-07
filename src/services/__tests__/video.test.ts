@@ -150,3 +150,30 @@ describe('getVideoStatusColor', () => {
     expect(getVideoStatusColor('posted')).toBe('#CCB000');
   });
 });
+
+describe('validateMediaConsent', () => {
+  const { validateMediaConsent } = require('../video');
+
+  const swimmers = [
+    { id: 's1', displayName: 'Alice A', mediaConsent: { granted: true, date: new Date() } },
+    { id: 's2', displayName: 'Bob B', mediaConsent: { granted: false, date: new Date() } },
+    { id: 's3', displayName: 'Charlie C' },
+    { id: 's4', displayName: 'Dana D', mediaConsent: { granted: true, date: new Date() } },
+  ] as any[];
+
+  it('returns empty array when all tagged swimmers have consent', () => {
+    expect(validateMediaConsent(['s1', 's4'], swimmers)).toEqual([]);
+  });
+
+  it('returns names of swimmers without consent', () => {
+    expect(validateMediaConsent(['s1', 's2', 's3'], swimmers)).toEqual(['Bob B', 'Charlie C']);
+  });
+
+  it('returns empty array for empty tag list', () => {
+    expect(validateMediaConsent([], swimmers)).toEqual([]);
+  });
+
+  it('ignores IDs not found in swimmers list', () => {
+    expect(validateMediaConsent(['s999'], swimmers)).toEqual([]);
+  });
+});

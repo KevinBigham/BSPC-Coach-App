@@ -18,8 +18,10 @@ import type {
   VideoSession,
   VideoSessionStatus,
   VideoAnalysisDraft,
+  Swimmer,
 } from '../types/firestore.types';
 import type { Group } from '../config/constants';
+import { hasMediaConsent } from '../utils/mediaConsent';
 
 type VideoSessionWithId = VideoSession & { id: string };
 
@@ -52,6 +54,20 @@ export function subscribeVideoDrafts(
       snapshot.docs.map((d) => ({ id: d.id, ...d.data() }) as VideoAnalysisDraft & { id: string }),
     );
   });
+}
+
+/**
+ * Validate that all tagged swimmers have media consent on file.
+ * Returns the list of swimmer names that lack consent (empty = all clear).
+ */
+export function validateMediaConsent(
+  taggedSwimmerIds: string[],
+  swimmers: (Swimmer & { id: string })[],
+): string[] {
+  return taggedSwimmerIds
+    .map((id) => swimmers.find((s) => s.id === id))
+    .filter((s): s is Swimmer & { id: string } => !!s && !hasMediaConsent(s))
+    .map((s) => s.displayName);
 }
 
 export async function createVideoSession(
