@@ -1,15 +1,18 @@
-# BSPC Coach App - Complete Project Overview
+# BSPC Coach App — Complete Project Overview
 
-**Version**: 1.2.0 | **Framework**: React Native + Expo SDK 54 | **Backend**: Firebase
-**Tests**: 602 passing across 55 suites | **Screens**: 49 | **Services**: 30 | **Stores**: 8
-**Cloud Functions**: 12 source files, 7 deployed functions
-**GitHub**: KevinBigham/BSPC-Coach-App (private)
+**Version**: 1.3.0 | **Framework**: React Native + Expo SDK 54 | **Backend**: Firebase
+**Tests**: 852 passing (799 client + 53 functions) across 85 suites
+**Screens**: 51 | **Services**: 30 | **Stores**: 8 | **Hooks**: 6 | **Components**: 22
+**Cloud Functions**: 12 deployed (18 source files) | **AI Knowledge Base**: 1,702 lines
+**GitHub**: KevinBigham/BSPC-Coach-App (private) | **Commits**: 41
 
 ---
 
 ## What This App Does
 
-A coaching app for the **Blue Springs Power Cats** (BSPC) competitive swim team. Coaches use it to manage swimmers, track attendance, plan practices, run meets, record audio/video for AI analysis, view analytics, and export reports. The visual theme is "Arcade Prime Time" — a dark broadcast studio aesthetic with purple and gold accents.
+A coaching app for the **Blue Springs Power Cats** (BSPC) competitive swim team. Coaches manage swimmers, track attendance, plan practices (with AI generation), run meets (with live timing), record audio/video for AI analysis, view analytics, and export reports. The AI is trained on actual BSPC workout data, drills, group standards, and coaching philosophy.
+
+Visual theme: "Arcade Prime Time" — dark broadcast studio aesthetic with purple (#B388FF) and gold (#FFD700) accents. No emoji in UIs — lucide-react-native icons only.
 
 ---
 
@@ -18,10 +21,10 @@ A coaching app for the **Blue Springs Power Cats** (BSPC) competitive swim team.
 | Layer | Technology |
 |-------|-----------|
 | Framework | React Native 0.81.5 + Expo 54 + Expo Router 6 |
-| Language | TypeScript (strict mode) |
+| Language | TypeScript 5.9.2 (strict mode, zero `any`) |
 | State | Zustand 5 (8 stores) + React Context (Auth, Toast) |
 | Backend | Firebase JS SDK 12 (Firestore, Auth, Storage, Functions v2) |
-| AI | Google Cloud Vertex AI (Gemini 2.0 Flash) via Cloud Functions |
+| AI | Google Cloud Vertex AI — Gemini 2.0 Flash via Cloud Functions |
 | Testing | Jest 29 + jest-expo + @testing-library/react-native |
 | Error Tracking | Sentry (production only) |
 | Build | EAS Build (dev/preview/production profiles) |
@@ -31,25 +34,8 @@ A coaching app for the **Blue Springs Power Cats** (BSPC) competitive swim team.
 
 ## File Map
 
-### Root Config
-| File | Purpose |
-|------|---------|
-| `app.json` | Expo config: name, icons, splash, plugins, EAS |
-| `package.json` | Dependencies, scripts, lint-staged |
-| `tsconfig.json` | Strict TS, extends expo/tsconfig.base |
-| `firebase.json` | Firestore/Storage rules paths, Functions config |
-| `firestore.rules` | 176 lines, 20+ collection rules with isCoach/isAdmin helpers |
-| `storage.rules` | Audio (100MB), video (500MB), photos (5MB), imports (50MB) |
-| `firestore.indexes.json` | Composite indexes for attendance, swimmers, notes |
-| `eas.json` | Build profiles: development, preview, production |
-| `babel.config.js` | babel-preset-expo + console strip in production |
-| `jest.config.js` | jest-expo preset, 50% coverage threshold |
-| `jest.setup.ts` | Mocks for expo-*, lucide, reanimated, netinfo, sentry |
-| `.eslintrc.js` | TS parser, react/hooks plugin, prettier integration |
-| `.prettierrc` | Single quotes, trailing commas, 100 char width |
-| `.env.example` | 7 Firebase vars + optional Sentry DSN |
+### App Screens (51 screens in `app/`)
 
-### App Screens (49 screens in `app/`)
 | Route | Screen | Key Features |
 |-------|--------|-------------|
 | `(tabs)/index` | Dashboard | Welcome card, pending AI drafts, meet countdown, recent PRs, quick stats, action grid, attendance charts, activity feed |
@@ -65,7 +51,7 @@ A coaching app for the **Blue Springs Power Cats** (BSPC) competitive swim team.
 | `swimmer/new` | Add Swimmer | Name, DOB, gender, group, parent contact |
 | `swimmer/edit` | Edit Swimmer | Photo upload, all fields + goals/strengths/focus areas, multi-parent contacts |
 | `swimmer/medical` | Medical Info | Allergies, conditions, medications, emergency notes (admin-only write) |
-| `swimmer/standards` | Time Standards | USA Swimming motivational times by event/age group |
+| `swimmer/standards` | Time Standards | USA Swimming motivational times by event/age group (SCY/LCM/SCM) |
 | `swimmer/invite-parent` | Parent Invite | Generate shareable invite code (7-day expiry) |
 | `calendar` | Calendar | Month grid, event dots by type, upcoming events |
 | `calendar/[date]` | Day Detail | Events for specific date |
@@ -103,6 +89,7 @@ A coaching app for the **Blue Springs Power Cats** (BSPC) competitive swim team.
 | `season/week` | Week Detail | Weekly training breakdown |
 
 ### Services (30 files in `src/services/`)
+
 | Service | Firestore Collections | Key Functions |
 |---------|----------------------|---------------|
 | `aiDrafts` | audio_sessions, swimmers/notes | subscribePendingDrafts, approveDraft, rejectDraft, approveAllDrafts |
@@ -123,7 +110,7 @@ A coaching app for the **Blue Springs Power Cats** (BSPC) competitive swim team.
 | `meets` | meets, entries, relays | subscribeMeets, addMeet, subscribeEntries, generatePsychSheet |
 | `notes` | swimmers/notes | subscribeNotes, addNote, deleteNote |
 | `notificationRules` | notification_rules | subscribeNotificationRules, evaluateAttendanceStreak |
-| `notifications` | coaches, notifications | registerForPushNotifications, subscribeNotifications |
+| `notifications` | coaches, notifications | registerForPushNotifications, subscribeToGroupTopics, unsubscribeFromAllTopics |
 | `parentInvites` | parent_invites | createParentInvite, subscribeInvitesForSwimmer |
 | `practicePlans` | practice_plans | subscribePracticePlans, addPracticePlan, duplicateAsTemplate |
 | `profilePhoto` | swimmers, Storage | uploadProfilePhoto, deleteProfilePhoto |
@@ -132,11 +119,12 @@ A coaching app for the **Blue Springs Power Cats** (BSPC) competitive swim team.
 | `seasonPlanning` | season_plans, weeks | subscribeSeasonPlans, generateWeekPlans, calculateTaperProgress |
 | `swimmers` | swimmers | subscribeSwimmers, addSwimmer, updateSwimmer |
 | `times` | swimmers/times | subscribeTimes, addTime (with auto-PR detection), deleteTime |
-| `video` | video_sessions, drafts | subscribeVideoSessions, uploadVideo, deleteVideoSession |
+| `video` | video_sessions, drafts | subscribeVideoSessions, uploadVideo, validateMediaConsent, deleteVideoSession |
 | `videoDrafts` | video_sessions/drafts, swimmers/notes | approveVideoDraft, rejectVideoDraft |
 | `workoutLibrary` | practice_plans | subscribeWorkouts, tagWorkout, rateWorkout |
 
 ### Stores (8 Zustand stores in `src/stores/`)
+
 | Store | State | Key Computed |
 |-------|-------|-------------|
 | `swimmersStore` | swimmers[], loading | getSwimmerById, getSwimmersByGroup |
@@ -148,14 +136,25 @@ A coaching app for the **Blue Springs Power Cats** (BSPC) competitive swim team.
 | `seasonStore` | plans, activePlan, weeks | subscribePlans, subscribeWeeks |
 | `videoStore` | sessions, selectedSession, uploadProgress | reset |
 
+### Hooks (6 in `src/hooks/`)
+
+| Hook | Returns | Wraps |
+|------|---------|-------|
+| `useSwimmer(id)` | { swimmer, loading } | onSnapshot on swimmer doc |
+| `useTimes(swimmerId, limit?)` | { times, loading } | subscribeTimes |
+| `useGoals(swimmerId)` | { goals, loading } | subscribeGoals |
+| `useSwimmerAttendance(swimmerId, limit?)` | { records, loading } | subscribeSwimmerAttendance |
+| `useMeetDetails(meetId)` | { meet, entries, loading } | meet doc + entries subcollection |
+
 ### Components (22 in `src/components/`)
+
 | Component | Purpose |
 |-----------|---------|
 | `ErrorBoundary` | App-level error catching with retry |
 | `ScreenErrorBoundary` | Screen-level error catching with navigation |
 | `OfflineIndicator` | Amber "OFFLINE MODE" banner with slide animation |
 | `Toast` | Animated success/error/info notifications |
-| `Skeleton`, `SkeletonLine`, `SkeletonCard`, `SkeletonList` | Loading placeholders with pulse animation |
+| `Skeleton`, `SkeletonLine`, `SkeletonCard`, `SkeletonList` | Loading placeholders |
 | `ProgressionChart` | PR progression bar chart with trend indicator |
 | `SplitComparisonChart` | Per-50 split overlay comparison |
 | `CalendarMonth` | Monthly grid with event type dots |
@@ -172,15 +171,8 @@ A coaching app for the **Blue Springs Power Cats** (BSPC) competitive swim team.
 | `PsychSheet` | Meet entries heat sheet |
 | `PRCelebration` | Personal record animation |
 
-### Charts (`src/components/charts/`)
-| Chart | Purpose |
-|-------|---------|
-| `BarChart` | Generic bar chart with auto-scaling |
-| `SparkLine` | Inline mini chart for dashboard |
-| `TimeDropChart` | Time improvement visualization |
-| `AttendanceHeatmap` | GitHub-style 7x12 grid |
+### Utils (10 in `src/utils/`)
 
-### Utils (8 in `src/utils/`)
 | Utility | Key Exports |
 |---------|-------------|
 | `date` | formatRelativeTime, formatShortDate, daysAgo |
@@ -188,36 +180,54 @@ A coaching app for the **Blue Springs Power Cats** (BSPC) competitive swim team.
 | `logger` | logger.debug/info/warn/error + Sentry breadcrumbs |
 | `errorHandler` | handleError, withRetry (exponential backoff) |
 | `haptics` | tapLight/Medium/Heavy, notifySuccess/Warning/Error |
-| `offlineQueue` | enqueueUpload, processQueue (AsyncStorage-backed, 3 retries) |
+| `offlineQueue` | enqueueUpload (with idempotency keys), processQueue (3 retries) |
 | `meetTiming` | formatSplitDisplay, calculatePlacement, detectPR |
 | `relay` | optimizeFreeRelayOrder, optimizeMedleyRelayOrder, estimateRelayTime |
+| `deepLinking` | parseDeepLink — 4 routes (swimmer, meet, calendar, invite) |
+| `mediaConsent` | hasMediaConsent, filterConsentedSwimmers, grantConsent, revokeConsent |
 
-### Cloud Functions (7 deployed from `functions/src/`)
+### Cloud Functions (12 deployed from `functions/src/`)
+
 | Function | Type | Trigger | Purpose |
 |----------|------|---------|---------|
 | `generatePractice` | Callable | HTTP | AI practice plan generation (Gemini 2.0 Flash) |
 | `redeemInvite` | Callable | HTTP | Parent invitation code redemption |
-| `onAudioUploaded` | Trigger | audio_sessions update → "uploaded" | Transcribe audio, extract swimmer observations |
-| `onVideoUploaded` | Trigger | video_sessions update → "uploaded" | Analyze video technique, generate drafts |
-| `onDraftReviewed` | Trigger | drafts update → approved set | Mark session "posted" when all drafts reviewed |
-| `onNotificationCreated` | Trigger | notifications create | Send FCM push notification to coach devices |
-| `dailyDigest` | Scheduled | Every day at 8 PM | Daily attendance/notes/video summary |
+| `manageTopicSubscription` | Callable | HTTP | FCM topic subscribe/unsubscribe |
+| `onAudioUploaded` | Trigger | audio_sessions → "uploaded" | Transcribe audio + extract swimmer observations |
+| `onVideoUploaded` | Trigger | video_sessions → "uploaded" | Analyze video technique + generate drafts |
+| `onDraftReviewed` | Trigger | drafts → approved | Mark session "posted" when all drafts reviewed |
+| `onNotificationCreated` | Trigger | notifications create | Send FCM push notification |
+| `onAttendanceWritten` | Trigger | attendance write | Recompute attendance aggregations |
+| `onTimesWritten` | Trigger | swimmers/times write | Recompute swimmer PR aggregations |
+| `onNotesWritten` | Trigger | swimmers/notes write | Recompute note count aggregations |
+| `dailyDigest` | Scheduled | 8 PM daily | Attendance/notes/video summary |
+| `rebuildAggregations` | Scheduled | 4 AM daily | Full aggregation rebuild safety net |
 
-### Data & Types
+### AI Knowledge Base (`functions/src/ai/swimKnowledge.ts` — 1,702 lines)
+
+| Content | Count |
+|---------|-------|
+| Named drills (organized by stroke) | 60+ |
+| Group skill profiles (Bronze→Diamond) | 6 |
+| Common faults with corrections | 30+ |
+| Turn coaching breakdowns | 7 turn types |
+| BR pullout sequence | 6 steps |
+| Interval references (real BSPC data) | All 6 groups |
+| Swimming glossary terms | 50+ |
+| Breakout focus points | 10 |
+| Team philosophy statements | 8 |
+| Helper functions | 5 |
+
+All data sourced from actual BSPC workout logs (Sept 2024–Dec 2025), Sheaff Performance Development Principles, and BSPC group promotion documents.
+
+### Data Files
+
 | File | Contents |
 |------|----------|
-| `src/types/firestore.types.ts` | 60+ interfaces: Coach, Swimmer, SwimTime, AttendanceRecord, AudioSession, VideoSession, PracticePlan, CalendarEvent, Meet, SeasonPlan, etc. |
-| `src/types/meet.types.ts` | Meet-specific: MeetEntry, Relay, RelayLeg, PsychSheetEntry |
+| `src/data/timeStandards.ts` | USA Swimming SCY + LCM + SCM motivational time standards (3,614 lines, all age groups/genders/events) |
+| `src/types/firestore.types.ts` | 60+ interfaces including MediaConsent for COPPA compliance |
 | `src/config/constants.ts` | All domain enums: GROUPS, EVENTS, STROKES, COURSES, NOTE_TAGS, etc. |
 | `src/config/theme.ts` | Colors, fonts, spacing, border radius, group colors |
-| `src/data/timeStandards.ts` | USA Swimming SCY motivational time standards (550+ entries) |
-
-### Scripts (in `scripts/`)
-| Script | Purpose |
-|--------|---------|
-| `seed-calendar.ts` | Seed Spring 2026 practice schedule (204 events) |
-| `seed-meets.ts` | Seed 2 meets with events |
-| `seed-roster.ts` | Import real roster from Excel file |
 
 ---
 
@@ -245,59 +255,71 @@ A coaching app for the **Blue Springs Power Cats** (BSPC) competitive swim team.
 
 ---
 
-## Firebase Project Details
+## Development Phases Completed (17 + post-sprint)
 
-| Key | Value |
-|-----|-------|
-| Project ID | bspc-coach |
-| API Key | AIzaSyCR_X-LQST_7xDpqWoUcVCzwmEc9Rctvs8 |
-| Auth Domain | bspc-coach.firebaseapp.com |
-| Storage Bucket | bspc-coach.firebasestorage.app |
-| Functions Region | us-central1 |
-| Messaging Sender ID | (in .env) |
-| App ID | (in .env) |
-
----
-
-## Development Phases Completed
-
-| Phase | Commit | What Shipped |
-|-------|--------|-------------|
-| 0-1 | ec5fc6e, e5e29ea | Full app foundation, all 49 screens, 28 services, Arcade Prime Time theme |
-| 2 | 0971d7e | ESLint, Prettier, Husky, zero `any` types |
-| 3 | ec7c438 | EAS Build (dev/preview/production profiles) |
-| 4 | 7f61309 | Jest + RNTL testing infrastructure |
-| 5 | 01a6780 | Core test suite: 437 tests across 37 suites |
-| 6 | b7d4096 | GitHub Actions CI/CD pipeline |
-| 7 | 15668ff | Error handling: boundaries, logger, withRetry |
-| 8 | 503d756 | Performance: skeleton loaders, haptics |
-| 9A | cc2267c | Season planning with periodization |
-| 9B-D | ec34df9 | Race analytics, doc export, notification rules |
-| 10 | bb14f9d | App Store prep: privacy policy, terms of service |
-| 11 | 1e845a2 | Wire analytics to real data, fix calendar collection |
-| 12 | cc20f80 | Offline persistence + upload queue |
-| 13 | 1065a35 | Video temporal comparison screen |
-| 14 | f1363a1 | Profile photos + media delete functions |
-| 15 | c1b3bfa | Firestore rules hardening, Sentry, babel, v1.2.0 |
-| 16 | e02d2ed | DOCX export for practice plans and reports |
+| Phase | What Shipped |
+|-------|-------------|
+| 0-1 | Full app foundation — 49 screens, 28 services, Arcade Prime Time theme |
+| 2 | ESLint, Prettier, Husky, zero `any` types |
+| 3 | EAS Build (dev/preview/production profiles) |
+| 4 | Jest + RNTL testing infrastructure |
+| 5 | Core test suite — 437 tests across 37 suites |
+| 6 | GitHub Actions CI/CD pipeline |
+| 7 | Error handling — boundaries, logger, withRetry |
+| 8 | Performance — skeleton loaders, haptics |
+| 9A | Season planning with periodization |
+| 9B-D | Race analytics, doc export, notification rules |
+| 10 | App Store prep — privacy policy, terms of service |
+| 11 | Wire analytics to real data, fix calendar collection |
+| 12 | Offline persistence + upload queue + OfflineIndicator |
+| 13 | Video temporal comparison screen |
+| 14 | Profile photos + media delete functions |
+| 15 | Firestore rules hardening, Sentry, babel, v1.2.0 |
+| 16 | DOCX export for practice plans and reports |
+| 17 | Sprint — LCM/SCM standards, aggregations, deep linking, FCM topics, hooks, full test coverage, v1.3.0 |
+| Post-17 | Idempotency keys, COPPA/SafeSport media consent, swimming knowledge base (1,702 lines), upgraded all 4 AI prompts |
 
 ---
 
-## Known Gaps & Future Opportunities
+## Known Gaps & Future Roadmap
 
-### Not Yet Implemented
-1. **Parent Portal** — `parent-portal/` directory exists but excluded from build; parents can redeem invites but no parent-facing app yet
-2. **LCM/SCM Time Standards** — Only SCY standards populated in `timeStandards.ts`
-3. **Custom Hooks** — `src/hooks/` directory is empty; patterns like useOffline, useFormState could be extracted
-4. **Aggregations** — `aggregations` collection exists in rules but no Cloud Function populates it yet
-5. **Workout Library Community Sharing** — Service exists but no sharing/import between coaches
-6. **Meet Import from bspowercats.com** — Calendar was seeded manually; could auto-pull schedule
-7. **EAS Submit** — Apple/Google store credentials marked FILL_AFTER_ENROLLMENT in eas.json
+### Ready to Build Next
+1. **Parent Portal** — `parent-portal/` scaffold exists (Next.js 15), invite system works, need full parent-facing UI
+2. **EAS Submit** — Apple Developer enrollment submitted (pending ~1-2 days), Google Play needs setup
+3. **Wire aggregations to dashboard** — Cloud Functions write aggregations, dashboard needs to read them
+4. **Deploy Cloud Functions** — Need `FIREBASE_TOKEN` GitHub secret to enable auto-deploy
 
-### Quality Improvements
-1. **Coverage** — 602 tests at ~50% threshold; component tests are light vs service tests
-2. **E2E Tests** — No Detox/Maestro end-to-end tests yet
-3. **Storybook** — No component library documentation
-4. **Deep Linking** — URL scheme `bspc-coach://` registered but no deep link handlers
-5. **Push Notification Channels** — Basic FCM setup; could add topic-based channels
-6. **Batch Writes** — Some services could benefit from Firestore batched writes for atomicity
+### Medium Priority
+5. **E2E Tests** — No Detox/Maestro tests for critical flows (check-in, recording, meet management)
+6. **Workout cross-coach sharing** — Service exists but no sharing/import between coaches
+7. **Auto-pull schedule from bspowercats.com** — Calendar currently manually seeded
+8. **Meet spectator/live results** — Timer exists, could add spectator view
+9. **Push notification topics** — FCM topic infra built, could add group notifications UI
+
+### Lower Priority
+10. **Component test coverage** — All 22 components tested but some tests are light
+11. **Storybook** — No component library documentation
+12. **Attendance trend enrichment** — Notification rules exist, trend detection could be richer
+
+### Compliance (CRITICAL before parent portal)
+- **COPPA**: MediaConsent type + utilities built, need to wire consent gate into video/audio upload UI
+- **SafeSport MAAPP**: Need "Do Not Photograph" enforcement in tagging flows
+- **MSHSAA streaming**: Need approval workflow for postseason meet streaming
+- Reference: memory file `reference_coppa_safesport_compliance.md`
+
+---
+
+## Critical Patterns
+
+| Pattern | Detail |
+|---------|--------|
+| Time Format | All times stored as hundredths of seconds (6523 = 1:05.23) |
+| Firebase Timestamps | Typed as Date but runtime needs .toDate() |
+| PR Detection | Auto-detected in addTime(), old PRs un-flagged |
+| Batch Limit | All bulk writes chunk at 400 (Firestore max 500) |
+| Subscription Cleanup | All services return unsubscribe; stores manage single sub |
+| Relay Optimization | Free: 2nd→slowest→3rd→fastest. Medley: greedy by stroke |
+| Offline Queue | AsyncStorage-backed, 3 retries, idempotency keys |
+| AI Draft Pipeline | All AI results → draft review → coach approve/reject → post |
+| Media Consent | COPPA/SafeSport consent check before video/audio tagging |
+| PATH Note | npm/npx commands need: `export PATH="/opt/homebrew/bin:$PATH"` |
