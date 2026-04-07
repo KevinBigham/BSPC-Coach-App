@@ -13,7 +13,7 @@ interface ExtractedObservation {
 export async function extractObservations(
   sessionId: string,
   transcription: string,
-  group: string | null
+  group: string | null,
 ): Promise<void> {
   // Fetch swimmer names for matching
   let swimmerQuery: admin.firestore.Query = db.collection('swimmers').where('active', '==', true);
@@ -32,10 +32,13 @@ export async function extractObservations(
 
   // Call Gemini for extraction
   const { VertexAI } = await import('@google-cloud/vertexai');
-  const vertexAi = new VertexAI({ project: process.env.GCLOUD_PROJECT || '', location: 'us-central1' });
+  const vertexAi = new VertexAI({
+    project: process.env.GCLOUD_PROJECT || '',
+    location: 'us-central1',
+  });
   const model = vertexAi.getGenerativeModel({ model: 'gemini-2.0-flash' });
 
-  const prompt = getPrompt(transcription, swimmerNames);
+  const prompt = getPrompt(transcription, swimmerNames, group || undefined);
 
   const result = await model.generateContent({
     contents: [{ role: 'user', parts: [{ text: prompt }] }],
@@ -64,16 +67,32 @@ export async function extractObservations(
       return (
         name === s.displayName.toLowerCase() ||
         name === s.firstName.toLowerCase() ||
-        name.includes(s.firstName.toLowerCase()) && name.includes(s.lastName.toLowerCase())
+        (name.includes(s.firstName.toLowerCase()) && name.includes(s.lastName.toLowerCase()))
       );
     });
 
     if (!matched) continue;
 
     const validTags = [
-      'technique', 'freestyle', 'backstroke', 'breaststroke', 'butterfly',
-      'IM', 'starts', 'turns', 'underwaters', 'breakouts', 'kick', 'pull',
-      'drill', 'endurance', 'speed', 'race strategy', 'mental', 'attendance', 'general',
+      'technique',
+      'freestyle',
+      'backstroke',
+      'breaststroke',
+      'butterfly',
+      'IM',
+      'starts',
+      'turns',
+      'underwaters',
+      'breakouts',
+      'kick',
+      'pull',
+      'drill',
+      'endurance',
+      'speed',
+      'race strategy',
+      'mental',
+      'attendance',
+      'general',
     ];
     const tags = (obs.tags || []).filter((t: string) => validTags.includes(t));
 
