@@ -1,10 +1,10 @@
 # BSPC Coach App — Complete Project Overview
 
-**Version**: 1.3.0 | **Framework**: React Native + Expo SDK 54 | **Backend**: Firebase
-**Tests**: 852 passing (799 client + 53 functions) across 85 suites
-**Screens**: 51 | **Services**: 30 | **Stores**: 8 | **Hooks**: 6 | **Components**: 22
+**Version**: 1.3.1 | **Framework**: React Native + Expo SDK 54 | **Backend**: Firebase
+**Tests**: 861 passing (808 client + 53 functions) across 79 suites
+**Screens**: 51 | **Services**: 31 | **Stores**: 8 | **Hooks**: 6 | **Components**: 22
 **Cloud Functions**: 12 deployed (18 source files) | **AI Knowledge Base**: 1,702 lines
-**GitHub**: KevinBigham/BSPC-Coach-App (private) | **Commits**: 41
+**GitHub**: KevinBigham/BSPC-Coach-App (private) | **Commits**: 43
 
 ---
 
@@ -92,6 +92,7 @@ Visual theme: "Arcade Prime Time" — dark broadcast studio aesthetic with purpl
 
 | Service | Firestore Collections | Key Functions |
 |---------|----------------------|---------------|
+| `aggregations` | aggregations | subscribeAttendanceAggregation, subscribeSwimmerAggregation, getPRCount |
 | `aiDrafts` | audio_sessions, swimmers/notes | subscribePendingDrafts, approveDraft, rejectDraft, approveAllDrafts |
 | `aiPractice` | (Cloud Function) | generatePractice |
 | `analytics` | swimmers, times, attendance | getTimeDrops, getAttendanceCorrelation, getGroupProgressReport |
