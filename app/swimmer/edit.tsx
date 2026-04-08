@@ -26,6 +26,7 @@ import { GROUPS, type Group } from '../../src/config/constants';
 import * as ImagePicker from 'expo-image-picker';
 import type { Swimmer, ParentContact } from '../../src/types/firestore.types';
 import { uploadProfilePhoto, deleteProfilePhoto } from '../../src/services/profilePhoto';
+import { grantConsent, revokeConsent } from '../../src/utils/mediaConsent';
 
 export default function EditSwimmerScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -50,6 +51,11 @@ export default function EditSwimmerScreen() {
   // Photo
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [photoUploading, setPhotoUploading] = useState(false);
+
+  // Media consent
+  const [consentGranted, setConsentGranted] = useState(false);
+  const [consentGrantedBy, setConsentGrantedBy] = useState('');
+  const [consentNotes, setConsentNotes] = useState('');
 
   // Parent contacts
   const [parentContacts, setParentContacts] = useState<ParentContact[]>([]);
@@ -76,6 +82,9 @@ export default function EditSwimmerScreen() {
               ? s.parentContacts
               : [{ name: '', phone: '', email: '', relationship: 'Parent' }],
           );
+          setConsentGranted(s.mediaConsent?.granted === true);
+          setConsentGrantedBy(s.mediaConsent?.grantedBy || '');
+          setConsentNotes(s.mediaConsent?.notes || '');
           setPhotoUrl(s.profilePhotoUrl || null);
         }
       } catch (err: any) {
@@ -99,6 +108,10 @@ export default function EditSwimmerScreen() {
           .map((l) => l.trim())
           .filter(Boolean);
 
+      const mediaConsent = consentGranted
+        ? grantConsent(consentGrantedBy.trim() || 'Unknown', consentNotes.trim() || undefined)
+        : revokeConsent(consentNotes.trim() || undefined);
+
       await updateDoc(doc(db, 'swimmers', id!), {
         firstName: firstName.trim(),
         lastName: lastName.trim(),
@@ -112,6 +125,7 @@ export default function EditSwimmerScreen() {
         strengths: toArray(strengths),
         techniqueFocusAreas: toArray(focusAreas),
         parentContacts: parentContacts.filter((pc) => pc.name.trim()),
+        mediaConsent,
         updatedAt: serverTimestamp(),
       });
 
@@ -326,6 +340,50 @@ export default function EditSwimmerScreen() {
           </View>
         </View>
 
+        {/* Media Consent (COPPA/SafeSport) */}
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>MEDIA CONSENT</Text>
+          <Text style={styles.consentDesc}>
+            Required for video/photo tagging. Parent/guardian must provide verifiable consent per
+            COPPA and SafeSport MAAPP requirements.
+          </Text>
+          <View style={styles.toggleRow}>
+            <TouchableOpacity
+              style={[styles.toggleButton, consentGranted && styles.toggleActiveGold]}
+              onPress={() => setConsentGranted(true)}
+            >
+              <Text style={styles.toggleText}>Granted</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.toggleButton, !consentGranted && styles.toggleActiveError]}
+              onPress={() => setConsentGranted(false)}
+            >
+              <Text style={styles.toggleText}>Not Granted</Text>
+            </TouchableOpacity>
+          </View>
+          {consentGranted && (
+            <>
+              <Text style={styles.label}>GRANTED BY (parent/guardian name)</Text>
+              <TextInput
+                style={styles.input}
+                value={consentGrantedBy}
+                onChangeText={setConsentGrantedBy}
+                placeholder="Parent/guardian name"
+                placeholderTextColor={colors.textSecondary}
+                autoCapitalize="words"
+              />
+            </>
+          )}
+          <Text style={styles.label}>NOTES</Text>
+          <TextInput
+            style={styles.input}
+            value={consentNotes}
+            onChangeText={setConsentNotes}
+            placeholder="e.g. Signed form on file, email confirmation"
+            placeholderTextColor={colors.textSecondary}
+          />
+        </View>
+
         {/* Goals, Strengths, Focus Areas */}
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>DEVELOPMENT</Text>
@@ -486,6 +544,13 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     alignItems: 'center',
     backgroundColor: colors.bgBase,
+  },
+  consentDesc: {
+    fontFamily: fontFamily.body,
+    fontSize: fontSize.xs,
+    color: colors.textSecondary,
+    lineHeight: 18,
+    marginBottom: spacing.md,
   },
   toggleActive: { backgroundColor: colors.purple, borderColor: colors.purpleLight },
   toggleActiveGold: { backgroundColor: colors.goldDark, borderColor: colors.gold },

@@ -10,6 +10,7 @@ import {
   Image,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
+import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../../src/config/firebase';
 import { useAuth } from '../../src/contexts/AuthContext';
 import {
@@ -24,7 +25,12 @@ import { GROUPS, type Group } from '../../src/config/constants';
 import { subscribeSwimmers, updateSwimmer } from '../../src/services/swimmers';
 import { exportRosterCSV, shareCSV } from '../../src/services/export';
 import { useSwimmersStore } from '../../src/stores/swimmersStore';
-import type { Swimmer } from '../../src/types/firestore.types';
+import { getPRCount } from '../../src/services/aggregations';
+import type {
+  Swimmer,
+  AttendanceAggregation,
+  SwimmerAggregation,
+} from '../../src/types/firestore.types';
 
 type SortOption = 'az' | 'za' | 'group' | 'newest';
 const SORT_LABELS: Record<SortOption, string> = {
@@ -45,6 +51,48 @@ export default function RosterScreen() {
     params.group && GROUPS.includes(params.group as Group) ? (params.group as Group) : 'All',
   );
   const [sort, setSort] = useState<SortOption>('az');
+  const [attendanceAggs, setAttendanceAggs] = useState<Record<string, AttendanceAggregation>>({});
+  const [swimmerAggs, setSwimmerAggs] = useState<Record<string, SwimmerAggregation>>({});
+
+  // Subscribe to aggregation docs for all active swimmers
+  useEffect(() => {
+    const unsubs: (() => void)[] = [];
+    const ids = activeSwimmers.map((s) => s.id).filter(Boolean);
+
+    ids.forEach((id) => {
+      unsubs.push(
+        onSnapshot(
+          doc(db, 'aggregations', `attendance_${id}`),
+          (snap) => {
+            if (snap.exists()) {
+              setAttendanceAggs((prev) => ({
+                ...prev,
+                [id]: snap.data() as AttendanceAggregation,
+              }));
+            }
+          },
+          () => {
+            /* ignore errors */
+          },
+        ),
+      );
+      unsubs.push(
+        onSnapshot(
+          doc(db, 'aggregations', `swimmer_${id}`),
+          (snap) => {
+            if (snap.exists()) {
+              setSwimmerAggs((prev) => ({ ...prev, [id]: snap.data() as SwimmerAggregation }));
+            }
+          },
+          () => {
+            /* ignore errors */
+          },
+        ),
+      );
+    });
+
+    return () => unsubs.forEach((u) => u());
+  }, [activeSwimmers]);
 
   useEffect(() => {
     if (showInactive) {
@@ -153,6 +201,17 @@ export default function RosterScreen() {
               {item.group}
             </Text>
           </View>
+          {attendanceAggs[item.id] && (
+            <Text style={styles.aggStat}>
+              {Math.round(attendanceAggs[item.id].attendancePercent30)}%
+            </Text>
+          )}
+          {swimmerAggs[item.id] && getPRCount(swimmerAggs[item.id]) > 0 && (
+            <Text style={styles.aggStatPR}>
+              {getPRCount(swimmerAggs[item.id])} PR
+              {getPRCount(swimmerAggs[item.id]) !== 1 ? 's' : ''}
+            </Text>
+          )}
           {item.usaSwimmingId && <Text style={styles.usaId}>USA #{item.usaSwimmingId}</Text>}
         </View>
       </View>
@@ -445,6 +504,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   groupBadgeText: { fontFamily: fontFamily.pixel, fontSize: fontSize.pixel },
+  aggStat: { fontFamily: fontFamily.statMono, fontSize: fontSize.xs, color: colors.success },
+  aggStatPR: { fontFamily: fontFamily.statMono, fontSize: fontSize.xs, color: colors.gold },
   usaId: { fontFamily: fontFamily.statMono, fontSize: fontSize.xs, color: colors.textSecondary },
   chevron: { fontSize: fontSize.xxl, color: colors.textSecondary, marginLeft: spacing.sm },
   // Empty

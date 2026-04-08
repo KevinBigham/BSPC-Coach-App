@@ -19,10 +19,19 @@ import {
   subscribeVideoSessions,
   getVideoStatusLabel,
   getVideoStatusColor,
+  validateMediaConsent,
 } from '../src/services/video';
+import { filterConsentedSwimmers, hasMediaConsent } from '../src/utils/mediaConsent';
 import { handleError } from '../src/utils/errorHandler';
 import { useToast } from '../src/contexts/ToastContext';
-import { colors, spacing, fontSize, borderRadius, fontFamily, groupColors } from '../src/config/theme';
+import {
+  colors,
+  spacing,
+  fontSize,
+  borderRadius,
+  fontFamily,
+  groupColors,
+} from '../src/config/theme';
 import { GROUPS, type Group } from '../src/config/constants';
 import type { VideoSession } from '../src/types/firestore.types';
 
@@ -67,7 +76,7 @@ export default function VideoScreen() {
 
   const toggleSwimmer = (id: string) => {
     setSelectedSwimmerIds((prev) =>
-      prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]
+      prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id],
     );
   };
 
@@ -75,6 +84,17 @@ export default function VideoScreen() {
     if (!videoUri || !coach?.uid) return;
     if (selectedSwimmerIds.length === 0) {
       Alert.alert('Tag Swimmers', 'Select at least one swimmer to analyze');
+      return;
+    }
+
+    // Belt-and-suspenders consent check
+    const swimmersWithIds = swimmers.filter((s): s is typeof s & { id: string } => !!s.id);
+    const nonConsented = validateMediaConsent(selectedSwimmerIds, swimmersWithIds);
+    if (nonConsented.length > 0) {
+      Alert.alert(
+        'Media Consent Required',
+        `The following swimmers do not have media consent on file: ${nonConsented.join(', ')}. Remove them or update their consent in the swimmer edit screen.`,
+      );
       return;
     }
 
@@ -89,15 +109,10 @@ export default function VideoScreen() {
         videoDuration,
         date,
         selectedSwimmerIds,
-        (selectedGroup as Group) || undefined
+        (selectedGroup as Group) || undefined,
       );
 
-      const { storagePath } = await uploadVideo(
-        videoUri,
-        coach.uid,
-        date,
-        setUploadPercent
-      );
+      const { storagePath } = await uploadVideo(videoUri, coach.uid, date, setUploadPercent);
 
       await updateVideoSession(sessionId, {
         storagePath,
@@ -116,9 +131,11 @@ export default function VideoScreen() {
     setUploading(false);
   };
 
+  const consentedSwimmers = filterConsentedSwimmers(swimmers);
   const filteredSwimmers = selectedGroup
-    ? swimmers.filter((s) => s.group === selectedGroup)
-    : swimmers;
+    ? consentedSwimmers.filter((s) => s.group === selectedGroup)
+    : consentedSwimmers;
+  const nonConsentedCount = swimmers.length - consentedSwimmers.length;
 
   return (
     <>
@@ -129,10 +146,7 @@ export default function VideoScreen() {
           <View style={styles.captureSection}>
             <Text style={styles.sectionTitle}>CAPTURE VIDEO</Text>
             <View style={styles.captureRow}>
-              <TouchableOpacity
-                style={styles.captureBtn}
-                onPress={() => pickVideo(true)}
-              >
+              <TouchableOpacity style={styles.captureBtn} onPress={() => pickVideo(true)}>
                 <Text style={styles.captureBtnText}>RECORD VIDEO</Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -163,7 +177,9 @@ export default function VideoScreen() {
                   style={[styles.chip, !selectedGroup && styles.chipActive]}
                   onPress={() => setSelectedGroup('')}
                 >
-                  <Text style={[styles.chipText, !selectedGroup && styles.chipTextActive]}>ALL</Text>
+                  <Text style={[styles.chipText, !selectedGroup && styles.chipTextActive]}>
+                    ALL
+                  </Text>
                 </TouchableOpacity>
                 {GROUPS.map((g) => (
                   <TouchableOpacity
@@ -171,7 +187,9 @@ export default function VideoScreen() {
                     style={[styles.chip, selectedGroup === g && styles.chipActive]}
                     onPress={() => setSelectedGroup(g)}
                   >
-                    <Text style={[styles.chipText, selectedGroup === g && styles.chipTextActive]}>{g}</Text>
+                    <Text style={[styles.chipText, selectedGroup === g && styles.chipTextActive]}>
+                      {g}
+                    </Text>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -181,6 +199,12 @@ export default function VideoScreen() {
             <Text style={styles.fieldLabel}>
               TAG SWIMMERS ({selectedSwimmerIds.length} selected)
             </Text>
+            {nonConsentedCount > 0 && (
+              <Text style={styles.consentWarning}>
+                {nonConsentedCount} swimmer{nonConsentedCount !== 1 ? 's' : ''} hidden — no media
+                consent on file
+              </Text>
+            )}
             <View style={styles.swimmerGrid}>
               {filteredSwimmers.map((s) => {
                 const selected = selectedSwimmerIds.includes(s.id!);
@@ -190,7 +214,9 @@ export default function VideoScreen() {
                     style={[styles.swimmerChip, selected && styles.swimmerChipActive]}
                     onPress={() => toggleSwimmer(s.id!)}
                   >
-                    <Text style={[styles.swimmerChipText, selected && styles.swimmerChipTextActive]}>
+                    <Text
+                      style={[styles.swimmerChipText, selected && styles.swimmerChipTextActive]}
+                    >
                       {s.firstName} {s.lastName[0]}.
                     </Text>
                   </TouchableOpacity>
@@ -204,7 +230,10 @@ export default function VideoScreen() {
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.cancelBtn}
-              onPress={() => { setVideoUri(null); setSelectedSwimmerIds([]); }}
+              onPress={() => {
+                setVideoUri(null);
+                setSelectedSwimmerIds([]);
+              }}
             >
               <Text style={styles.cancelBtnText}>CANCEL</Text>
             </TouchableOpacity>
@@ -215,9 +244,7 @@ export default function VideoScreen() {
         {uploading && (
           <View style={styles.progressSection}>
             <ActivityIndicator size="large" color={colors.gold} />
-            <Text style={styles.progressText}>
-              UPLOADING... {Math.round(uploadPercent)}%
-            </Text>
+            <Text style={styles.progressText}>UPLOADING... {Math.round(uploadPercent)}%</Text>
             <View style={styles.progressTrack}>
               <View style={[styles.progressFill, { width: `${uploadPercent}%` }]} />
             </View>
@@ -225,9 +252,7 @@ export default function VideoScreen() {
         )}
 
         {/* Recent Sessions */}
-        <Text style={[styles.sectionTitle, { marginTop: spacing.xl }]}>
-          RECENT SESSIONS
-        </Text>
+        <Text style={[styles.sectionTitle, { marginTop: spacing.xl }]}>RECENT SESSIONS</Text>
         {sessions.length === 0 ? (
           <Text style={styles.emptyText}>
             No video sessions yet. Record or pick a video to get started.
@@ -253,7 +278,8 @@ export default function VideoScreen() {
                     </View>
                   </View>
                   <Text style={styles.sessionMeta}>
-                    {session.taggedSwimmerIds.length} swimmer{session.taggedSwimmerIds.length !== 1 ? 's' : ''} tagged
+                    {session.taggedSwimmerIds.length} swimmer
+                    {session.taggedSwimmerIds.length !== 1 ? 's' : ''} tagged
                     {session.duration > 0 ? ` | ${session.duration}s` : ''}
                     {session.group ? ` | ${session.group}` : ''}
                   </Text>
@@ -358,6 +384,12 @@ const styles = StyleSheet.create({
   chipText: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.xs, color: colors.textSecondary },
   chipTextActive: { color: colors.text },
 
+  consentWarning: {
+    fontFamily: fontFamily.body,
+    fontSize: fontSize.xs,
+    color: colors.warning,
+    marginBottom: spacing.sm,
+  },
   swimmerGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
   swimmerChip: {
     paddingHorizontal: spacing.md,
