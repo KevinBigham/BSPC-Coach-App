@@ -8,7 +8,12 @@
 
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../config/firebase';
-import type { AttendanceAggregation, SwimmerAggregation } from '../types/firestore.types';
+import type {
+  AttendanceAggregation,
+  DashboardActivityAggregation,
+  DashboardAttendanceAggregation,
+  SwimmerAggregation,
+} from '../types/firestore.types';
 
 /** Subscribe to a swimmer's attendance aggregation */
 export function subscribeAttendanceAggregation(
@@ -33,6 +38,32 @@ export function subscribeSwimmerAggregation(
     doc(db, 'aggregations', `swimmer_${swimmerId}`),
     (snap) => {
       callback(snap.exists() ? (snap.data() as SwimmerAggregation) : null);
+    },
+    () => callback(null),
+  );
+}
+
+/** Subscribe to dashboard attendance aggregation */
+export function subscribeDashboardAttendanceAggregation(
+  callback: (agg: DashboardAttendanceAggregation | null) => void,
+): () => void {
+  return onSnapshot(
+    doc(db, 'aggregations', 'dashboard_attendance'),
+    (snap) => {
+      callback(snap.exists() ? (snap.data() as DashboardAttendanceAggregation) : null);
+    },
+    () => callback(null),
+  );
+}
+
+/** Subscribe to dashboard activity aggregation */
+export function subscribeDashboardActivityAggregation(
+  callback: (agg: DashboardActivityAggregation | null) => void,
+): () => void {
+  return onSnapshot(
+    doc(db, 'aggregations', 'dashboard_activity'),
+    (snap) => {
+      callback(snap.exists() ? (snap.data() as DashboardActivityAggregation) : null);
     },
     () => callback(null),
   );

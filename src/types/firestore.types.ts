@@ -143,6 +143,24 @@ export interface SwimmerAggregation {
   updatedAt: FirebaseTimestamp;
 }
 
+export interface DashboardAttendanceAggregation {
+  countsByDate: Record<string, number>;
+  updatedAt: FirebaseTimestamp;
+}
+
+export interface DashboardActivityItem {
+  id: string;
+  type: 'attendance' | 'note' | 'time' | 'pr' | 'video';
+  text: string;
+  coach: string;
+  timestamp: FirebaseTimestamp;
+}
+
+export interface DashboardActivityAggregation {
+  items: DashboardActivityItem[];
+  updatedAt: FirebaseTimestamp;
+}
+
 export interface RecentActivityItem {
   type: 'note' | 'attendance' | 'ai_draft' | 'time';
   summary: string;

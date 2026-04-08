@@ -1,5 +1,9 @@
 import { onDocumentWritten } from 'firebase-functions/v2/firestore';
 import * as admin from 'firebase-admin';
+import {
+  recomputeDashboardAttendanceAggregation,
+  recomputeDashboardActivityAggregation,
+} from './dashboardAggregations';
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -19,6 +23,8 @@ export const onAttendanceWritten = onDocumentWritten('attendance/{recordId}', as
   if (!swimmerId) return;
 
   await recomputeAttendanceAggregation(swimmerId);
+  await recomputeDashboardAttendanceAggregation();
+  await recomputeDashboardActivityAggregation();
 });
 
 export async function recomputeAttendanceAggregation(swimmerId: string): Promise<void> {

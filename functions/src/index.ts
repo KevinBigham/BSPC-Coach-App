@@ -9,4 +9,5 @@ export { manageTopicSubscription } from './callable/manageTopics';
 export { onAttendanceWritten } from './triggers/onAttendanceWritten';
 export { onTimesWritten } from './triggers/onTimesWritten';
 export { onNotesWritten } from './triggers/onNotesWritten';
+export { onVideoSessionWritten } from './triggers/onVideoSessionWritten';
 export { rebuildAggregations } from './scheduled/rebuildAggregations';

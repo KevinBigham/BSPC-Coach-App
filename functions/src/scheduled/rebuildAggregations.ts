@@ -3,6 +3,10 @@ import * as admin from 'firebase-admin';
 import { recomputeAttendanceAggregation } from '../triggers/onAttendanceWritten';
 import { recomputeSwimmerPRs } from '../triggers/onTimesWritten';
 import { recomputeNotesAggregation } from '../triggers/onNotesWritten';
+import {
+  recomputeDashboardAttendanceAggregation,
+  recomputeDashboardActivityAggregation,
+} from '../triggers/dashboardAggregations';
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -30,4 +34,7 @@ export const rebuildAggregations = onSchedule('every day 04:00', async () => {
       }),
     );
   }
+
+  await recomputeDashboardAttendanceAggregation();
+  await recomputeDashboardActivityAggregation();
 });

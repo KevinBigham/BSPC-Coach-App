@@ -17,6 +17,8 @@ import { onSnapshot } from 'firebase/firestore';
 import {
   subscribeAttendanceAggregation,
   subscribeSwimmerAggregation,
+  subscribeDashboardAttendanceAggregation,
+  subscribeDashboardActivityAggregation,
   getPRCount,
 } from '../aggregations';
 import type { SwimmerAggregation } from '../../types/firestore.types';
@@ -87,6 +89,135 @@ describe('aggregations service', () => {
 
       subscribeSwimmerAggregation('s1', cb);
       expect(cb).toHaveBeenCalledWith({ prsByEvent: {}, noteCount: 5 });
+    });
+
+    it('returns null on listener error', () => {
+      const cb = jest.fn();
+      mockOnSnapshot.mockImplementation(((_ref: unknown, _onNext: unknown, onError: () => void) => {
+        onError();
+        return jest.fn();
+      }) as never);
+
+      subscribeSwimmerAggregation('s1', cb);
+      expect(cb).toHaveBeenCalledWith(null);
+    });
+  });
+
+  describe('subscribeDashboardAttendanceAggregation', () => {
+    it('calls onSnapshot with correct doc path', () => {
+      const cb = jest.fn();
+      subscribeDashboardAttendanceAggregation(cb);
+
+      expect(mockOnSnapshot).toHaveBeenCalledTimes(1);
+      const docRef = mockOnSnapshot.mock.calls[0][0] as unknown as { path: string };
+      expect(docRef.path).toBe('aggregations/dashboard_attendance');
+    });
+
+    it('returns data when doc exists', () => {
+      const cb = jest.fn();
+      mockOnSnapshot.mockImplementation(((
+        _ref: unknown,
+        onNext: (snap: { exists: () => boolean; data: () => unknown }) => void,
+      ) => {
+        onNext({ exists: () => true, data: () => ({ countsByDate: { '2026-04-08': 12 } }) });
+        return jest.fn();
+      }) as never);
+
+      subscribeDashboardAttendanceAggregation(cb);
+      expect(cb).toHaveBeenCalledWith({ countsByDate: { '2026-04-08': 12 } });
+    });
+
+    it('returns null when doc does not exist', () => {
+      const cb = jest.fn();
+      mockOnSnapshot.mockImplementation(((
+        _ref: unknown,
+        onNext: (snap: { exists: () => boolean; data: () => unknown }) => void,
+      ) => {
+        onNext({ exists: () => false, data: () => null });
+        return jest.fn();
+      }) as never);
+
+      subscribeDashboardAttendanceAggregation(cb);
+      expect(cb).toHaveBeenCalledWith(null);
+    });
+
+    it('returns unsubscribe function', () => {
+      const unsub = jest.fn();
+      mockOnSnapshot.mockReturnValue(unsub as never);
+
+      const result = subscribeDashboardAttendanceAggregation(jest.fn());
+      expect(result).toBe(unsub);
+    });
+  });
+
+  describe('subscribeDashboardActivityAggregation', () => {
+    it('calls onSnapshot with correct doc path', () => {
+      const cb = jest.fn();
+      subscribeDashboardActivityAggregation(cb);
+
+      expect(mockOnSnapshot).toHaveBeenCalledTimes(1);
+      const docRef = mockOnSnapshot.mock.calls[0][0] as unknown as { path: string };
+      expect(docRef.path).toBe('aggregations/dashboard_activity');
+    });
+
+    it('returns data when doc exists', () => {
+      const cb = jest.fn();
+      const timestamp = new Date('2026-04-08T12:00:00Z');
+      mockOnSnapshot.mockImplementation(((
+        _ref: unknown,
+        onNext: (snap: { exists: () => boolean; data: () => unknown }) => void,
+      ) => {
+        onNext({
+          exists: () => true,
+          data: () => ({
+            items: [
+              {
+                id: 'att-a1',
+                type: 'attendance',
+                text: 'Jane checked in',
+                coach: 'Coach K',
+                timestamp,
+              },
+            ],
+          }),
+        });
+        return jest.fn();
+      }) as never);
+
+      subscribeDashboardActivityAggregation(cb);
+      expect(cb).toHaveBeenCalledWith({
+        items: [
+          {
+            id: 'att-a1',
+            type: 'attendance',
+            text: 'Jane checked in',
+            coach: 'Coach K',
+            timestamp,
+          },
+        ],
+      });
+    });
+
+    it('returns null when doc does not exist', () => {
+      const cb = jest.fn();
+      mockOnSnapshot.mockImplementation(((
+        _ref: unknown,
+        onNext: (snap: { exists: () => boolean; data: () => unknown }) => void,
+      ) => {
+        onNext({ exists: () => false, data: () => null });
+        return jest.fn();
+      }) as never);
+
+      subscribeDashboardActivityAggregation(cb);
+      expect(cb).toHaveBeenCalledWith(null);
+    });
+
+    it('returns unsubscribe function', () => {
+      const unsub = jest.fn();
+      mockOnSnapshot.mockReturnValue(unsub as never);
+
+      const result = subscribeDashboardActivityAggregation(jest.fn());
+      expect(result).toBe(unsub);
     });
   });
 

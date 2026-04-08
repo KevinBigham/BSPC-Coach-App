@@ -1,12 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  StyleSheet,
-  RefreshControl,
-} from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl } from 'react-native';
 import { router } from 'expo-router';
 import {
   collection,
@@ -19,25 +12,28 @@ import {
 } from 'firebase/firestore';
 import { db } from '../../src/config/firebase';
 import { useAuth } from '../../src/contexts/AuthContext';
-import { colors, spacing, fontSize, borderRadius, fontFamily, groupColors } from '../../src/config/theme';
+import {
+  colors,
+  spacing,
+  fontSize,
+  borderRadius,
+  fontFamily,
+  groupColors,
+} from '../../src/config/theme';
 import { GROUPS } from '../../src/config/constants';
 import { getTodayString } from '../../src/utils/time';
-import { daysAgoString } from '../../src/utils/date';
 import { formatRelativeTime } from '../../src/utils/date';
 import { useSwimmersStore } from '../../src/stores/swimmersStore';
 import { useAttendanceStore } from '../../src/stores/attendanceStore';
+import {
+  subscribeDashboardActivityAggregation,
+  subscribeDashboardAttendanceAggregation,
+} from '../../src/services/aggregations';
 import { subscribeUpcomingMeets } from '../../src/services/meets';
 import { getMeetStatusColor } from '../../src/services/meets';
 import AttendanceHeatmap from '../../src/components/charts/AttendanceHeatmap';
+import type { DashboardActivityItem } from '../../src/types/firestore.types';
 import type { Meet } from '../../src/types/meet.types';
-
-interface ActivityItem {
-  id: string;
-  type: 'attendance' | 'note' | 'time' | 'pr' | 'video';
-  text: string;
-  coach: string;
-  timestamp: any;
-}
 
 const ACTIVITY_CONFIG = {
   attendance: { label: 'CHECK-IN', color: colors.success, bgColor: 'rgba(204, 176, 0, 0.08)' },
@@ -53,12 +49,14 @@ export default function DashboardScreen() {
   const { coach, isAdmin } = useAuth();
   const storeSwimmers = useSwimmersStore((s) => s.swimmers);
   const todayRecords = useAttendanceStore((s) => s.todayRecords);
-  const [recentActivity, setRecentActivity] = useState<ActivityItem[]>([]);
+  const [recentActivity, setRecentActivity] = useState<DashboardActivityItem[]>([]);
   const [weekAttendance, setWeekAttendance] = useState<Record<string, number>>({});
   const [pendingDrafts, setPendingDrafts] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const [nextMeet, setNextMeet] = useState<(Meet & { id: string }) | null>(null);
-  const [recentPRs, setRecentPRs] = useState<{ id: string; event: string; course: string; timeDisplay: string; swimmerName?: string }[]>([]);
+  const [recentPRs, setRecentPRs] = useState<
+    { id: string; event: string; course: string; timeDisplay: string; swimmerName?: string }[]
+  >([]);
   const today = getTodayString();
 
   // Derived from Zustand stores
@@ -107,19 +105,8 @@ export default function DashboardScreen() {
 
   // 7-day attendance for spark chart
   useEffect(() => {
-    const twelveWeeksAgo = daysAgoString(84);
-    const q = query(
-      collection(db, 'attendance'),
-      where('practiceDate', '>=', twelveWeeksAgo),
-      orderBy('practiceDate', 'asc')
-    );
-    return onSnapshot(q, (snapshot) => {
-      const counts: Record<string, number> = {};
-      snapshot.forEach((doc) => {
-        const date = doc.data().practiceDate as string;
-        counts[date] = (counts[date] || 0) + 1;
-      });
-      setWeekAttendance(counts);
+    return subscribeDashboardAttendanceAggregation((aggregation) => {
+      setWeekAttendance(aggregation?.countsByDate ?? {});
     });
   }, []);
 
@@ -131,104 +118,29 @@ export default function DashboardScreen() {
 
     const unsubAudio = onSnapshot(
       query(collection(db, 'audio_sessions'), where('status', '==', 'review')),
-      (snap) => { audioCount = snap.size; update(); }
+      (snap) => {
+        audioCount = snap.size;
+        update();
+      },
     );
     const unsubVideo = onSnapshot(
       query(collection(db, 'video_sessions'), where('status', '==', 'review')),
-      (snap) => { videoCount = snap.size; update(); }
+      (snap) => {
+        videoCount = snap.size;
+        update();
+      },
     );
-    return () => { unsubAudio(); unsubVideo(); };
+    return () => {
+      unsubAudio();
+      unsubVideo();
+    };
   }, []);
 
   // Unified activity feed: attendance + notes + times
   useEffect(() => {
-    const items: Map<string, ActivityItem> = new Map();
-    const mergeAndUpdate = () => {
-      const sorted = Array.from(items.values())
-        .sort((a, b) => {
-          const ta = a.timestamp?.toDate?.() || a.timestamp || 0;
-          const tb = b.timestamp?.toDate?.() || b.timestamp || 0;
-          return (tb instanceof Date ? tb.getTime() : 0) - (ta instanceof Date ? ta.getTime() : 0);
-        })
-        .slice(0, 15);
-      setRecentActivity(sorted);
-    };
-
-    const unsubAttendance = onSnapshot(
-      query(collection(db, 'attendance'), orderBy('createdAt', 'desc'), limit(8)),
-      (snapshot) => {
-        snapshot.docs.forEach((d) => {
-          const data = d.data();
-          items.set(`att-${d.id}`, {
-            id: `att-${d.id}`,
-            type: 'attendance',
-            text: `${data.swimmerName} checked in`,
-            coach: data.coachName || 'Coach',
-            timestamp: data.createdAt,
-          });
-        });
-        mergeAndUpdate();
-      }
-    );
-
-    const unsubNotes = onSnapshot(
-      query(collectionGroup(db, 'notes'), orderBy('createdAt', 'desc'), limit(5)),
-      (snapshot) => {
-        snapshot.docs.forEach((d) => {
-          const data = d.data();
-          items.set(`note-${d.id}`, {
-            id: `note-${d.id}`,
-            type: 'note',
-            text: `Note added: "${data.content?.substring(0, 60)}${data.content?.length > 60 ? '...' : ''}"`,
-            coach: data.coachName || 'Coach',
-            timestamp: data.createdAt,
-          });
-        });
-        mergeAndUpdate();
-      }
-    );
-
-    const unsubTimes = onSnapshot(
-      query(collectionGroup(db, 'times'), orderBy('createdAt', 'desc'), limit(5)),
-      (snapshot) => {
-        snapshot.docs.forEach((d) => {
-          const data = d.data();
-          items.set(`time-${d.id}`, {
-            id: `time-${d.id}`,
-            type: data.isPR ? 'pr' : 'time',
-            text: `${data.event} ${data.course}: ${data.timeDisplay}${data.isPR ? ' — NEW PR!' : ''}`,
-            coach: data.meetName || 'Manual entry',
-            timestamp: data.createdAt,
-          });
-        });
-        mergeAndUpdate();
-      }
-    );
-
-    const unsubVideo = onSnapshot(
-      query(collection(db, 'video_sessions'), where('status', '==', 'review'), orderBy('createdAt', 'desc'), limit(5)),
-      (snapshot) => {
-        snapshot.docs.forEach((d) => {
-          const data = d.data();
-          const swimmerCount = data.taggedSwimmerIds?.length || 0;
-          items.set(`video-${d.id}`, {
-            id: `video-${d.id}`,
-            type: 'video',
-            text: `VIDEO READY: ${swimmerCount} swimmer${swimmerCount !== 1 ? 's' : ''} analyzed`,
-            coach: data.coachName || 'Coach',
-            timestamp: data.createdAt,
-          });
-        });
-        mergeAndUpdate();
-      }
-    );
-
-    return () => {
-      unsubAttendance();
-      unsubNotes();
-      unsubTimes();
-      unsubVideo();
-    };
+    return subscribeDashboardActivityAggregation((aggregation) => {
+      setRecentActivity(aggregation?.items ?? []);
+    });
   }, []);
 
   // 7-day spark chart data
@@ -258,29 +170,24 @@ export default function DashboardScreen() {
     <ScrollView
       style={styles.container}
       contentContainerStyle={styles.content}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} />}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} />
+      }
     >
       {/* Welcome Scorebug */}
       <View style={styles.welcomeCard}>
         <View>
-          <Text style={styles.welcomeText}>
-            {coach?.displayName?.toUpperCase() || 'COACH'}
-          </Text>
+          <Text style={styles.welcomeText}>{coach?.displayName?.toUpperCase() || 'COACH'}</Text>
           <Text style={styles.welcomeSub}>Welcome back</Text>
         </View>
         <View style={styles.roleTag}>
-          <Text style={styles.roleTagText}>
-            {coach?.role === 'admin' ? 'ADMIN' : 'COACH'}
-          </Text>
+          <Text style={styles.roleTagText}>{coach?.role === 'admin' ? 'ADMIN' : 'COACH'}</Text>
         </View>
       </View>
 
       {/* Pending AI Drafts Banner */}
       {pendingDrafts > 0 && (
-        <TouchableOpacity
-          style={styles.draftsBanner}
-          onPress={() => router.push('/ai-review')}
-        >
+        <TouchableOpacity style={styles.draftsBanner} onPress={() => router.push('/ai-review')}>
           <Text style={styles.draftsBannerText}>
             {pendingDrafts} AI DRAFT{pendingDrafts > 1 ? 'S' : ''} READY FOR REVIEW
           </Text>
@@ -289,25 +196,30 @@ export default function DashboardScreen() {
       )}
 
       {/* Meet Countdown */}
-      {nextMeet && (() => {
-        const daysAway = Math.ceil((new Date(nextMeet.startDate).getTime() - Date.now()) / 86400000);
-        return (
-          <TouchableOpacity
-            style={styles.meetCountdown}
-            onPress={() => router.push(`/meet/${nextMeet.id}`)}
-          >
-            <View style={{ flex: 1 }}>
-              <Text style={styles.meetCountdownLabel}>NEXT MEET</Text>
-              <Text style={styles.meetCountdownName}>{nextMeet.name.toUpperCase()}</Text>
-              <Text style={styles.meetCountdownInfo}>{nextMeet.location} | {nextMeet.startDate}</Text>
-            </View>
-            <View style={styles.meetCountdownDays}>
-              <Text style={styles.meetCountdownNum}>{daysAway < 0 ? 0 : daysAway}</Text>
-              <Text style={styles.meetCountdownUnit}>{daysAway === 1 ? 'DAY' : 'DAYS'}</Text>
-            </View>
-          </TouchableOpacity>
-        );
-      })()}
+      {nextMeet &&
+        (() => {
+          const daysAway = Math.ceil(
+            (new Date(nextMeet.startDate).getTime() - Date.now()) / 86400000,
+          );
+          return (
+            <TouchableOpacity
+              style={styles.meetCountdown}
+              onPress={() => router.push(`/meet/${nextMeet.id}`)}
+            >
+              <View style={{ flex: 1 }}>
+                <Text style={styles.meetCountdownLabel}>NEXT MEET</Text>
+                <Text style={styles.meetCountdownName}>{nextMeet.name.toUpperCase()}</Text>
+                <Text style={styles.meetCountdownInfo}>
+                  {nextMeet.location} | {nextMeet.startDate}
+                </Text>
+              </View>
+              <View style={styles.meetCountdownDays}>
+                <Text style={styles.meetCountdownNum}>{daysAway < 0 ? 0 : daysAway}</Text>
+                <Text style={styles.meetCountdownUnit}>{daysAway === 1 ? 'DAY' : 'DAYS'}</Text>
+              </View>
+            </TouchableOpacity>
+          );
+        })()}
 
       {/* Recent PRs */}
       {recentPRs.length > 0 && (
@@ -317,7 +229,9 @@ export default function DashboardScreen() {
             <View key={pr.id} style={styles.prRow}>
               <Text style={styles.prBadge}>PR</Text>
               <View style={{ flex: 1 }}>
-                <Text style={styles.prEvent}>{pr.event} ({pr.course})</Text>
+                <Text style={styles.prEvent}>
+                  {pr.event} ({pr.course})
+                </Text>
               </View>
               <Text style={styles.prTime}>{pr.timeDisplay}</Text>
             </View>
@@ -343,22 +257,37 @@ export default function DashboardScreen() {
 
       {/* Quick Actions Grid */}
       <View style={styles.actionsGrid}>
-        <TouchableOpacity style={styles.actionBtn} onPress={() => router.push('/(tabs)/attendance')}>
+        <TouchableOpacity
+          style={styles.actionBtn}
+          onPress={() => router.push('/(tabs)/attendance')}
+        >
           <Text style={styles.actionBtnText}>ATTENDANCE</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.actionBtn} onPress={() => router.push('/audio')}>
           <Text style={styles.actionBtnText}>RECORD</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.actionBtn, styles.actionBtnAlt]} onPress={() => router.push('/search')}>
+        <TouchableOpacity
+          style={[styles.actionBtn, styles.actionBtnAlt]}
+          onPress={() => router.push('/search')}
+        >
           <Text style={styles.actionBtnTextAlt}>SEARCH</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.actionBtn, styles.actionBtnAlt]} onPress={() => router.push('/messages')}>
+        <TouchableOpacity
+          style={[styles.actionBtn, styles.actionBtnAlt]}
+          onPress={() => router.push('/messages')}
+        >
           <Text style={styles.actionBtnTextAlt}>CHAT</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.actionBtn, styles.actionBtnAlt]} onPress={() => router.push('/calendar')}>
+        <TouchableOpacity
+          style={[styles.actionBtn, styles.actionBtnAlt]}
+          onPress={() => router.push('/calendar')}
+        >
           <Text style={styles.actionBtnTextAlt}>CALENDAR</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.actionBtn, styles.actionBtnGold]} onPress={() => router.push('/analytics')}>
+        <TouchableOpacity
+          style={[styles.actionBtn, styles.actionBtnGold]}
+          onPress={() => router.push('/analytics')}
+        >
           <Text style={styles.actionBtnTextGold}>ANALYTICS</Text>
         </TouchableOpacity>
       </View>
@@ -381,7 +310,9 @@ export default function DashboardScreen() {
                   ]}
                 />
               </View>
-              <Text style={[styles.sparkLabel, day.date === today && { color: colors.gold }]}>{day.dayLabel}</Text>
+              <Text style={[styles.sparkLabel, day.date === today && { color: colors.gold }]}>
+                {day.dayLabel}
+              </Text>
             </View>
           ))}
         </View>
@@ -408,10 +339,17 @@ export default function DashboardScreen() {
               style={styles.groupRow}
               onPress={() => router.push(`/(tabs)/roster?group=${group}`)}
             >
-              <View style={[styles.groupDot, { backgroundColor: groupColors[group] || colors.text }]} />
+              <View
+                style={[styles.groupDot, { backgroundColor: groupColors[group] || colors.text }]}
+              />
               <Text style={styles.groupName}>{group}</Text>
               <View style={styles.groupBarBg}>
-                <View style={[styles.groupBarFill, { width: `${pct}%`, backgroundColor: groupColors[group] || colors.accent }]} />
+                <View
+                  style={[
+                    styles.groupBarFill,
+                    { width: `${pct}%`, backgroundColor: groupColors[group] || colors.accent },
+                  ]}
+                />
               </View>
               <Text style={styles.groupCount}>{count}</Text>
               <Text style={styles.groupChevron}>›</Text>
@@ -427,14 +365,29 @@ export default function DashboardScreen() {
           <View style={styles.activityFeed}>
             {recentActivity.map((item) => {
               const config = ACTIVITY_CONFIG[item.type];
-              const ts = item.timestamp?.toDate?.() || (item.timestamp instanceof Date ? item.timestamp : null);
+              const rawTimestamp = item.timestamp as Date & { toDate?: () => Date };
+              const ts =
+                typeof rawTimestamp?.toDate === 'function'
+                  ? rawTimestamp.toDate()
+                  : rawTimestamp instanceof Date
+                    ? rawTimestamp
+                    : null;
               return (
                 <View key={item.id} style={styles.activityItem}>
-                  <View style={[styles.activityTag, { backgroundColor: config.bgColor, borderColor: config.color }]}>
-                    <Text style={[styles.activityTagText, { color: config.color }]}>{config.label}</Text>
+                  <View
+                    style={[
+                      styles.activityTag,
+                      { backgroundColor: config.bgColor, borderColor: config.color },
+                    ]}
+                  >
+                    <Text style={[styles.activityTagText, { color: config.color }]}>
+                      {config.label}
+                    </Text>
                   </View>
                   <View style={styles.activityContent}>
-                    <Text style={styles.activityText} numberOfLines={1}>{item.text}</Text>
+                    <Text style={styles.activityText} numberOfLines={1}>
+                      {item.text}
+                    </Text>
                     <View style={styles.activityMeta}>
                       <Text style={styles.activityCoach}>{item.coach}</Text>
                       {ts && <Text style={styles.activityTime}>{formatRelativeTime(ts)}</Text>}
@@ -462,79 +415,295 @@ const styles = StyleSheet.create({
   content: { padding: spacing.lg, gap: spacing.lg, paddingBottom: spacing.xxxl },
 
   // Welcome
-  welcomeCard: { backgroundColor: 'rgba(74, 14, 120, 0.25)', borderRadius: borderRadius.lg, padding: spacing.xl, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderWidth: 1, borderColor: colors.purple },
-  welcomeText: { fontFamily: fontFamily.heading, fontSize: fontSize.xxl, color: colors.text, letterSpacing: 2 },
-  welcomeSub: { fontFamily: fontFamily.body, fontSize: fontSize.sm, color: colors.textSecondary, marginTop: spacing.xs },
-  roleTag: { backgroundColor: 'rgba(255, 215, 0, 0.1)', borderWidth: 1, borderColor: colors.gold, paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderRadius: borderRadius.xs },
+  welcomeCard: {
+    backgroundColor: 'rgba(74, 14, 120, 0.25)',
+    borderRadius: borderRadius.lg,
+    padding: spacing.xl,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.purple,
+  },
+  welcomeText: {
+    fontFamily: fontFamily.heading,
+    fontSize: fontSize.xxl,
+    color: colors.text,
+    letterSpacing: 2,
+  },
+  welcomeSub: {
+    fontFamily: fontFamily.body,
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    marginTop: spacing.xs,
+  },
+  roleTag: {
+    backgroundColor: 'rgba(255, 215, 0, 0.1)',
+    borderWidth: 1,
+    borderColor: colors.gold,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.xs,
+  },
   roleTagText: { fontFamily: fontFamily.pixel, fontSize: fontSize.pixel, color: colors.gold },
 
   // Drafts Banner
-  draftsBanner: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'rgba(255, 215, 0, 0.1)', borderRadius: borderRadius.md, padding: spacing.lg, borderWidth: 1, borderColor: colors.gold },
-  draftsBannerText: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.sm, color: colors.gold, letterSpacing: 1 },
+  draftsBanner: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 215, 0, 0.1)',
+    borderRadius: borderRadius.md,
+    padding: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.gold,
+  },
+  draftsBannerText: {
+    fontFamily: fontFamily.bodySemi,
+    fontSize: fontSize.sm,
+    color: colors.gold,
+    letterSpacing: 1,
+  },
   draftsBannerArrow: { fontFamily: fontFamily.heading, fontSize: fontSize.xxl, color: colors.gold },
 
   // Stats
   statsRow: { flexDirection: 'row', gap: spacing.sm },
-  statCard: { flex: 1, backgroundColor: colors.bgDeep, borderRadius: borderRadius.lg, padding: spacing.md, alignItems: 'center', borderWidth: 1, borderColor: colors.border },
+  statCard: {
+    flex: 1,
+    backgroundColor: colors.bgDeep,
+    borderRadius: borderRadius.lg,
+    padding: spacing.md,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
   statNumber: { fontFamily: fontFamily.stat, fontSize: fontSize.xxxl, color: colors.accent },
-  statLabel: { fontFamily: fontFamily.pixel, fontSize: fontSize.pixel, color: colors.textSecondary, letterSpacing: 1, marginTop: spacing.xs },
+  statLabel: {
+    fontFamily: fontFamily.pixel,
+    fontSize: fontSize.pixel,
+    color: colors.textSecondary,
+    letterSpacing: 1,
+    marginTop: spacing.xs,
+  },
 
   // Actions Grid
   actionsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  actionBtn: { width: '48%', flexGrow: 1, backgroundColor: colors.purple, padding: spacing.md, borderRadius: borderRadius.md, alignItems: 'center' },
+  actionBtn: {
+    width: '48%',
+    flexGrow: 1,
+    backgroundColor: colors.purple,
+    padding: spacing.md,
+    borderRadius: borderRadius.md,
+    alignItems: 'center',
+  },
   actionBtnAlt: { backgroundColor: colors.bgDeep, borderWidth: 1, borderColor: colors.border },
-  actionBtnText: { fontFamily: fontFamily.heading, fontSize: fontSize.lg, color: colors.text, letterSpacing: 1 },
-  actionBtnTextAlt: { fontFamily: fontFamily.heading, fontSize: fontSize.lg, color: colors.accent, letterSpacing: 1 },
+  actionBtnText: {
+    fontFamily: fontFamily.heading,
+    fontSize: fontSize.lg,
+    color: colors.text,
+    letterSpacing: 1,
+  },
+  actionBtnTextAlt: {
+    fontFamily: fontFamily.heading,
+    fontSize: fontSize.lg,
+    color: colors.accent,
+    letterSpacing: 1,
+  },
   actionBtnGold: { backgroundColor: colors.bgDeep, borderWidth: 1, borderColor: colors.gold },
-  actionBtnTextGold: { fontFamily: fontFamily.heading, fontSize: fontSize.lg, color: colors.gold, letterSpacing: 1 },
+  actionBtnTextGold: {
+    fontFamily: fontFamily.heading,
+    fontSize: fontSize.lg,
+    color: colors.gold,
+    letterSpacing: 1,
+  },
 
   // Meet Countdown
-  meetCountdown: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bgDeep, borderWidth: 1, borderColor: colors.gold, borderRadius: borderRadius.lg, padding: spacing.lg },
-  meetCountdownLabel: { fontFamily: fontFamily.pixel, fontSize: 7, letterSpacing: 1, color: colors.gold, marginBottom: spacing.xs },
-  meetCountdownName: { fontFamily: fontFamily.heading, fontSize: fontSize.xl, fontWeight: '700', letterSpacing: 2, color: colors.text },
-  meetCountdownInfo: { fontFamily: fontFamily.body, fontSize: fontSize.xs, color: colors.textSecondary, marginTop: 2 },
+  meetCountdown: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.bgDeep,
+    borderWidth: 1,
+    borderColor: colors.gold,
+    borderRadius: borderRadius.lg,
+    padding: spacing.lg,
+  },
+  meetCountdownLabel: {
+    fontFamily: fontFamily.pixel,
+    fontSize: 7,
+    letterSpacing: 1,
+    color: colors.gold,
+    marginBottom: spacing.xs,
+  },
+  meetCountdownName: {
+    fontFamily: fontFamily.heading,
+    fontSize: fontSize.xl,
+    fontWeight: '700',
+    letterSpacing: 2,
+    color: colors.text,
+  },
+  meetCountdownInfo: {
+    fontFamily: fontFamily.body,
+    fontSize: fontSize.xs,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
   meetCountdownDays: { alignItems: 'center', marginLeft: spacing.lg },
   meetCountdownNum: { fontFamily: fontFamily.stat, fontSize: 36, color: colors.gold },
-  meetCountdownUnit: { fontFamily: fontFamily.pixel, fontSize: 7, letterSpacing: 1, color: colors.gold },
+  meetCountdownUnit: {
+    fontFamily: fontFamily.pixel,
+    fontSize: 7,
+    letterSpacing: 1,
+    color: colors.gold,
+  },
 
   // PR Feed
-  prRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.borderLight, gap: spacing.md },
-  prBadge: { fontFamily: fontFamily.pixel, fontSize: 7, letterSpacing: 1, color: colors.gold, backgroundColor: 'rgba(255,215,0,0.1)', paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: borderRadius.xs, borderWidth: 1, borderColor: colors.gold, overflow: 'hidden' },
+  prRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderLight,
+    gap: spacing.md,
+  },
+  prBadge: {
+    fontFamily: fontFamily.pixel,
+    fontSize: 7,
+    letterSpacing: 1,
+    color: colors.gold,
+    backgroundColor: 'rgba(255,215,0,0.1)',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: borderRadius.xs,
+    borderWidth: 1,
+    borderColor: colors.gold,
+    overflow: 'hidden',
+  },
   prEvent: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.sm, color: colors.text },
   prTime: { fontFamily: fontFamily.stat, fontSize: fontSize.md, color: colors.gold },
 
   // Spark Chart
   sparkChart: { flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-end', height: 100 },
   sparkCol: { flex: 1, alignItems: 'center', gap: spacing.xs },
-  sparkCount: { fontFamily: fontFamily.statMono, fontSize: fontSize.xs, color: colors.textSecondary, height: 14 },
-  sparkBarBg: { width: '100%', height: 60, backgroundColor: colors.bgBase, borderRadius: 3, overflow: 'hidden', justifyContent: 'flex-end' },
+  sparkCount: {
+    fontFamily: fontFamily.statMono,
+    fontSize: fontSize.xs,
+    color: colors.textSecondary,
+    height: 14,
+  },
+  sparkBarBg: {
+    width: '100%',
+    height: 60,
+    backgroundColor: colors.bgBase,
+    borderRadius: 3,
+    overflow: 'hidden',
+    justifyContent: 'flex-end',
+  },
   sparkBarFill: { width: '100%', borderRadius: 3, minHeight: 2 },
-  sparkLabel: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.xs, color: colors.textSecondary },
+  sparkLabel: {
+    fontFamily: fontFamily.bodySemi,
+    fontSize: fontSize.xs,
+    color: colors.textSecondary,
+  },
 
   // Sections
-  sectionCard: { backgroundColor: colors.bgDeep, borderRadius: borderRadius.lg, padding: spacing.lg, borderWidth: 1, borderColor: colors.border },
-  sectionTitle: { fontFamily: fontFamily.heading, fontSize: fontSize.xl, color: colors.text, letterSpacing: 1, marginBottom: spacing.md },
-  groupRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.borderLight },
+  sectionCard: {
+    backgroundColor: colors.bgDeep,
+    borderRadius: borderRadius.lg,
+    padding: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  sectionTitle: {
+    fontFamily: fontFamily.heading,
+    fontSize: fontSize.xl,
+    color: colors.text,
+    letterSpacing: 1,
+    marginBottom: spacing.md,
+  },
+  groupRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderLight,
+  },
   groupDot: { width: 12, height: 12, borderRadius: 6, marginRight: spacing.md },
   groupName: { fontFamily: fontFamily.body, fontSize: fontSize.md, color: colors.text, width: 80 },
-  groupBarBg: { flex: 1, height: 6, backgroundColor: colors.bgBase, borderRadius: 3, marginRight: spacing.sm, overflow: 'hidden' },
+  groupBarBg: {
+    flex: 1,
+    height: 6,
+    backgroundColor: colors.bgBase,
+    borderRadius: 3,
+    marginRight: spacing.sm,
+    overflow: 'hidden',
+  },
   groupBarFill: { height: '100%', borderRadius: 3 },
-  groupCount: { fontFamily: fontFamily.stat, fontSize: fontSize.md, color: colors.accent, width: 30, textAlign: 'right', marginRight: spacing.sm },
+  groupCount: {
+    fontFamily: fontFamily.stat,
+    fontSize: fontSize.md,
+    color: colors.accent,
+    width: 30,
+    textAlign: 'right',
+    marginRight: spacing.sm,
+  },
   groupChevron: { fontSize: fontSize.lg, color: colors.textSecondary },
 
   // Activity Feed
-  activityFeed: { borderWidth: 2, borderColor: colors.border, borderRadius: borderRadius.sm, overflow: 'hidden' },
-  activityItem: { flexDirection: 'row', alignItems: 'center', padding: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.borderLight, gap: spacing.md },
-  activityTag: { borderWidth: 1, paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: borderRadius.xs },
+  activityFeed: {
+    borderWidth: 2,
+    borderColor: colors.border,
+    borderRadius: borderRadius.sm,
+    overflow: 'hidden',
+  },
+  activityItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderLight,
+    gap: spacing.md,
+  },
+  activityTag: {
+    borderWidth: 1,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: borderRadius.xs,
+  },
   activityTagText: { fontFamily: fontFamily.pixel, fontSize: 7 },
   activityContent: { flex: 1 },
   activityText: { fontFamily: fontFamily.body, fontSize: fontSize.sm, color: colors.text },
   activityMeta: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: 2 },
-  activityCoach: { fontFamily: fontFamily.statMono, fontSize: fontSize.xs, color: colors.textSecondary },
-  activityTime: { fontFamily: fontFamily.statMono, fontSize: fontSize.xs, color: colors.textSecondary },
+  activityCoach: {
+    fontFamily: fontFamily.statMono,
+    fontSize: fontSize.xs,
+    color: colors.textSecondary,
+  },
+  activityTime: {
+    fontFamily: fontFamily.statMono,
+    fontSize: fontSize.xs,
+    color: colors.textSecondary,
+  },
 
   // Placeholder
-  activityPlaceholder: { borderWidth: 2, borderColor: colors.border, borderRadius: borderRadius.sm, padding: spacing.lg, alignItems: 'center' },
-  pixelLabel: { fontFamily: fontFamily.pixel, fontSize: fontSize.pixel, color: colors.gold, letterSpacing: 1, marginBottom: spacing.md },
-  placeholderText: { fontFamily: fontFamily.body, color: colors.textSecondary, fontSize: fontSize.sm, lineHeight: 20, textAlign: 'center' },
+  activityPlaceholder: {
+    borderWidth: 2,
+    borderColor: colors.border,
+    borderRadius: borderRadius.sm,
+    padding: spacing.lg,
+    alignItems: 'center',
+  },
+  pixelLabel: {
+    fontFamily: fontFamily.pixel,
+    fontSize: fontSize.pixel,
+    color: colors.gold,
+    letterSpacing: 1,
+    marginBottom: spacing.md,
+  },
+  placeholderText: {
+    fontFamily: fontFamily.body,
+    color: colors.textSecondary,
+    fontSize: fontSize.sm,
+    lineHeight: 20,
+    textAlign: 'center',
+  },
 });

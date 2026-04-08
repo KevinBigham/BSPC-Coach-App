@@ -1,5 +1,6 @@
 import { onDocumentWritten } from 'firebase-functions/v2/firestore';
 import * as admin from 'firebase-admin';
+import { recomputeDashboardActivityAggregation } from './dashboardAggregations';
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -12,6 +13,7 @@ export const onTimesWritten = onDocumentWritten(
   async (event) => {
     const swimmerId = event.params.swimmerId;
     await recomputeSwimmerPRs(swimmerId);
+    await recomputeDashboardActivityAggregation();
   },
 );
 
