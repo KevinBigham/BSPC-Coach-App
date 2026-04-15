@@ -1,0 +1,28 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": [
+    "index.ts",
+    "app/**/*.{ts,tsx}",
+    "jest.setup.ts",
+    "src/**/*.test.{ts,tsx}",
+    "src/**/__tests__/**/*.{ts,tsx}",
+    "functions/src/index.ts",
+    "functions/src/**/*.test.ts",
+    "functions/src/**/__tests__/**/*.ts"
+  ],
+  "project": [
+    "src/**/*.{ts,tsx}",
+    "app/**/*.{ts,tsx}",
+    "functions/src/**/*.ts"
+  ],
+  "ignore": [
+    "parent-portal/**",
+    "scripts/**",
+    "functions/lib/**",
+    "**/*.d.ts"
+  ],
+  "ignoreDependencies": [
+    "babel-plugin-transform-remove-console"
+  ],
+  "ignoreBinaries": []
+}
