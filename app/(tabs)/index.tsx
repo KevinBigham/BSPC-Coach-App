@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl } from 'react-native';
 import { router } from 'expo-router';
+import { Bell } from 'lucide-react-native';
 import {
   collection,
   collectionGroup,
@@ -25,13 +26,16 @@ import { getTodayString } from '../../src/utils/time';
 import { formatRelativeTime } from '../../src/utils/date';
 import { useSwimmersStore } from '../../src/stores/swimmersStore';
 import { useAttendanceStore } from '../../src/stores/attendanceStore';
+import { useVideoStore } from '../../src/stores/videoStore';
 import {
   subscribeDashboardActivityAggregation,
   subscribeDashboardAttendanceAggregation,
 } from '../../src/services/aggregations';
 import { subscribeUpcomingMeets } from '../../src/services/meets';
-import { getMeetStatusColor } from '../../src/services/meets';
+import { getUnreadCount } from '../../src/services/notifications';
 import AttendanceHeatmap from '../../src/components/charts/AttendanceHeatmap';
+import SparkLine from '../../src/components/charts/SparkLine';
+import { withScreenErrorBoundary } from '../../src/components/ScreenErrorBoundary';
 import type { DashboardActivityItem } from '../../src/types/firestore.types';
 import type { Meet } from '../../src/types/meet.types';
 
@@ -45,13 +49,15 @@ const ACTIVITY_CONFIG = {
 
 const DAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
-export default function DashboardScreen() {
-  const { coach, isAdmin } = useAuth();
+function DashboardScreen() {
+  const { coach } = useAuth();
   const storeSwimmers = useSwimmersStore((s) => s.swimmers);
   const todayRecords = useAttendanceStore((s) => s.todayRecords);
+  const uploadProgress = useVideoStore((state) => state.uploadProgress);
   const [recentActivity, setRecentActivity] = useState<DashboardActivityItem[]>([]);
   const [weekAttendance, setWeekAttendance] = useState<Record<string, number>>({});
   const [pendingDrafts, setPendingDrafts] = useState(0);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const [nextMeet, setNextMeet] = useState<(Meet & { id: string }) | null>(null);
   const [recentPRs, setRecentPRs] = useState<
@@ -143,6 +149,15 @@ export default function DashboardScreen() {
     });
   }, []);
 
+  useEffect(() => {
+    if (!coach?.uid) {
+      setUnreadCount(0);
+      return;
+    }
+
+    return getUnreadCount(coach.uid, setUnreadCount);
+  }, [coach?.uid]);
+
   // 7-day spark chart data
   const sparkData = useMemo(() => {
     const data: { date: string; count: number; dayLabel: string }[] = [];
@@ -158,8 +173,6 @@ export default function DashboardScreen() {
     }
     return data;
   }, [weekAttendance]);
-
-  const maxSpark = Math.max(...sparkData.map((d) => d.count), 1);
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -180,10 +193,29 @@ export default function DashboardScreen() {
           <Text style={styles.welcomeText}>{coach?.displayName?.toUpperCase() || 'COACH'}</Text>
           <Text style={styles.welcomeSub}>Welcome back</Text>
         </View>
-        <View style={styles.roleTag}>
-          <Text style={styles.roleTagText}>{coach?.role === 'admin' ? 'ADMIN' : 'COACH'}</Text>
+        <View style={styles.welcomeActions}>
+          <TouchableOpacity style={styles.bellButton} onPress={() => router.push('/notifications')}>
+            <Bell size={18} color={colors.accent} strokeWidth={2} />
+            {unreadCount > 0 && (
+              <View style={styles.bellBadge}>
+                <Text style={styles.bellBadgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+          <View style={styles.roleTag}>
+            <Text style={styles.roleTagText}>{coach?.role === 'admin' ? 'ADMIN' : 'COACH'}</Text>
+          </View>
         </View>
       </View>
+
+      {uploadProgress > 0 && uploadProgress < 1 && (
+        <View style={styles.uploadProgressBanner}>
+          <Text style={styles.uploadProgressText}>
+            VIDEO UPLOAD {Math.round(uploadProgress * 100)}%
+          </Text>
+          <Text style={styles.uploadProgressValue}>QUEUED / ACTIVE</Text>
+        </View>
+      )}
 
       {/* Pending AI Drafts Banner */}
       {pendingDrafts > 0 && (
@@ -295,25 +327,22 @@ export default function DashboardScreen() {
       {/* 7-Day Attendance Spark Chart */}
       <View style={styles.sectionCard}>
         <Text style={styles.sectionTitle}>7-DAY ATTENDANCE</Text>
-        <View style={styles.sparkChart}>
+        <View style={styles.sparkLineWrap}>
+          <SparkLine
+            data={sparkData.map((day) => day.count)}
+            width={320}
+            height={60}
+            color={colors.accent}
+          />
+        </View>
+        <View style={styles.sparkLabelRow}>
           {sparkData.map((day) => (
-            <View key={day.date} style={styles.sparkCol}>
-              <Text style={styles.sparkCount}>{day.count || ''}</Text>
-              <View style={styles.sparkBarBg}>
-                <View
-                  style={[
-                    styles.sparkBarFill,
-                    {
-                      height: day.count > 0 ? `${(day.count / maxSpark) * 100}%` : 0,
-                      backgroundColor: day.date === today ? colors.gold : colors.accent,
-                    },
-                  ]}
-                />
-              </View>
-              <Text style={[styles.sparkLabel, day.date === today && { color: colors.gold }]}>
-                {day.dayLabel}
-              </Text>
-            </View>
+            <Text
+              key={day.date}
+              style={[styles.sparkLabel, day.date === today && styles.sparkLabelToday]}
+            >
+              {day.dayLabel}
+            </Text>
           ))}
         </View>
       </View>
@@ -437,6 +466,39 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginTop: spacing.xs,
   },
+  welcomeActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  bellButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.bgDeep,
+    position: 'relative',
+  },
+  bellBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    paddingHorizontal: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.gold,
+  },
+  bellBadgeText: {
+    fontFamily: fontFamily.pixel,
+    fontSize: fontSize.pixel,
+    color: colors.bgDeep,
+  },
   roleTag: {
     backgroundColor: 'rgba(255, 215, 0, 0.1)',
     borderWidth: 1,
@@ -465,6 +527,27 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   draftsBannerArrow: { fontFamily: fontFamily.heading, fontSize: fontSize.xxl, color: colors.gold },
+  uploadProgressBanner: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: 'rgba(179, 136, 255, 0.12)',
+    borderRadius: borderRadius.md,
+    padding: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.accent,
+  },
+  uploadProgressText: {
+    fontFamily: fontFamily.bodySemi,
+    fontSize: fontSize.sm,
+    color: colors.accent,
+    letterSpacing: 1,
+  },
+  uploadProgressValue: {
+    fontFamily: fontFamily.statMono,
+    fontSize: fontSize.xs,
+    color: colors.textSecondary,
+  },
 
   // Stats
   statsRow: { flexDirection: 'row', gap: spacing.sm },
@@ -582,27 +665,21 @@ const styles = StyleSheet.create({
   prTime: { fontFamily: fontFamily.stat, fontSize: fontSize.md, color: colors.gold },
 
   // Spark Chart
-  sparkChart: { flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-end', height: 100 },
-  sparkCol: { flex: 1, alignItems: 'center', gap: spacing.xs },
-  sparkCount: {
-    fontFamily: fontFamily.statMono,
-    fontSize: fontSize.xs,
-    color: colors.textSecondary,
-    height: 14,
+  sparkLineWrap: {
+    alignItems: 'center',
+    marginBottom: spacing.sm,
   },
-  sparkBarBg: {
-    width: '100%',
-    height: 60,
-    backgroundColor: colors.bgBase,
-    borderRadius: 3,
-    overflow: 'hidden',
-    justifyContent: 'flex-end',
+  sparkLabelRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
   },
-  sparkBarFill: { width: '100%', borderRadius: 3, minHeight: 2 },
   sparkLabel: {
     fontFamily: fontFamily.bodySemi,
     fontSize: fontSize.xs,
     color: colors.textSecondary,
+  },
+  sparkLabelToday: {
+    color: colors.gold,
   },
 
   // Sections
@@ -707,3 +784,5 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 });
+
+export default withScreenErrorBoundary(DashboardScreen, 'DashboardScreen');

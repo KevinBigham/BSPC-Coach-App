@@ -47,11 +47,13 @@ import {
   registerForPushNotifications,
   unregisterPushToken,
   getNotificationPermissionStatus,
+  getUnreadCount,
   subscribeNotifications,
   markNotificationRead,
   subscribeToGroupTopics,
   unsubscribeFromAllTopics,
 } from '../notifications';
+import type { Group } from '../../config/constants';
 
 const firestore = require('firebase/firestore');
 const ExpoNotifications = require('expo-notifications');
@@ -110,6 +112,18 @@ describe('subscribeNotifications', () => {
   });
 });
 
+describe('getUnreadCount', () => {
+  it('subscribes to unread notifications for the coach', () => {
+    const callback = jest.fn();
+    getUnreadCount('coach-1', callback);
+
+    expect(firestore.collection).toHaveBeenCalledWith({}, 'notifications');
+    expect(firestore.where).toHaveBeenCalledWith('coachId', '==', 'coach-1');
+    expect(firestore.where).toHaveBeenCalledWith('read', '==', false);
+    expect(firestore.onSnapshot).toHaveBeenCalled();
+  });
+});
+
 describe('markNotificationRead', () => {
   it('updates the notification doc with read: true', async () => {
     await markNotificationRead('notif-1');
@@ -126,7 +140,7 @@ describe('subscribeToGroupTopics', () => {
   });
 
   it('subscribes to group topics + broadcast_all', async () => {
-    await subscribeToGroupTopics('token-abc', ['Gold', 'Advanced'] as any);
+    await subscribeToGroupTopics('token-abc', ['Gold', 'Advanced'] as Group[]);
     expect(mockCallable).toHaveBeenCalledTimes(3);
     expect(mockCallable).toHaveBeenCalledWith({
       action: 'subscribe',
@@ -147,7 +161,7 @@ describe('subscribeToGroupTopics', () => {
 
   it('continues on individual topic failure', async () => {
     mockCallable.mockRejectedValueOnce(new Error('network'));
-    await subscribeToGroupTopics('token-abc', ['Gold', 'Silver'] as any);
+    await subscribeToGroupTopics('token-abc', ['Gold', 'Silver'] as Group[]);
     // Should still attempt all 3 topics (Gold fails, Silver + broadcast_all proceed)
     expect(mockCallable).toHaveBeenCalledTimes(3);
   });
@@ -159,7 +173,7 @@ describe('unsubscribeFromAllTopics', () => {
   });
 
   it('unsubscribes from group topics + broadcast_all', async () => {
-    await unsubscribeFromAllTopics('token-abc', ['Bronze'] as any);
+    await unsubscribeFromAllTopics('token-abc', ['Bronze'] as Group[]);
     expect(mockCallable).toHaveBeenCalledTimes(2);
     expect(mockCallable).toHaveBeenCalledWith({
       action: 'unsubscribe',

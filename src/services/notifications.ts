@@ -10,6 +10,7 @@ import {
   updateDoc,
   arrayUnion,
   arrayRemove,
+  type Unsubscribe,
 } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { db, functions } from '../config/firebase';
@@ -75,7 +76,7 @@ export function subscribeNotifications(
   coachId: string,
   callback: (notifications: (Notification & { id: string })[]) => void,
   max = 30,
-) {
+): Unsubscribe {
   const q = query(
     collection(db, 'notifications'),
     where('coachId', '==', coachId),
@@ -86,6 +87,17 @@ export function subscribeNotifications(
     callback(
       snapshot.docs.map((d) => ({ id: d.id, ...d.data() }) as Notification & { id: string }),
     );
+  });
+}
+
+export function getUnreadCount(coachId: string, callback: (count: number) => void): Unsubscribe {
+  const q = query(
+    collection(db, 'notifications'),
+    where('coachId', '==', coachId),
+    where('read', '==', false),
+  );
+  return onSnapshot(q, (snapshot) => {
+    callback(snapshot.size);
   });
 }
 
