@@ -88,7 +88,11 @@ service cloud.firestore {
       allow read: if isAuth() &&
         (isAdmin() || (isCoach() && resource.data.coachId == request.auth.uid));
       allow create: if isCoach() && request.resource.data.coachId == request.auth.uid;
-      allow update: if isCoach() && resource.data.coachId == request.auth.uid;
+      // On update, require that both the existing and new coachId match the caller
+      // so a coach cannot reassign their own job to another coach's UID.
+      allow update: if isCoach()
+        && resource.data.coachId == request.auth.uid
+        && request.resource.data.coachId == request.auth.uid;
       allow delete: if isAdmin();
     }
 
