@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   StyleSheet,
   Alert,
-  ActivityIndicator,
   Platform,
 } from 'react-native';
 import { Stack } from 'expo-router';
@@ -19,7 +18,7 @@ import {
   uploadAudio,
 } from '../src/services/audio';
 import { getTodayString } from '../src/utils/time';
-import { formatRelativeTime } from '../src/utils/date';
+import { formatRelativeTime, toDateSafe, type FirestoreTimestampLike } from '../src/utils/date';
 import { GROUPS, type Group } from '../src/config/constants';
 import {
   colors,
@@ -404,9 +403,7 @@ function AudioScreen() {
             sessions.map((session) => {
               const badge = STATUS_BADGE[session.status] || STATUS_BADGE.uploaded;
               const createdAt =
-                session.createdAt instanceof Date
-                  ? session.createdAt
-                  : (session.createdAt as any)?.toDate?.() || new Date();
+                toDateSafe(session.createdAt as FirestoreTimestampLike) ?? new Date();
 
               return (
                 <View key={session.id} style={styles.sessionCard}>

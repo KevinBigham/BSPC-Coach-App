@@ -103,11 +103,12 @@ INSTRUCTIONS:
       status: 'review',
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Audio processing error:', err);
+    const errorMessage = err instanceof Error && err.message ? err.message : 'Unknown error';
     await sessionRef.update({
       status: 'failed',
-      errorMessage: err.message || 'Unknown error',
+      errorMessage,
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
   }

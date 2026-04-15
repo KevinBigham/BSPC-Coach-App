@@ -49,8 +49,8 @@ function SettingsScreen() {
       });
       // AuthContext will refresh from Firestore on next auth state change
       // For immediate feedback, we trust the toggle state
-    } catch (err: any) {
-      Alert.alert('Error', err.message);
+    } catch (err: unknown) {
+      Alert.alert('Error', err instanceof Error ? err.message : String(err));
     }
     setSaving(false);
   };

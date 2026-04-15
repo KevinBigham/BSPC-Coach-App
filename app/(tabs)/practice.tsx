@@ -21,7 +21,7 @@ import {
 } from '../../src/config/theme';
 import { GROUPS, NOTE_TAGS, type Group, type NoteTag } from '../../src/config/constants';
 import { getTodayString } from '../../src/utils/time';
-import { formatRelativeTime } from '../../src/utils/date';
+import { formatRelativeTime, toDateSafe, type FirestoreTimestampLike } from '../../src/utils/date';
 import {
   subscribeGroupNotes,
   addGroupNote,
@@ -84,8 +84,8 @@ function PracticeScreen() {
       notifySuccess();
       setGnText('');
       setGnTags([]);
-    } catch (err: any) {
-      Alert.alert('Error', err.message);
+    } catch (err: unknown) {
+      Alert.alert('Error', err instanceof Error ? err.message : String(err));
     }
     setGnSaving(false);
   };
@@ -113,8 +113,8 @@ function PracticeScreen() {
         onPress: async () => {
           try {
             await deletePracticePlan(plan.id);
-          } catch (err: any) {
-            Alert.alert('Error', err.message);
+          } catch (err: unknown) {
+            Alert.alert('Error', err instanceof Error ? err.message : String(err));
           }
         },
       },
@@ -124,8 +124,8 @@ function PracticeScreen() {
   const handleDuplicate = async (plan: PlanWithId) => {
     try {
       await duplicateAsTemplate(plan, coach?.uid || '', coach?.displayName || 'Coach');
-    } catch (err: any) {
-      Alert.alert('Error', err.message);
+    } catch (err: unknown) {
+      Alert.alert('Error', err instanceof Error ? err.message : String(err));
     }
   };
 
@@ -422,10 +422,7 @@ function PracticeScreen() {
 
           {/* Group Notes List */}
           {groupNotes.slice(0, 15).map((note) => {
-            const createdAt =
-              note.createdAt instanceof Date
-                ? note.createdAt
-                : (note.createdAt as any)?.toDate?.() || new Date();
+            const createdAt = toDateSafe(note.createdAt as FirestoreTimestampLike) ?? new Date();
             return (
               <TouchableOpacity
                 key={note.id}

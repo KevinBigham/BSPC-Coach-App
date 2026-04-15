@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { initSentry } from '../src/config/sentry';
-import { Stack, useRouter, useSegments } from 'expo-router';
+import { Stack, useRouter, useSegments, type Href } from 'expo-router';
 import * as Linking from 'expo-linking';
 
 initSentry();
@@ -125,7 +125,7 @@ function RootNavigator() {
       const result = parseDeepLink(event.url);
       if (result) {
         logger.info('Deep link navigating to', { path: result.path });
-        router.push(result.path as any);
+        router.push(result.path as Href);
       }
     }
 

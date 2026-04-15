@@ -6,6 +6,41 @@
 import { formatDistanceToNow, format, subDays, isToday, isYesterday } from 'date-fns';
 
 /**
+ * A value that might be a Firestore Timestamp (with .toDate()), a JS Date,
+ * a string, a number epoch, or nullish. This covers the reality that domain
+ * types model timestamps as Date while the Firestore SDK hands back Timestamp
+ * objects at the IO boundary.
+ */
+export type FirestoreTimestampLike =
+  | Date
+  | string
+  | number
+  | { toDate: () => Date }
+  | null
+  | undefined;
+
+/**
+ * Coerce a Firestore-like timestamp value to a JS Date.
+ * Returns null when the value is null/undefined or cannot be parsed.
+ */
+export function toDateSafe(value: FirestoreTimestampLike): Date | null {
+  if (value == null) return null;
+  if (value instanceof Date) return value;
+  if (typeof value === 'string' || typeof value === 'number') {
+    const d = new Date(value);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+  if (typeof value === 'object' && typeof (value as { toDate?: unknown }).toDate === 'function') {
+    try {
+      return (value as { toDate: () => Date }).toDate();
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+/**
  * Formats a date as relative time: "2h ago", "Yesterday", "Mar 15"
  * Used in activity feeds and message timestamps.
  */

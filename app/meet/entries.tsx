@@ -23,10 +23,10 @@ import {
 import { GROUPS, type Group } from '../../src/config/constants';
 import { useSwimmersStore } from '../../src/stores/swimmersStore';
 import { subscribeEntries, addEntriesBatch, removeEntry } from '../../src/services/meets';
-import { formatTime, calculateAge } from '../../src/data/timeStandards';
+import { calculateAge } from '../../src/data/timeStandards';
 import type { Meet, MeetEntry } from '../../src/types/meet.types';
-import type { Swimmer } from '../../src/types/firestore.types';
 import { withScreenErrorBoundary } from '../../src/components/ScreenErrorBoundary';
+import { toDateSafe, type FirestoreTimestampLike } from '../../src/utils/date';
 
 type MeetWithId = Meet & { id: string };
 type EntryWithId = MeetEntry & { id: string };
@@ -103,10 +103,7 @@ function EntriesScreen() {
         const swimmer = swimmers.find((s) => s.id === swimmerId);
         if (!swimmer) continue;
 
-        const dob =
-          swimmer.dateOfBirth instanceof Date
-            ? swimmer.dateOfBirth
-            : (swimmer.dateOfBirth as any)?.toDate?.() || new Date();
+        const dob = toDateSafe(swimmer.dateOfBirth as FirestoreTimestampLike) ?? new Date();
         const age = calculateAge(dob);
         const eventNum = meet.events.find((e) => e.name === eventName)?.number || 0;
 
@@ -127,8 +124,8 @@ function EntriesScreen() {
       }
 
       router.back();
-    } catch (err: any) {
-      Alert.alert('Error', err.message);
+    } catch (err: unknown) {
+      Alert.alert('Error', err instanceof Error ? err.message : String(err));
     }
     setSaving(false);
   };

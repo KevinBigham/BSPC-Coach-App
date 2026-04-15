@@ -1,5 +1,5 @@
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
-import { router } from 'expo-router';
+import { router, type Href } from 'expo-router';
 import {
   Users,
   Bell,
@@ -16,8 +16,8 @@ import { withScreenErrorBoundary } from '../../src/components/ScreenErrorBoundar
 interface MoreItem {
   label: string;
   sublabel: string;
-  icon: React.ComponentType<any>;
-  route: string;
+  icon: React.ComponentType<{ size?: number; color?: string; strokeWidth?: number }>;
+  route: Href;
   iconColor: string;
 }
 
@@ -93,7 +93,7 @@ function MoreScreen() {
           <TouchableOpacity
             key={item.label}
             style={styles.tile}
-            onPress={() => router.push(item.route as any)}
+            onPress={() => router.push(item.route)}
           >
             <item.icon size={28} color={item.iconColor} strokeWidth={2} />
             <Text style={styles.tileLabel}>{item.label}</Text>

@@ -89,8 +89,8 @@ function EditSwimmerScreen() {
           setConsentNotes(s.mediaConsent?.notes || '');
           setPhotoUrl(s.profilePhotoUrl || null);
         }
-      } catch (err: any) {
-        Alert.alert('Error', err.message);
+      } catch (err: unknown) {
+        Alert.alert('Error', err instanceof Error ? err.message : String(err));
       }
       setLoading(false);
     })();
@@ -133,8 +133,8 @@ function EditSwimmerScreen() {
 
       notifySuccess();
       router.back();
-    } catch (err: any) {
-      Alert.alert('Error', err.message);
+    } catch (err: unknown) {
+      Alert.alert('Error', err instanceof Error ? err.message : String(err));
     }
     setSaving(false);
   };
@@ -170,8 +170,8 @@ function EditSwimmerScreen() {
     try {
       const url = await uploadProfilePhoto(id, result.assets[0].uri);
       setPhotoUrl(url);
-    } catch (err: any) {
-      Alert.alert('Error', err.message);
+    } catch (err: unknown) {
+      Alert.alert('Error', err instanceof Error ? err.message : String(err));
     }
     setPhotoUploading(false);
   };
@@ -182,8 +182,8 @@ function EditSwimmerScreen() {
     try {
       await deleteProfilePhoto(id);
       setPhotoUrl(null);
-    } catch (err: any) {
-      Alert.alert('Error', err.message);
+    } catch (err: unknown) {
+      Alert.alert('Error', err instanceof Error ? err.message : String(err));
     }
     setPhotoUploading(false);
   };

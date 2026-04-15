@@ -55,8 +55,11 @@ function InviteParentScreen() {
     setGenerating(true);
     try {
       await createParentInvite(swimmerId, swimmerName, coach.uid, coach.displayName);
-    } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to generate invite code');
+    } catch (err: unknown) {
+      Alert.alert(
+        'Error',
+        err instanceof Error && err.message ? err.message : 'Failed to generate invite code',
+      );
     }
     setGenerating(false);
   }, [swimmerId, swimmerName, coach]);

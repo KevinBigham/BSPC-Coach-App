@@ -123,8 +123,8 @@ function RosterScreen() {
         break;
       case 'group':
         result = [...result].sort((a, b) => {
-          const gi = GROUPS.indexOf(a.group as any);
-          const gj = GROUPS.indexOf(b.group as any);
+          const gi = GROUPS.indexOf(a.group);
+          const gj = GROUPS.indexOf(b.group);
           return gi - gj || a.lastName.localeCompare(b.lastName);
         });
         break;
@@ -156,7 +156,7 @@ function RosterScreen() {
         {
           text: 'Activate',
           onPress: async () => {
-            await updateSwimmer(swimmer.id, { active: true } as any);
+            await updateSwimmer(swimmer.id, { active: true });
           },
         },
       ],
@@ -234,8 +234,8 @@ function RosterScreen() {
             try {
               const csv = exportRosterCSV(swimmers);
               await shareCSV('bspc_roster.csv', csv);
-            } catch (err: any) {
-              Alert.alert('Export Error', err.message);
+            } catch (err: unknown) {
+              Alert.alert('Export Error', err instanceof Error ? err.message : String(err));
             }
           }}
         >

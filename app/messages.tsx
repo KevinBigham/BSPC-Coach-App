@@ -25,7 +25,7 @@ import {
 import { db } from '../src/config/firebase';
 import { useAuth } from '../src/contexts/AuthContext';
 import { colors, spacing, fontSize, borderRadius, fontFamily } from '../src/config/theme';
-import { formatRelativeTime } from '../src/utils/date';
+import { formatRelativeTime, toDateSafe, type FirestoreTimestampLike } from '../src/utils/date';
 import type { Message } from '../src/types/firestore.types';
 import { withScreenErrorBoundary } from '../src/components/ScreenErrorBoundary';
 
@@ -79,7 +79,7 @@ function MessagesScreen() {
       setTimeout(() => {
         flatListRef.current?.scrollToEnd({ animated: true });
       }, 200);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Send failed:', err);
     }
     setSending(false);
@@ -94,8 +94,8 @@ function MessagesScreen() {
         onPress: async () => {
           try {
             await deleteDoc(doc(db, 'coach_chat', msg.id));
-          } catch (err: any) {
-            Alert.alert('Error', err.message);
+          } catch (err: unknown) {
+            Alert.alert('Error', err instanceof Error ? err.message : String(err));
           }
         },
       },
@@ -104,8 +104,7 @@ function MessagesScreen() {
 
   const renderMessage = ({ item }: { item: Message & { id: string } }) => {
     const isMe = item.senderId === coach?.uid;
-    const ts =
-      item.createdAt instanceof Date ? item.createdAt : (item.createdAt as any)?.toDate?.() || null;
+    const ts = toDateSafe(item.createdAt as FirestoreTimestampLike);
     const readCount = Object.keys(item.readBy || {}).length;
 
     return (

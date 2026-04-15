@@ -54,8 +54,8 @@ function AIReviewScreen() {
       await checkAndCompleteSession(draft.sessionId);
       notifySuccess();
       setEditingDraft(null);
-    } catch (err: any) {
-      Alert.alert('Error', err.message);
+    } catch (err: unknown) {
+      Alert.alert('Error', err instanceof Error ? err.message : String(err));
     }
     setProcessing((prev) => {
       const next = new Set(prev);
@@ -77,8 +77,8 @@ function AIReviewScreen() {
           try {
             await rejectDraft(draft.sessionId, draft.id, coach.uid);
             await checkAndCompleteSession(draft.sessionId);
-          } catch (err: any) {
-            Alert.alert('Error', err.message);
+          } catch (err: unknown) {
+            Alert.alert('Error', err instanceof Error ? err.message : String(err));
           }
           setProcessing((prev) => {
             const next = new Set(prev);
@@ -105,8 +105,8 @@ function AIReviewScreen() {
             for (const sid of sessionIds) {
               await checkAndCompleteSession(sid);
             }
-          } catch (err: any) {
-            Alert.alert('Error', err.message);
+          } catch (err: unknown) {
+            Alert.alert('Error', err instanceof Error ? err.message : String(err));
           }
           setLoading(false);
         },

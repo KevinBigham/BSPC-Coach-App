@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { doc, onSnapshot } from 'firebase/firestore';
@@ -14,11 +14,10 @@ import {
 } from '../../src/config/theme';
 import { RELAY_EVENTS, MEDLEY_RELAY_ORDER } from '../../src/config/constants';
 import { useSwimmersStore } from '../../src/stores/swimmersStore';
-import { addRelay, subscribeRelays } from '../../src/services/meets';
-import { optimizeFreeRelayOrder, estimateRelayTime, formatRelayLeg } from '../../src/utils/relay';
+import { addRelay } from '../../src/services/meets';
+import { estimateRelayTime, formatRelayLeg } from '../../src/utils/relay';
 import { formatTime } from '../../src/data/timeStandards';
-import type { Meet, Relay, RelayLeg } from '../../src/types/meet.types';
-import type { Swimmer } from '../../src/types/firestore.types';
+import type { Meet, RelayLeg } from '../../src/types/meet.types';
 import { withScreenErrorBoundary } from '../../src/components/ScreenErrorBoundary';
 
 type MeetWithId = Meet & { id: string };
@@ -109,8 +108,8 @@ function RelayBuilderScreen() {
       });
 
       router.back();
-    } catch (err: any) {
-      Alert.alert('Error', err.message);
+    } catch (err: unknown) {
+      Alert.alert('Error', err instanceof Error ? err.message : String(err));
     }
     setSaving(false);
   };

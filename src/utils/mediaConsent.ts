@@ -42,7 +42,8 @@ export function getNonConsentedSwimmers<T extends Pick<Swimmer, 'mediaConsent' |
 export function grantConsent(grantedBy: string, notes?: string): MediaConsent {
   return {
     granted: true,
-    date: new Date() as any, // Runtime: Firestore serverTimestamp; typed as Date
+    // FirebaseTimestamp is typed as Date — Firestore serializes to Timestamp at write time.
+    date: new Date(),
     grantedBy,
     notes,
   };
@@ -52,7 +53,7 @@ export function grantConsent(grantedBy: string, notes?: string): MediaConsent {
 export function revokeConsent(notes?: string): MediaConsent {
   return {
     granted: false,
-    date: new Date() as any,
+    date: new Date(),
     notes,
   };
 }

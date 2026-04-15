@@ -6,10 +6,6 @@ import {
   HeadingLevel,
   AlignmentType,
   BorderStyle,
-  TableRow,
-  TableCell,
-  Table,
-  WidthType,
 } from 'docx';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
@@ -131,7 +127,9 @@ function footer(): Paragraph {
 // Practice Plan DOCX
 // ---------------------------------------------------------------------------
 
-export async function exportPracticePlanDocx(plan: PracticePlan): Promise<void> {
+export async function exportPracticePlanDocx(
+  plan: Omit<PracticePlan, 'id' | 'createdAt' | 'updatedAt'>,
+): Promise<void> {
   const totalYardage = plan.sets.reduce((sum, set) => sum + formatSetYardage(set), 0);
   const sortedSets = [...plan.sets].sort((a, b) => a.order - b.order);
 

@@ -12,15 +12,8 @@ import {
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '../../src/contexts/AuthContext';
-import {
-  colors,
-  spacing,
-  fontSize,
-  borderRadius,
-  fontFamily,
-  groupColors,
-} from '../../src/config/theme';
-import { GROUPS, SET_CATEGORIES, type Group, type SetCategory } from '../../src/config/constants';
+import { colors, spacing, fontSize, borderRadius, fontFamily } from '../../src/config/theme';
+import { GROUPS, SET_CATEGORIES, type SetCategory } from '../../src/config/constants';
 import { usePracticeStore } from '../../src/stores/practiceStore';
 import { addPracticePlan, updatePracticePlan } from '../../src/services/practicePlans';
 import SetBlock from '../../src/components/SetBlock';
@@ -53,8 +46,8 @@ function PracticeBuilderScreen() {
       notifySuccess();
       store.reset();
       router.back();
-    } catch (err: any) {
-      Alert.alert('Error', err.message);
+    } catch (err: unknown) {
+      Alert.alert('Error', err instanceof Error ? err.message : String(err));
     }
     setSaving(false);
   };
@@ -87,8 +80,8 @@ function PracticeBuilderScreen() {
           <TouchableOpacity
             onPress={() => {
               const plan = store.toPlan(coach?.uid || '', coach?.displayName || 'Coach');
-              exportPracticePlanDocx(plan as any).catch((err) =>
-                Alert.alert('Export Error', err.message),
+              exportPracticePlanDocx(plan).catch((err: unknown) =>
+                Alert.alert('Export Error', err instanceof Error ? err.message : String(err)),
               );
             }}
           >

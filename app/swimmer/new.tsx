@@ -75,8 +75,8 @@ function AddSwimmerScreen() {
 
       const docRef = await addDoc(collection(db, 'swimmers'), swimmerData);
       router.replace(`/swimmer/${docRef.id}`);
-    } catch (err: any) {
-      Alert.alert('Error', err.message);
+    } catch (err: unknown) {
+      Alert.alert('Error', err instanceof Error ? err.message : String(err));
     }
     setSaving(false);
   };

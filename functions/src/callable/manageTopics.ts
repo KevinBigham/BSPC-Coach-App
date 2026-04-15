@@ -47,7 +47,8 @@ export const manageTopicSubscription = onCall({ maxInstances: 10 }, async (reque
       await messaging.unsubscribeFromTopic([token], topic);
     }
     return { success: true, action, topic };
-  } catch (err: any) {
-    throw new HttpsError('internal', `Failed to ${action} topic: ${err.message}`);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    throw new HttpsError('internal', `Failed to ${action} topic: ${message}`);
   }
 });

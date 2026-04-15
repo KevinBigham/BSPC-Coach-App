@@ -30,10 +30,11 @@ export default function ForgotPasswordScreen() {
     try {
       await sendPasswordResetEmail(auth, email.trim());
       setSent(true);
-    } catch (err: any) {
-      if (err.code === 'auth/user-not-found') {
+    } catch (err: unknown) {
+      const code = err instanceof Error && 'code' in err ? (err as { code: string }).code : '';
+      if (code === 'auth/user-not-found') {
         setError('No account found with this email');
-      } else if (err.code === 'auth/invalid-email') {
+      } else if (code === 'auth/invalid-email') {
         setError('Invalid email address');
       } else {
         setError('Failed to send reset email. Try again.');
@@ -124,25 +125,132 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bgBase },
   inner: { flex: 1, justifyContent: 'center', paddingHorizontal: spacing.xxl },
   branding: { alignItems: 'center', marginBottom: spacing.xxl },
-  title: { fontFamily: fontFamily.heading, fontSize: fontSize.xxxl, color: colors.text, letterSpacing: 2 },
-  subtitle: { fontFamily: fontFamily.body, fontSize: fontSize.sm, color: colors.textSecondary, textAlign: 'center', marginTop: spacing.sm, lineHeight: 20, maxWidth: 280 },
-  form: { backgroundColor: colors.bgSurface, borderRadius: borderRadius.lg, padding: spacing.xl, borderWidth: 1, borderColor: colors.border },
-  errorBox: { backgroundColor: colors.errorLight, padding: spacing.md, borderRadius: borderRadius.sm, marginBottom: spacing.lg, borderWidth: 1, borderColor: colors.error },
-  errorText: { fontFamily: fontFamily.body, color: colors.error, fontSize: fontSize.sm, textAlign: 'center' },
-  label: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.xs, color: colors.textSecondary, marginBottom: spacing.xs, marginTop: spacing.md, letterSpacing: 1 },
-  input: { borderWidth: 1, borderColor: colors.border, borderRadius: borderRadius.sm, padding: spacing.md, fontSize: fontSize.md, fontFamily: fontFamily.body, color: colors.text, backgroundColor: colors.bgDeep },
-  button: { backgroundColor: colors.purple, padding: spacing.lg, borderRadius: borderRadius.sm, alignItems: 'center', marginTop: spacing.xl },
+  title: {
+    fontFamily: fontFamily.heading,
+    fontSize: fontSize.xxxl,
+    color: colors.text,
+    letterSpacing: 2,
+  },
+  subtitle: {
+    fontFamily: fontFamily.body,
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginTop: spacing.sm,
+    lineHeight: 20,
+    maxWidth: 280,
+  },
+  form: {
+    backgroundColor: colors.bgSurface,
+    borderRadius: borderRadius.lg,
+    padding: spacing.xl,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  errorBox: {
+    backgroundColor: colors.errorLight,
+    padding: spacing.md,
+    borderRadius: borderRadius.sm,
+    marginBottom: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.error,
+  },
+  errorText: {
+    fontFamily: fontFamily.body,
+    color: colors.error,
+    fontSize: fontSize.sm,
+    textAlign: 'center',
+  },
+  label: {
+    fontFamily: fontFamily.bodySemi,
+    fontSize: fontSize.xs,
+    color: colors.textSecondary,
+    marginBottom: spacing.xs,
+    marginTop: spacing.md,
+    letterSpacing: 1,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: borderRadius.sm,
+    padding: spacing.md,
+    fontSize: fontSize.md,
+    fontFamily: fontFamily.body,
+    color: colors.text,
+    backgroundColor: colors.bgDeep,
+  },
+  button: {
+    backgroundColor: colors.purple,
+    padding: spacing.lg,
+    borderRadius: borderRadius.sm,
+    alignItems: 'center',
+    marginTop: spacing.xl,
+  },
   buttonDisabled: { opacity: 0.6 },
-  buttonText: { fontFamily: fontFamily.heading, color: colors.text, fontSize: 20, letterSpacing: 2 },
-  backLink: { fontFamily: fontFamily.bodySemi, color: colors.accent, fontSize: fontSize.sm, textAlign: 'center', marginTop: spacing.xl },
+  buttonText: {
+    fontFamily: fontFamily.heading,
+    color: colors.text,
+    fontSize: 20,
+    letterSpacing: 2,
+  },
+  backLink: {
+    fontFamily: fontFamily.bodySemi,
+    color: colors.accent,
+    fontSize: fontSize.sm,
+    textAlign: 'center',
+    marginTop: spacing.xl,
+  },
 
   // Success state
-  successCard: { backgroundColor: colors.bgSurface, borderRadius: borderRadius.lg, padding: spacing.xxl, borderWidth: 1, borderColor: colors.border, alignItems: 'center' },
-  successPixel: { fontFamily: fontFamily.pixel, fontSize: fontSize.pixel, color: colors.gold, letterSpacing: 1, marginBottom: spacing.md },
-  successTitle: { fontFamily: fontFamily.heading, fontSize: fontSize.xxl, color: colors.text, letterSpacing: 2, marginBottom: spacing.lg },
-  successText: { fontFamily: fontFamily.body, fontSize: fontSize.md, color: colors.text, textAlign: 'center', lineHeight: 22 },
+  successCard: {
+    backgroundColor: colors.bgSurface,
+    borderRadius: borderRadius.lg,
+    padding: spacing.xxl,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+  },
+  successPixel: {
+    fontFamily: fontFamily.pixel,
+    fontSize: fontSize.pixel,
+    color: colors.gold,
+    letterSpacing: 1,
+    marginBottom: spacing.md,
+  },
+  successTitle: {
+    fontFamily: fontFamily.heading,
+    fontSize: fontSize.xxl,
+    color: colors.text,
+    letterSpacing: 2,
+    marginBottom: spacing.lg,
+  },
+  successText: {
+    fontFamily: fontFamily.body,
+    fontSize: fontSize.md,
+    color: colors.text,
+    textAlign: 'center',
+    lineHeight: 22,
+  },
   emailHighlight: { fontFamily: fontFamily.bodySemi, color: colors.accent },
-  successHint: { fontFamily: fontFamily.body, fontSize: fontSize.sm, color: colors.textSecondary, textAlign: 'center', marginTop: spacing.md, lineHeight: 20 },
-  backButton: { backgroundColor: colors.purple, paddingHorizontal: spacing.xxl, paddingVertical: spacing.md, borderRadius: borderRadius.sm, marginTop: spacing.xl },
-  backButtonText: { fontFamily: fontFamily.heading, color: colors.text, fontSize: fontSize.lg, letterSpacing: 2 },
+  successHint: {
+    fontFamily: fontFamily.body,
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginTop: spacing.md,
+    lineHeight: 20,
+  },
+  backButton: {
+    backgroundColor: colors.purple,
+    paddingHorizontal: spacing.xxl,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.sm,
+    marginTop: spacing.xl,
+  },
+  backButtonText: {
+    fontFamily: fontFamily.heading,
+    color: colors.text,
+    fontSize: fontSize.lg,
+    letterSpacing: 2,
+  },
 });

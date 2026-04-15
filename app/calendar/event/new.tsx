@@ -70,8 +70,8 @@ function NewEventScreen() {
         coach.uid,
       );
       router.back();
-    } catch (err: any) {
-      Alert.alert('Error', err.message);
+    } catch (err: unknown) {
+      Alert.alert('Error', err instanceof Error ? err.message : String(err));
     }
     setSaving(false);
   };

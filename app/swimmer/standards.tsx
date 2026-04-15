@@ -1,7 +1,15 @@
 import { useState, useEffect, useMemo } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert } from 'react-native';
-import { useLocalSearchParams, router } from 'expo-router';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { useLocalSearchParams } from 'expo-router';
+import {
+  doc,
+  onSnapshot,
+  collection,
+  query,
+  orderBy,
+  type QuerySnapshot,
+  type QueryDocumentSnapshot,
+} from 'firebase/firestore';
 import { db } from '../../src/config/firebase';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { colors, spacing, fontSize, borderRadius, fontFamily } from '../../src/config/theme';
@@ -29,6 +37,7 @@ import type {
   StandardLevel,
 } from '../../src/types/firestore.types';
 import { withScreenErrorBoundary } from '../../src/components/ScreenErrorBoundary';
+import { toDateSafe, type FirestoreTimestampLike } from '../../src/utils/date';
 
 function StandardsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -47,15 +56,14 @@ function StandardsScreen() {
 
   useEffect(() => {
     if (!id) return;
-    const {
-      collection: col,
-      query: q,
-      orderBy,
-      onSnapshot: onSnap,
-    } = require('firebase/firestore');
-    const timesQuery = q(col(db, 'swimmers', id, 'times'), orderBy('createdAt', 'desc'));
-    return onSnap(timesQuery, (snap: any) => {
-      setTimes(snap.docs.map((d: any) => ({ id: d.id, ...d.data() })));
+    const timesQuery = query(collection(db, 'swimmers', id, 'times'), orderBy('createdAt', 'desc'));
+    return onSnapshot(timesQuery, (snap: QuerySnapshot) => {
+      setTimes(
+        snap.docs.map((d: QueryDocumentSnapshot) => ({
+          id: d.id,
+          ...(d.data() as SwimTime),
+        })),
+      );
     });
   }, [id]);
 
@@ -66,10 +74,7 @@ function StandardsScreen() {
 
   const age = useMemo(() => {
     if (!swimmer?.dateOfBirth) return 14;
-    const dob =
-      swimmer.dateOfBirth instanceof Date
-        ? swimmer.dateOfBirth
-        : (swimmer.dateOfBirth as any)?.toDate?.() || new Date();
+    const dob = toDateSafe(swimmer.dateOfBirth as FirestoreTimestampLike) ?? new Date();
     return calculateAge(dob);
   }, [swimmer]);
 

@@ -57,10 +57,11 @@ export const generatePractice = onCall(
       }
 
       return parsed;
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (err instanceof HttpsError) throw err;
       console.error('AI practice generation failed:', err);
-      throw new HttpsError('internal', 'Failed to generate practice: ' + (err.message || 'unknown error'));
+      const message = err instanceof Error && err.message ? err.message : 'unknown error';
+      throw new HttpsError('internal', 'Failed to generate practice: ' + message);
     }
   },
 );

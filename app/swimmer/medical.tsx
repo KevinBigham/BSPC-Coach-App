@@ -53,8 +53,8 @@ function MedicalScreen() {
             at: data.updatedAt instanceof Date ? data.updatedAt : null,
           });
         }
-      } catch (err: any) {
-        Alert.alert('Error', err.message);
+      } catch (err: unknown) {
+        Alert.alert('Error', err instanceof Error ? err.message : String(err));
       }
       setLoading(false);
     })();
@@ -81,8 +81,8 @@ function MedicalScreen() {
 
       Alert.alert('Saved', 'Medical information updated.');
       router.back();
-    } catch (err: any) {
-      Alert.alert('Error', err.message);
+    } catch (err: unknown) {
+      Alert.alert('Error', err instanceof Error ? err.message : String(err));
     }
     setSaving(false);
   };

@@ -42,8 +42,9 @@ function LiveMeetScreen() {
       router.push(
         `/meet/${meetId}/timer?eventId=${eventId}&eventName=${encodeURIComponent(event.name)}`,
       );
-    } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to start event');
+    } catch (err: unknown) {
+      const message = err instanceof Error && err.message ? err.message : 'Failed to start event';
+      Alert.alert('Error', message);
     }
   };
 

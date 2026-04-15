@@ -37,8 +37,6 @@ import {
   groupColors,
 } from '../../src/config/theme';
 import { NOTE_TAGS, EVENTS, COURSES, type NoteTag, type Course } from '../../src/config/constants';
-import { formatRelativeTime, formatShortDate } from '../../src/utils/date';
-import { formatTimeDisplay } from '../../src/utils/time';
 import { exportTimesCSV, shareCSV } from '../../src/services/export';
 import { exportSwimmerReportDocx } from '../../src/services/docxExport';
 import { subscribeGoals } from '../../src/services/goals';
@@ -54,10 +52,11 @@ import type {
   SwimmerNote,
   SwimTime,
   AttendanceRecord,
-  AttendanceStatus,
   SwimmerGoal,
+  Coach,
 } from '../../src/types/firestore.types';
 import { withScreenErrorBoundary } from '../../src/components/ScreenErrorBoundary';
+import { toDateSafe, type FirestoreTimestampLike } from '../../src/utils/date';
 
 type Tab = 'overview' | 'notes' | 'times' | 'attendance' | 'timeline';
 
@@ -152,8 +151,8 @@ function SwimmerProfileScreen() {
       });
       setNoteText('');
       setSelectedTags([]);
-    } catch (err: any) {
-      Alert.alert('Error', err.message);
+    } catch (err: unknown) {
+      Alert.alert('Error', err instanceof Error ? err.message : String(err));
     }
     setSavingNote(false);
   };
@@ -167,8 +166,8 @@ function SwimmerProfileScreen() {
         onPress: async () => {
           try {
             await deleteDoc(doc(db, 'swimmers', id!, 'notes', noteId));
-          } catch (err: any) {
-            Alert.alert('Error', err.message);
+          } catch (err: unknown) {
+            Alert.alert('Error', err instanceof Error ? err.message : String(err));
           }
         },
       },
@@ -184,8 +183,8 @@ function SwimmerProfileScreen() {
         onPress: async () => {
           try {
             await deleteDoc(doc(db, 'swimmers', id!, 'times', timeId));
-          } catch (err: any) {
-            Alert.alert('Error', err.message);
+          } catch (err: unknown) {
+            Alert.alert('Error', err instanceof Error ? err.message : String(err));
           }
         },
       },
@@ -383,10 +382,7 @@ function OverviewTab({
   swimmerId: string;
 }) {
   // Compute age group for standards
-  const dob =
-    swimmer.dateOfBirth instanceof Date
-      ? swimmer.dateOfBirth
-      : (swimmer.dateOfBirth as any)?.toDate?.() || null;
+  const dob = toDateSafe(swimmer.dateOfBirth as FirestoreTimestampLike);
   const age = dob ? calculateAge(dob) : null;
   const ageGroup = age !== null ? getAgeGroup(age) : null;
   const activeGoals = goals.filter((g) => !g.achieved);
@@ -637,14 +633,8 @@ function AttendanceTab({ records }: { records: (AttendanceRecord & { id: string 
           <Text style={styles.emptyText}>No attendance records yet</Text>
         ) : (
           records.map((rec) => {
-            const arrivedAt =
-              rec.arrivedAt instanceof Date
-                ? rec.arrivedAt
-                : (rec.arrivedAt as any)?.toDate?.() || null;
-            const departedAt =
-              rec.departedAt instanceof Date
-                ? rec.departedAt
-                : (rec.departedAt as any)?.toDate?.() || null;
+            const arrivedAt = toDateSafe(rec.arrivedAt as FirestoreTimestampLike);
+            const departedAt = toDateSafe(rec.departedAt as FirestoreTimestampLike);
             const status = rec.status || 'normal';
             const statusColor = STATUS_COLORS[status] || colors.textSecondary;
 
@@ -796,7 +786,7 @@ function TimesTab({
 }: {
   times: (SwimTime & { id: string })[];
   swimmerId: string;
-  coach: any;
+  coach: Coach | null;
   onDeleteTime: (id: string) => void;
   swimmer: Swimmer;
 }) {
@@ -821,10 +811,7 @@ function TimesTab({
   }, [times]);
 
   // Compute age group for standard badges
-  const dob =
-    swimmer.dateOfBirth instanceof Date
-      ? swimmer.dateOfBirth
-      : (swimmer.dateOfBirth as any)?.toDate?.() || null;
+  const dob = toDateSafe(swimmer.dateOfBirth as FirestoreTimestampLike);
   const age = dob ? calculateAge(dob) : null;
   const ageGroup = age !== null ? getAgeGroup(age) : null;
 
@@ -841,8 +828,8 @@ function TimesTab({
               try {
                 const csv = exportTimesCSV(times);
                 await shareCSV('bspc_times.csv', csv);
-              } catch (err: any) {
-                Alert.alert('Export Error', err.message);
+              } catch (err: unknown) {
+                Alert.alert('Export Error', err instanceof Error ? err.message : String(err));
               }
             }}
           >
@@ -889,7 +876,7 @@ function TimesTab({
               {ageGroup &&
                 (() => {
                   const standard = getAchievedStandard(
-                    time.course as any,
+                    time.course,
                     swimmer.gender,
                     ageGroup,
                     time.event,
@@ -936,7 +923,7 @@ function AddTimeModal({
   onClose,
 }: {
   swimmerId: string;
-  coach: any;
+  coach: Coach | null;
   existingTimes: (SwimTime & { id: string })[];
   onClose: () => void;
 }) {
@@ -1003,8 +990,8 @@ function AddTimeModal({
       }
 
       onClose();
-    } catch (err: any) {
-      Alert.alert('Error', err.message);
+    } catch (err: unknown) {
+      Alert.alert('Error', err instanceof Error ? err.message : String(err));
     }
     setSaving(false);
   };

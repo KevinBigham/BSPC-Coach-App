@@ -65,13 +65,12 @@ export const onVideoUploaded = onDocumentUpdated(
         const mimeType = (metadata.contentType as string) || 'video/mp4';
 
         result = await model.generateContent({
-          contents: [{
-            role: 'user',
-            parts: [
-              { inlineData: { mimeType, data: videoBase64 } },
-              { text: prompt },
-            ],
-          }],
+          contents: [
+            {
+              role: 'user',
+              parts: [{ inlineData: { mimeType, data: videoBase64 } }, { text: prompt }],
+            },
+          ],
         });
       } else {
         // Large video: use GCS file URI
@@ -79,13 +78,12 @@ export const onVideoUploaded = onDocumentUpdated(
         const mimeType = (metadata.contentType as string) || 'video/mp4';
 
         result = await model.generateContent({
-          contents: [{
-            role: 'user',
-            parts: [
-              { fileData: { fileUri: gcsUri, mimeType: mimeType } },
-              { text: prompt },
-            ],
-          }],
+          contents: [
+            {
+              role: 'user',
+              parts: [{ fileData: { fileUri: gcsUri, mimeType: mimeType } }, { text: prompt }],
+            },
+          ],
         });
       }
 
@@ -108,14 +106,25 @@ export const onVideoUploaded = onDocumentUpdated(
         jsonStr = jsonMatch[1].trim();
       }
 
-      let observations: any[];
+      // AI response is an array of observation drafts (shape checked below).
+      type AiObservation = {
+        swimmerName?: string;
+        observation?: string;
+        diagnosis?: string;
+        drillRecommendation?: string;
+        phase?: string;
+        tags?: string[];
+        confidence?: number;
+      };
+
+      let parsedUnknown: unknown;
       try {
-        observations = JSON.parse(jsonStr);
+        parsedUnknown = JSON.parse(jsonStr);
       } catch {
         // Try to find JSON array in the response
         const arrMatch = responseText.match(/\[[\s\S]*\]/);
         if (arrMatch) {
-          observations = JSON.parse(arrMatch[0]);
+          parsedUnknown = JSON.parse(arrMatch[0]);
         } else {
           await sessionRef.update({
             status: 'failed',
@@ -126,7 +135,11 @@ export const onVideoUploaded = onDocumentUpdated(
         }
       }
 
-      if (!Array.isArray(observations) || observations.length === 0) {
+      const observations: AiObservation[] = Array.isArray(parsedUnknown)
+        ? (parsedUnknown as AiObservation[])
+        : [];
+
+      if (observations.length === 0) {
         await sessionRef.update({
           status: 'review',
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -149,12 +162,13 @@ export const onVideoUploaded = onDocumentUpdated(
 
       for (const obs of observations) {
         const swimmerNameLower = (obs.swimmerName || '').toLowerCase();
-        const matchedId = nameToId[swimmerNameLower]
-          || Object.entries(nameToId).find(([name]) =>
-            swimmerNameLower.includes(name) || name.includes(swimmerNameLower)
-          )?.[1]
-          || taggedIds[0] // Default to first tagged swimmer
-          || '';
+        const matchedId =
+          nameToId[swimmerNameLower] ||
+          Object.entries(nameToId).find(
+            ([name]) => swimmerNameLower.includes(name) || name.includes(swimmerNameLower),
+          )?.[1] ||
+          taggedIds[0] || // Default to first tagged swimmer
+          '';
 
         const draftRef = draftsRef.doc();
         batch.set(draftRef, {
@@ -177,14 +191,14 @@ export const onVideoUploaded = onDocumentUpdated(
         status: 'review',
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
-
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Video processing error:', err);
+      const errorMessage = err instanceof Error && err.message ? err.message : 'Unknown error';
       await sessionRef.update({
         status: 'failed',
-        errorMessage: err.message || 'Unknown error',
+        errorMessage,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
     }
-  }
+  },
 );
