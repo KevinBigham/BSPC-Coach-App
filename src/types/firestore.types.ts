@@ -1,4 +1,11 @@
-import type { Group, Course, NoteTag, SetCategory } from '../config/constants';
+import type {
+  Group,
+  Course,
+  NoteTag,
+  SetCategory,
+  StandardLevel,
+  CalendarEventType,
+} from '../config/constants';
 
 // Firebase Timestamp placeholder — will be replaced with actual Firebase Timestamp type
 // once @react-native-firebase is installed
@@ -307,7 +314,7 @@ export interface Notification {
   createdAt: FirebaseTimestamp;
 }
 
-export type StandardLevel = 'B' | 'BB' | 'A' | 'AA' | 'AAA' | 'AAAA';
+export type { StandardLevel };
 
 export interface SwimmerGoal {
   id?: string;
@@ -325,7 +332,7 @@ export interface SwimmerGoal {
   updatedAt: FirebaseTimestamp;
 }
 
-export type CalendarEventType = 'practice' | 'meet' | 'team_event' | 'fundraiser' | 'social';
+export type { CalendarEventType };
 
 export interface CalendarEvent {
   id?: string;

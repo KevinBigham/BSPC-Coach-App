@@ -1,7 +1,7 @@
-import type { Group, Course } from '../config/constants';
+import type { Group, Course, MeetStatus } from '../config/constants';
 import type { FirebaseTimestamp } from './firestore.types';
 
-export type MeetStatus = 'upcoming' | 'in_progress' | 'completed' | 'cancelled';
+export type { MeetStatus };
 
 export interface Meet {
   id?: string;
