@@ -31,6 +31,8 @@ import {
 } from '../src/config/theme';
 import type { AudioSession } from '../src/types/firestore.types';
 import { enqueueUpload } from '../src/utils/offlineQueue';
+import { tapMedium, notifySuccess } from '../src/utils/haptics';
+import { withScreenErrorBoundary } from '../src/components/ScreenErrorBoundary';
 
 type RecordingState = 'idle' | 'recording' | 'stopped';
 
@@ -45,7 +47,7 @@ const STATUS_BADGE: Record<string, { label: string; color: string }> = {
   queued: { label: 'QUEUED', color: colors.warning },
 };
 
-export default function AudioScreen() {
+function AudioScreen() {
   const { coach } = useAuth();
   const [recordingState, setRecordingState] = useState<RecordingState>('idle');
   const [duration, setDuration] = useState(0);
@@ -162,8 +164,25 @@ export default function AudioScreen() {
   };
 
   // ── Platform-dispatched recording controls ──
-  const startRecording = Platform.OS === 'web' ? startRecordingWeb : startRecordingNative;
-  const stopRecording = Platform.OS === 'web' ? stopRecordingWeb : stopRecordingNative;
+  const startRecording = async () => {
+    tapMedium();
+    if (Platform.OS === 'web') {
+      await startRecordingWeb();
+      return;
+    }
+
+    await startRecordingNative();
+  };
+
+  const stopRecording = async () => {
+    tapMedium();
+    if (Platform.OS === 'web') {
+      stopRecordingWeb();
+      return;
+    }
+
+    await stopRecordingNative();
+  };
 
   const handleUpload = async () => {
     const isWeb = Platform.OS === 'web';
@@ -191,12 +210,13 @@ export default function AudioScreen() {
         today,
         selectedGroup || undefined,
       );
-      await updateAudioSession(sessionId, { status: 'queued' as any });
+      await updateAudioSession(sessionId, { status: 'queued' });
       await enqueueUpload({
         type: 'audio',
         uri,
         metadata: { sessionId, coachId: coach.uid, date: today },
       });
+      notifySuccess();
       Alert.alert('Queued', 'Recording saved. It will upload when you reconnect.');
       setRecordingState('idle');
       setDuration(0);
@@ -229,7 +249,7 @@ export default function AudioScreen() {
       await updateAudioSession(sessionId, {
         storagePath,
         status: 'uploaded',
-      } as any);
+      });
 
       // Reset recording state
       recordingRef.current = null;
@@ -605,3 +625,5 @@ const styles = StyleSheet.create({
   statusBadgeText: { fontFamily: fontFamily.pixel, fontSize: fontSize.pixel },
   sessionCoach: { fontFamily: fontFamily.body, fontSize: fontSize.xs, color: colors.textSecondary },
 });
+
+export default withScreenErrorBoundary(AudioScreen, 'AudioScreen');

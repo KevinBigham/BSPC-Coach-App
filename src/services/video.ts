@@ -136,6 +136,8 @@ export async function uploadVideo(
 
 export function getVideoStatusLabel(status: VideoSessionStatus): string {
   switch (status) {
+    case 'queued':
+      return 'QUEUED';
     case 'uploading':
       return 'UPLOADING';
     case 'uploaded':
@@ -155,6 +157,8 @@ export function getVideoStatusLabel(status: VideoSessionStatus): string {
 
 export function getVideoStatusColor(status: VideoSessionStatus): string {
   switch (status) {
+    case 'queued':
+      return '#FFD700';
     case 'uploading':
       return '#7a7a8e';
     case 'uploaded':

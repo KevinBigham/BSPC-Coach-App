@@ -2,6 +2,9 @@ jest.mock('../../config/firebase', () => require('../../__mocks__/firebase'));
 
 import { useVideoStore } from '../videoStore';
 import type { VideoSession } from '../../types/firestore.types';
+import React from 'react';
+import { Text } from 'react-native';
+import { act, render } from '@testing-library/react-native';
 
 type VideoSessionWithId = VideoSession & { id: string };
 
@@ -84,5 +87,26 @@ describe('videoStore', () => {
     const sessions = useVideoStore.getState().sessions;
     expect(sessions).toHaveLength(2);
     expect(sessions[0].id).toBe('vs2');
+  });
+
+  it('supports the dashboard upload-progress pill subscriber', () => {
+    function UploadPillProbe() {
+      const uploadProgress = useVideoStore((state) => state.uploadProgress);
+
+      if (uploadProgress <= 0 || uploadProgress >= 1) {
+        return React.createElement(Text, null, 'NO PILL');
+      }
+
+      return React.createElement(Text, null, `PILL ${Math.round(uploadProgress * 100)}%`);
+    }
+
+    const { getByText, rerender } = render(React.createElement(UploadPillProbe));
+    expect(getByText('NO PILL')).toBeTruthy();
+
+    act(() => {
+      useVideoStore.getState().setUploadProgress(0.45);
+    });
+    rerender(React.createElement(UploadPillProbe));
+    expect(getByText('PILL 45%')).toBeTruthy();
   });
 });
