@@ -1,4 +1,5 @@
 import type { Swimmer } from '../types/firestore.types';
+import { parseSwimTimeString } from '../utils/time';
 
 type SwimmerWithId = Swimmer & { id: string };
 
@@ -53,33 +54,6 @@ export interface ImportResult {
   prs: number;
   skipped: number;
   errors: string[];
-}
-
-function parseSDIFTime(timeStr: string): { hundredths: number; display: string } | null {
-  const cleaned = timeStr.trim();
-  if (!cleaned || cleaned === 'NT' || cleaned === 'NS' || cleaned === 'DQ' || cleaned === 'SCR') {
-    return null;
-  }
-
-  // Formats: "MM:SS.hh", "SS.hh", "M:SS.hh"
-  const colonMatch = cleaned.match(/^(\d+):(\d{2})\.(\d{2})$/);
-  if (colonMatch) {
-    const min = parseInt(colonMatch[1]);
-    const sec = parseInt(colonMatch[2]);
-    const hund = parseInt(colonMatch[3]);
-    const total = min * 6000 + sec * 100 + hund;
-    return { hundredths: total, display: cleaned };
-  }
-
-  const secMatch = cleaned.match(/^(\d+)\.(\d{2})$/);
-  if (secMatch) {
-    const sec = parseInt(secMatch[1]);
-    const hund = parseInt(secMatch[2]);
-    const total = sec * 100 + hund;
-    return { hundredths: total, display: cleaned };
-  }
-
-  return null;
 }
 
 function mapEventCode(distance: string, strokeCode: string): string | null {
@@ -148,7 +122,7 @@ export function parseSDIF(content: string): SDIFParseResult {
           continue;
         }
 
-        const parsedTime = parseSDIFTime(timeStr);
+        const parsedTime = parseSwimTimeString(timeStr);
         if (!parsedTime) {
           // Skip NT/NS/DQ/SCR entries silently
           continue;
@@ -182,26 +156,6 @@ function titleCase(str: string): string {
   return str.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-export function matchSwimmers(records: SDIFRecord[], swimmers: SwimmerWithId[]): MatchResult[] {
-  return records.map((record) => {
-    // 1. Exact match on USA Swimming ID
-    if (record.usaSwimmingId) {
-      const exact = swimmers.find((s) => s.usaSwimmingId === record.usaSwimmingId);
-      if (exact) {
-        return { record, matchedSwimmer: exact, confidence: 'exact' as const };
-      }
-    }
-
-    // 2. Name match (case-insensitive)
-    const nameMatch = swimmers.find(
-      (s) =>
-        s.firstName.toLowerCase() === record.firstName.toLowerCase() &&
-        s.lastName.toLowerCase() === record.lastName.toLowerCase(),
-    );
-    if (nameMatch) {
-      return { record, matchedSwimmer: nameMatch, confidence: 'name' as const };
-    }
-
-    return { record, matchedSwimmer: null, confidence: 'none' as const };
-  });
-}
+// Re-export the canonical roster matcher from meetResultsImport so existing
+// callers (and tests) can import it from either module without diverging.
+export { matchSwimmersToRoster as matchSwimmers } from './meetResultsImport';

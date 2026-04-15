@@ -34,3 +34,43 @@ export function parseTimeInput(min: string, sec: string, hund: string): number {
   const h = parseInt(hund) || 0;
   return m * 6000 + s * 100 + h;
 }
+
+/**
+ * Parses a swim time string as it appears in meet-result files (SDIF, HY3).
+ * Accepts "MM:SS.hh", "M:SS.hh", and "SS.hh" formats.
+ * Returns null for empty / scratch / DQ placeholders ("NT", "NS", "DQ", "SCR"),
+ * and when `extraNoTimeTokens` includes the trimmed input (e.g., HY3 uses "0.00").
+ */
+export function parseSwimTimeString(
+  timeStr: string,
+  extraNoTimeTokens: readonly string[] = [],
+): { hundredths: number; display: string } | null {
+  const cleaned = timeStr.trim();
+  if (
+    !cleaned ||
+    cleaned === 'NT' ||
+    cleaned === 'NS' ||
+    cleaned === 'DQ' ||
+    cleaned === 'SCR' ||
+    extraNoTimeTokens.includes(cleaned)
+  ) {
+    return null;
+  }
+
+  const colonMatch = cleaned.match(/^(\d+):(\d{2})\.(\d{2})$/);
+  if (colonMatch) {
+    const min = parseInt(colonMatch[1]);
+    const sec = parseInt(colonMatch[2]);
+    const hund = parseInt(colonMatch[3]);
+    return { hundredths: min * 6000 + sec * 100 + hund, display: cleaned };
+  }
+
+  const secMatch = cleaned.match(/^(\d+)\.(\d{2})$/);
+  if (secMatch) {
+    const sec = parseInt(secMatch[1]);
+    const hund = parseInt(secMatch[2]);
+    return { hundredths: sec * 100 + hund, display: cleaned };
+  }
+
+  return null;
+}
