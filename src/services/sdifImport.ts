@@ -1,7 +1,10 @@
-import type { Swimmer } from '../types/firestore.types';
 import { parseSwimTimeString } from '../utils/time';
+import type { SDIFParseResult } from './meetImportTypes';
 
-type SwimmerWithId = Swimmer & { id: string };
+// Re-export shared meet-import types so existing callers can continue to
+// import them from this module. The canonical definitions live in
+// `./meetImportTypes` to avoid a runtime cycle with `meetResultsImport`.
+export type { SDIFRecord, SDIFParseResult, MatchResult, ImportResult } from './meetImportTypes';
 
 // SDIF event code → app event name mapping
 // SDIF uses distance + stroke code: e.g., "0050" + "A" = 50 Free
@@ -21,40 +24,6 @@ const COURSE_CODES: Record<string, 'SCY' | 'SCM' | 'LCM'> = {
   '2': 'SCM',
   '3': 'LCM',
 };
-
-export interface SDIFRecord {
-  firstName: string;
-  lastName: string;
-  usaSwimmingId: string;
-  event: string;
-  time: number; // hundredths
-  timeDisplay: string;
-  course: 'SCY' | 'SCM' | 'LCM';
-  meetName: string;
-  meetDate: string;
-  gender: 'M' | 'F';
-}
-
-export interface SDIFParseResult {
-  meetName: string;
-  meetDate: string;
-  course: 'SCY' | 'SCM' | 'LCM';
-  records: SDIFRecord[];
-  errors: string[];
-}
-
-export interface MatchResult {
-  record: SDIFRecord;
-  matchedSwimmer: SwimmerWithId | null;
-  confidence: 'exact' | 'name' | 'none';
-}
-
-export interface ImportResult {
-  imported: number;
-  prs: number;
-  skipped: number;
-  errors: string[];
-}
 
 function mapEventCode(distance: string, strokeCode: string): string | null {
   const dist = parseInt(distance);

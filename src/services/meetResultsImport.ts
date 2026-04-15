@@ -16,7 +16,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import type { Swimmer, SwimTime } from '../types/firestore.types';
-import type { SDIFRecord, MatchResult, ImportResult } from './sdifImport';
+import type { SDIFRecord, MatchResult, ImportResult } from './meetImportTypes';
 import { createImportJob, updateImportJob } from './importJobs';
 
 type SwimmerWithId = Swimmer & { id: string };
