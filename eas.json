@@ -26,9 +26,9 @@
   "submit": {
     "production": {
       "ios": {
-        "appleId": "FILL_AFTER_ENROLLMENT",
+        "appleId": "tkb1230@gmail.com",
         "ascAppId": "FILL_AFTER_ASC_SETUP",
-        "appleTeamId": "FILL_AFTER_ENROLLMENT"
+        "appleTeamId": "N4DY34LC6F"
       },
       "android": {
         "serviceAccountKeyPath": "./google-service-account.json",
