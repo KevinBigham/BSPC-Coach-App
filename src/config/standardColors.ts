@@ -27,12 +27,3 @@ export const standardBorderColors: Record<StandardLevel, string> = {
   AAA: colors.goldDark,
   AAAA: colors.gold,
 };
-
-export const standardLabels: Record<StandardLevel, string> = {
-  B: 'B',
-  BB: 'BB',
-  A: 'A',
-  AA: 'AA',
-  AAA: 'AAA',
-  AAAA: 'AAAA',
-};

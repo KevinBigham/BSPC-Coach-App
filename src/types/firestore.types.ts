@@ -161,21 +161,6 @@ export interface DashboardActivityAggregation {
   updatedAt: FirebaseTimestamp;
 }
 
-export interface RecentActivityItem {
-  type: 'note' | 'attendance' | 'ai_draft' | 'time';
-  summary: string;
-  coachName: string;
-  timestamp: FirebaseTimestamp;
-}
-
-export interface DashboardGlobal {
-  totalActiveSwimmers: number;
-  todayAttendanceCount: number;
-  groupCounts: Record<Group, number>;
-  recentActivity: RecentActivityItem[];
-  updatedAt: FirebaseTimestamp;
-}
-
 export type AudioSessionStatus =
   | 'queued'
   | 'uploading'
@@ -301,17 +286,6 @@ export interface PracticePlan {
   updatedAt: FirebaseTimestamp;
 }
 
-export interface GroupNote {
-  id?: string;
-  content: string;
-  tags: NoteTag[];
-  group: Group;
-  practiceDate: string;
-  coachId: string;
-  coachName: string;
-  createdAt: FirebaseTimestamp;
-}
-
 export interface Message {
   id?: string;
   content: string;
@@ -385,15 +359,6 @@ export interface RSVP {
   status: RSVPStatus;
   parentName?: string;
   note?: string;
-  updatedAt: FirebaseTimestamp;
-}
-
-export interface Parent {
-  uid: string;
-  email: string;
-  displayName?: string;
-  linkedSwimmerIds: string[];
-  createdAt: FirebaseTimestamp;
   updatedAt: FirebaseTimestamp;
 }
 

@@ -12,8 +12,7 @@ import {
   serverTimestamp,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
-import type { SeasonPlan, WeekPlan, FirebaseTimestamp } from '../types/firestore.types';
-import type { Group } from '../config/constants';
+import type { SeasonPlan, WeekPlan } from '../types/firestore.types';
 
 type SeasonPlanWithId = SeasonPlan & { id: string };
 type WeekPlanWithId = WeekPlan & { id: string };
@@ -28,25 +27,6 @@ export function subscribeSeasonPlans(
   const q = query(
     collection(db, 'season_plans'),
     where('coachId', '==', coachId),
-    orderBy('startDate', 'desc'),
-  );
-  return onSnapshot(q, (snapshot) => {
-    callback(snapshot.docs.map((d) => ({ id: d.id, ...d.data() }) as SeasonPlanWithId));
-  });
-}
-
-/**
- * Subscribe to season plans for a specific group
- */
-export function subscribeSeasonPlansByGroup(
-  coachId: string,
-  group: Group,
-  callback: (plans: SeasonPlanWithId[]) => void,
-) {
-  const q = query(
-    collection(db, 'season_plans'),
-    where('coachId', '==', coachId),
-    where('group', '==', group),
     orderBy('startDate', 'desc'),
   );
   return onSnapshot(q, (snapshot) => {
