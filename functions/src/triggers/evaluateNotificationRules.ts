@@ -61,8 +61,10 @@ function evaluateMissedPracticeGap(
   currentDate: string,
   daysSince: number,
 ): boolean {
+  // No prior attendance means no baseline to measure a gap from — a swimmer's
+  // first attendance record cannot have "missed" a prior practice.
   if (lastAttendedDate === null) {
-    return true;
+    return false;
   }
 
   if (daysSince <= 0) {
