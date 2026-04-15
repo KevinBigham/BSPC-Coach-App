@@ -7,8 +7,7 @@ import type {
   CalendarEventType,
 } from '../config/constants';
 
-// Firebase Timestamp placeholder — will be replaced with actual Firebase Timestamp type
-// once @react-native-firebase is installed
+/** Domain alias for a Firestore timestamp — modeled as Date client-side. */
 export type FirebaseTimestamp = Date;
 
 export type CoachRole = 'admin' | 'coach';

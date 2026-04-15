@@ -40,7 +40,7 @@ function EntriesScreen() {
   const [filterGroup, setFilterGroup] = useState<Group | 'All'>('All');
   const [saving, setSaving] = useState(false);
 
-  // Track local selections: swimmerId_eventName → true/false
+  // Keyed by `${swimmerId}_${eventName}`.
   const [selections, setSelections] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
@@ -54,7 +54,6 @@ function EntriesScreen() {
     if (!meetId) return;
     return subscribeEntries(meetId, (data) => {
       setEntries(data);
-      // Initialize selections from existing entries
       const sel: Record<string, boolean> = {};
       for (const e of data) {
         sel[`${e.swimmerId}_${e.eventName}`] = true;
@@ -80,7 +79,6 @@ function EntriesScreen() {
     if (!meetId || !meet || !coach) return;
     setSaving(true);
     try {
-      // Find entries to add and remove
       const existingKeys = new Set(entries.map((e) => `${e.swimmerId}_${e.eventName}`));
       const newKeys = new Set(
         Object.entries(selections)
@@ -88,13 +86,11 @@ function EntriesScreen() {
           .map(([k]) => k),
       );
 
-      // Remove unchecked
       const toRemove = entries.filter((e) => !newKeys.has(`${e.swimmerId}_${e.eventName}`));
       for (const entry of toRemove) {
         await removeEntry(meetId, entry.id);
       }
 
-      // Add newly checked
       const toAdd: Omit<MeetEntry, 'id' | 'createdAt'>[] = [];
       for (const key of newKeys) {
         if (existingKeys.has(key)) continue;

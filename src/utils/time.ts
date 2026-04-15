@@ -1,8 +1,3 @@
-/**
- * Time utilities for the BSPC Coach App.
- * Centralizes time formatting/parsing used across attendance, times, dashboard.
- */
-
 /** Returns today's date as YYYY-MM-DD string */
 export function getTodayString(): string {
   return new Date().toISOString().split('T')[0];

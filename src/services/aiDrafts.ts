@@ -22,13 +22,12 @@ export type DraftWithContext = AIDraft & {
 };
 
 export function subscribePendingDrafts(
-  callback: (drafts: DraftWithContext[]) => void
+  callback: (drafts: DraftWithContext[]) => void,
 ): Unsubscribe {
-  // Listen to audio sessions with status='review'
   const q = query(
     collection(db, 'audio_sessions'),
     where('status', '==', 'review'),
-    orderBy('createdAt', 'desc')
+    orderBy('createdAt', 'desc'),
   );
 
   return onSnapshot(q, async (sessionSnap) => {
@@ -62,7 +61,7 @@ export async function approveDraft(
   draft: AIDraft,
   coachUid: string,
   editedContent?: string,
-  editedTags?: string[]
+  editedTags?: string[],
 ): Promise<void> {
   const content = editedContent || draft.observation;
   const tags = editedTags || draft.tags;
@@ -90,7 +89,7 @@ export async function approveDraft(
 export async function rejectDraft(
   sessionId: string,
   draftId: string,
-  coachUid: string
+  coachUid: string,
 ): Promise<void> {
   await updateDoc(doc(db, 'audio_sessions', sessionId, 'drafts', draftId), {
     approved: false,
@@ -102,7 +101,7 @@ export async function rejectDraft(
 export async function approveAllDrafts(
   drafts: DraftWithContext[],
   coachUid: string,
-  coachName: string
+  coachName: string,
 ): Promise<number> {
   let approved = 0;
 
@@ -112,17 +111,12 @@ export async function approveAllDrafts(
     const batch = writeBatch(db);
 
     for (const draft of chunk) {
-      // Mark draft approved
-      batch.update(
-        doc(db, 'audio_sessions', draft.sessionId, 'drafts', draft.id),
-        {
-          approved: true,
-          reviewedBy: coachUid,
-          reviewedAt: serverTimestamp(),
-        }
-      );
+      batch.update(doc(db, 'audio_sessions', draft.sessionId, 'drafts', draft.id), {
+        approved: true,
+        reviewedBy: coachUid,
+        reviewedAt: serverTimestamp(),
+      });
 
-      // Create swimmer note
       const noteRef = doc(collection(db, 'swimmers', draft.swimmerId, 'notes'));
       batch.set(noteRef, {
         content: draft.observation,
@@ -145,10 +139,7 @@ export async function approveAllDrafts(
 }
 
 export async function checkAndCompleteSession(sessionId: string): Promise<void> {
-  // Check if all drafts in the session are reviewed
-  const draftsSnap = await getDocs(
-    collection(db, 'audio_sessions', sessionId, 'drafts')
-  );
+  const draftsSnap = await getDocs(collection(db, 'audio_sessions', sessionId, 'drafts'));
 
   const allReviewed = draftsSnap.docs.every((d) => {
     const data = d.data();

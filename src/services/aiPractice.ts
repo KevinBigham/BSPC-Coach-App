@@ -21,16 +21,8 @@ export interface AIPracticeResponse {
   estimatedDuration: number;
 }
 
-/**
- * Call the Cloud Function to generate a practice plan using AI
- */
-export async function generatePractice(
-  request: AIPracticeRequest,
-): Promise<AIPracticeResponse> {
-  const fn = httpsCallable<AIPracticeRequest, AIPracticeResponse>(
-    functions,
-    'generatePractice',
-  );
+export async function generatePractice(request: AIPracticeRequest): Promise<AIPracticeResponse> {
+  const fn = httpsCallable<AIPracticeRequest, AIPracticeResponse>(functions, 'generatePractice');
   const result = await fn(request);
   return result.data;
 }

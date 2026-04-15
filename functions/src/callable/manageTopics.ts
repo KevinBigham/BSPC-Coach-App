@@ -4,7 +4,6 @@ import * as admin from 'firebase-admin';
 if (!admin.apps.length) admin.initializeApp();
 const messaging = admin.messaging();
 
-/** Valid topic prefixes */
 const VALID_GROUPS = ['Bronze', 'Silver', 'Gold', 'Advanced', 'Platinum', 'Diamond'];
 const VALID_TOPICS = [...VALID_GROUPS.map((g) => `group_${g}`), 'broadcast_all'];
 

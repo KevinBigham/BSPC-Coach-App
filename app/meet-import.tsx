@@ -89,7 +89,6 @@ function MeetImportScreen() {
       return;
     }
 
-    // Determine format
     const format = fileFormat === 'auto' ? detectFormat(rawText) : fileFormat;
     const parsed = format === 'hy3' ? parseHY3(rawText) : parseSDIF(rawText);
 

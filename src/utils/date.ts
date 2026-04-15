@@ -1,16 +1,6 @@
-/**
- * Date utilities for the BSPC Coach App.
- * Uses date-fns where helpful (already installed).
- */
-
 import { formatDistanceToNow, format, subDays, isToday, isYesterday } from 'date-fns';
 
-/**
- * A value that might be a Firestore Timestamp (with .toDate()), a JS Date,
- * a string, a number epoch, or nullish. This covers the reality that domain
- * types model timestamps as Date while the Firestore SDK hands back Timestamp
- * objects at the IO boundary.
- */
+/** Domain types model timestamps as Date, but the Firestore SDK hands back Timestamp at the IO boundary. */
 export type FirestoreTimestampLike =
   | Date
   | string
@@ -19,10 +9,7 @@ export type FirestoreTimestampLike =
   | null
   | undefined;
 
-/**
- * Coerce a Firestore-like timestamp value to a JS Date.
- * Returns null when the value is null/undefined or cannot be parsed.
- */
+/** Returns null when the value is null/undefined or cannot be parsed. */
 export function toDateSafe(value: FirestoreTimestampLike): Date | null {
   if (value == null) return null;
   if (value instanceof Date) return value;
@@ -40,10 +27,7 @@ export function toDateSafe(value: FirestoreTimestampLike): Date | null {
   return null;
 }
 
-/**
- * Formats a date as relative time: "2h ago", "Yesterday", "Mar 15"
- * Used in activity feeds and message timestamps.
- */
+/** "2h ago", "Yesterday", or "Mar 15". */
 export function formatRelativeTime(date: Date): string {
   if (isToday(date)) {
     return formatDistanceToNow(date, { addSuffix: true });

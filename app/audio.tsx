@@ -186,7 +186,6 @@ function AudioScreen() {
   const handleUpload = async () => {
     const isWeb = Platform.OS === 'web';
 
-    // On web, build a blob URI from collected chunks
     if (isWeb && audioChunksRef.current.length === 0) return;
     if (!isWeb && !recordingRef.current) return;
     if (!coach) return;
@@ -227,7 +226,6 @@ function AudioScreen() {
     const today = getTodayString();
 
     try {
-      // Create session doc first
       const sessionId = await createAudioSession(
         coach.uid,
         coach.displayName || 'Unknown',
@@ -236,7 +234,6 @@ function AudioScreen() {
         selectedGroup || undefined,
       );
 
-      // Upload audio file
       const { storagePath, downloadUrl } = await uploadAudio(
         uri,
         coach.uid,
@@ -244,13 +241,11 @@ function AudioScreen() {
         setUploadProgress,
       );
 
-      // Update session with upload info
       await updateAudioSession(sessionId, {
         storagePath,
         status: 'uploaded',
       });
 
-      // Reset recording state
       recordingRef.current = null;
       audioChunksRef.current = [];
       mediaRecorderRef.current = null;

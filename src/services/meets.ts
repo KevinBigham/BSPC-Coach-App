@@ -9,7 +9,6 @@ import {
   updateDoc,
   deleteDoc,
   doc,
-  getDocs,
   serverTimestamp,
   writeBatch,
 } from 'firebase/firestore';
@@ -23,25 +22,14 @@ type RelayWithId = Relay & { id: string };
 
 // ── Meets ──
 
-export function subscribeMeets(
-  callback: (meets: MeetWithId[]) => void,
-  max = 50,
-) {
-  const q = query(
-    collection(db, 'meets'),
-    orderBy('startDate', 'desc'),
-    limit(max),
-  );
+export function subscribeMeets(callback: (meets: MeetWithId[]) => void, max = 50) {
+  const q = query(collection(db, 'meets'), orderBy('startDate', 'desc'), limit(max));
   return onSnapshot(q, (snapshot) => {
-    callback(
-      snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as MeetWithId)),
-    );
+    callback(snapshot.docs.map((d) => ({ id: d.id, ...d.data() }) as MeetWithId));
   });
 }
 
-export function subscribeUpcomingMeets(
-  callback: (meets: MeetWithId[]) => void,
-) {
+export function subscribeUpcomingMeets(callback: (meets: MeetWithId[]) => void) {
   const today = new Date().toISOString().split('T')[0];
   const q = query(
     collection(db, 'meets'),
@@ -50,15 +38,11 @@ export function subscribeUpcomingMeets(
     limit(20),
   );
   return onSnapshot(q, (snapshot) => {
-    callback(
-      snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as MeetWithId)),
-    );
+    callback(snapshot.docs.map((d) => ({ id: d.id, ...d.data() }) as MeetWithId));
   });
 }
 
-export async function addMeet(
-  data: Omit<Meet, 'id' | 'createdAt' | 'updatedAt'>,
-): Promise<string> {
+export async function addMeet(data: Omit<Meet, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
   const ref = await addDoc(collection(db, 'meets'), {
     ...data,
     createdAt: serverTimestamp(),
@@ -67,10 +51,7 @@ export async function addMeet(
   return ref.id;
 }
 
-export async function updateMeet(
-  id: string,
-  data: Partial<Meet>,
-): Promise<void> {
+export async function updateMeet(id: string, data: Partial<Meet>): Promise<void> {
   await updateDoc(doc(db, 'meets', id), {
     ...data,
     updatedAt: serverTimestamp(),
@@ -83,18 +64,10 @@ export async function deleteMeet(id: string): Promise<void> {
 
 // ── Entries ──
 
-export function subscribeEntries(
-  meetId: string,
-  callback: (entries: EntryWithId[]) => void,
-) {
-  const q = query(
-    collection(db, 'meets', meetId, 'entries'),
-    orderBy('eventNumber', 'asc'),
-  );
+export function subscribeEntries(meetId: string, callback: (entries: EntryWithId[]) => void) {
+  const q = query(collection(db, 'meets', meetId, 'entries'), orderBy('eventNumber', 'asc'));
   return onSnapshot(q, (snapshot) => {
-    callback(
-      snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as EntryWithId)),
-    );
+    callback(snapshot.docs.map((d) => ({ id: d.id, ...d.data() }) as EntryWithId));
   });
 }
 
@@ -125,10 +98,7 @@ export async function addEntriesBatch(
   }
 }
 
-export async function removeEntry(
-  meetId: string,
-  entryId: string,
-): Promise<void> {
+export async function removeEntry(meetId: string, entryId: string): Promise<void> {
   await deleteDoc(doc(db, 'meets', meetId, 'entries', entryId));
 }
 
@@ -142,18 +112,10 @@ export async function updateEntry(
 
 // ── Relays ──
 
-export function subscribeRelays(
-  meetId: string,
-  callback: (relays: RelayWithId[]) => void,
-) {
-  const q = query(
-    collection(db, 'meets', meetId, 'relays'),
-    orderBy('eventName', 'asc'),
-  );
+export function subscribeRelays(meetId: string, callback: (relays: RelayWithId[]) => void) {
+  const q = query(collection(db, 'meets', meetId, 'relays'), orderBy('eventName', 'asc'));
   return onSnapshot(q, (snapshot) => {
-    callback(
-      snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as RelayWithId)),
-    );
+    callback(snapshot.docs.map((d) => ({ id: d.id, ...d.data() }) as RelayWithId));
   });
 }
 
@@ -176,19 +138,13 @@ export async function updateRelay(
   await updateDoc(doc(db, 'meets', meetId, 'relays', relayId), data);
 }
 
-export async function deleteRelay(
-  meetId: string,
-  relayId: string,
-): Promise<void> {
+export async function deleteRelay(meetId: string, relayId: string): Promise<void> {
   await deleteDoc(doc(db, 'meets', meetId, 'relays', relayId));
 }
 
 // ── Psych Sheet ──
 
-export function generatePsychSheet(
-  entries: EntryWithId[],
-): PsychSheetEntry[] {
-  // Group entries by event
+export function generatePsychSheet(entries: EntryWithId[]): PsychSheetEntry[] {
   const eventMap: Record<string, EntryWithId[]> = {};
   for (const entry of entries) {
     const key = `${entry.eventNumber}-${entry.eventName}`;
@@ -196,7 +152,6 @@ export function generatePsychSheet(
     eventMap[key].push(entry);
   }
 
-  // Sort by event number, then within each event by seed time
   return Object.entries(eventMap)
     .sort(([a], [b]) => {
       const numA = parseInt(a.split('-')[0]);
@@ -228,20 +183,30 @@ export function generatePsychSheet(
 
 export function getMeetStatusColor(status: Meet['status']): string {
   switch (status) {
-    case 'upcoming': return '#B388FF'; // accent
-    case 'in_progress': return '#FFD700'; // gold
-    case 'completed': return '#CCB000'; // dark gold
-    case 'cancelled': return '#7a7a8e'; // textSecondary
-    default: return '#7a7a8e';
+    case 'upcoming':
+      return '#B388FF'; // accent
+    case 'in_progress':
+      return '#FFD700'; // gold
+    case 'completed':
+      return '#CCB000'; // dark gold
+    case 'cancelled':
+      return '#7a7a8e'; // textSecondary
+    default:
+      return '#7a7a8e';
   }
 }
 
 export function getMeetStatusLabel(status: Meet['status']): string {
   switch (status) {
-    case 'upcoming': return 'Upcoming';
-    case 'in_progress': return 'In Progress';
-    case 'completed': return 'Completed';
-    case 'cancelled': return 'Cancelled';
-    default: return status;
+    case 'upcoming':
+      return 'Upcoming';
+    case 'in_progress':
+      return 'In Progress';
+    case 'completed':
+      return 'Completed';
+    case 'cancelled':
+      return 'Cancelled';
+    default:
+      return status;
   }
 }

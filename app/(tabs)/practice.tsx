@@ -48,7 +48,6 @@ function PracticeScreen() {
   const [selectedPlan, setSelectedPlan] = useState<PlanWithId | null>(null);
   const store = usePracticeStore();
 
-  // Group Notes state
   const [groupNotes, setGroupNotes] = useState<(GroupNote & { id: string })[]>([]);
   const [gnGroup, setGnGroup] = useState<Group>(GROUPS[0]);
   const [gnText, setGnText] = useState('');

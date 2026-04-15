@@ -21,9 +21,8 @@ import {
   getMeetStatusColor,
   getMeetStatusLabel,
 } from '../../src/services/meets';
-import { useMeetStore } from '../../src/stores/meetStore';
 import { formatTime } from '../../src/data/timeStandards';
-import { formatRelayLeg, estimateRelayTime } from '../../src/utils/relay';
+import { formatRelayLeg } from '../../src/utils/relay';
 import PsychSheet from '../../src/components/PsychSheet';
 import type { Meet, MeetEntry, Relay } from '../../src/types/meet.types';
 import { withScreenErrorBoundary } from '../../src/components/ScreenErrorBoundary';
@@ -94,14 +93,12 @@ function MeetDetailScreen() {
     { key: 'psych_sheet', label: 'PSYCH SHEET' },
   ];
 
-  // Group entries by event for the entries tab
   const entriesByEvent: Record<string, EntryWithId[]> = {};
   for (const entry of entries) {
     const key = entry.eventName;
     if (!entriesByEvent[key]) entriesByEvent[key] = [];
     entriesByEvent[key].push(entry);
   }
-  // Sort within each event by seed time
   for (const key of Object.keys(entriesByEvent)) {
     entriesByEvent[key].sort((a, b) => (a.seedTime || Infinity) - (b.seedTime || Infinity));
   }

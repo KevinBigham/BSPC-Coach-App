@@ -116,7 +116,6 @@ function RosterScreen() {
       );
     }
 
-    // Sort
     switch (sort) {
       case 'za':
         result = [...result].sort((a, b) => b.lastName.localeCompare(a.lastName));

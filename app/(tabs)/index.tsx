@@ -65,7 +65,6 @@ function DashboardScreen() {
   >([]);
   const today = getTodayString();
 
-  // Derived from Zustand stores
   const totalSwimmers = storeSwimmers.length;
   const swimmerCounts = useMemo(() => {
     const counts: Record<string, number> = {};

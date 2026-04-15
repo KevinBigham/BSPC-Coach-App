@@ -381,17 +381,15 @@ function OverviewTab({
   goals: (SwimmerGoal & { id: string })[];
   swimmerId: string;
 }) {
-  // Compute age group for standards
   const dob = toDateSafe(swimmer.dateOfBirth as FirestoreTimestampLike);
   const age = dob ? calculateAge(dob) : null;
   const ageGroup = age !== null ? getAgeGroup(age) : null;
   const activeGoals = goals.filter((g) => !g.achieved);
 
-  // Build PR board: group PRs by stroke category
   const prs = times.filter((t) => t.isPR);
   const prsByStroke: Record<string, (SwimTime & { id: string })[]> = {};
   for (const pr of prs) {
-    // Extract stroke from event name (e.g., "50 Free" → "Free")
+    // Event names are "distance stroke" (e.g. "50 Free" -> "Free").
     const parts = pr.event.split(' ');
     const stroke = parts.slice(1).join(' ') || pr.event;
     if (!prsByStroke[stroke]) prsByStroke[stroke] = [];
@@ -541,7 +539,6 @@ function OverviewTab({
 // ────────────────────────────────────────────────────────────────────────────
 
 function AttendanceTab({ records }: { records: (AttendanceRecord & { id: string })[] }) {
-  // Compute stats
   const total = records.length;
   const now = new Date();
   const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
@@ -549,17 +546,15 @@ function AttendanceTab({ records }: { records: (AttendanceRecord & { id: string 
 
   const last30 = records.filter((r) => r.practiceDate >= thirtyDaysAgoStr).length;
 
-  // Streak: consecutive days with attendance (by unique practiceDate, most recent first)
   const uniqueDates = [...new Set(records.map((r) => r.practiceDate))].sort().reverse();
   let streak = 0;
   if (uniqueDates.length > 0) {
-    // Count consecutive dates from most recent
     streak = 1;
     for (let i = 1; i < uniqueDates.length; i++) {
       const prev = new Date(uniqueDates[i - 1]);
       const curr = new Date(uniqueDates[i]);
       const diffDays = Math.round((prev.getTime() - curr.getTime()) / (1000 * 60 * 60 * 24));
-      // Allow gaps of weekends (up to 3 days apart counts as consecutive)
+      // Up to 3-day gaps (weekends, missed Monday) still count as consecutive.
       if (diffDays <= 3) {
         streak++;
       } else {
@@ -568,7 +563,6 @@ function AttendanceTab({ records }: { records: (AttendanceRecord & { id: string 
     }
   }
 
-  // Calendar heat grid: last 30 days
   const attendedDates = new Set(records.map((r) => r.practiceDate));
   const calendarDays: { date: string; attended: boolean }[] = [];
   for (let i = 29; i >= 0; i--) {
@@ -810,7 +804,6 @@ function TimesTab({
     return grouped;
   }, [times]);
 
-  // Compute age group for standard badges
   const dob = toDateSafe(swimmer.dateOfBirth as FirestoreTimestampLike);
   const age = dob ? calculateAge(dob) : null;
   const ageGroup = age !== null ? getAgeGroup(age) : null;
@@ -946,13 +939,12 @@ function AddTimeModal({
       return;
     }
 
-    // Format display
     const displayMin = min > 0 ? `${min}:` : '';
     const displaySec = min > 0 ? String(sec).padStart(2, '0') : String(sec);
     const displayHund = String(hund).padStart(2, '0');
     const timeDisplay = `${displayMin}${displaySec}.${displayHund}`;
 
-    // Check if PR (faster = lower hundredths for same event+course)
+    // Lower hundredths = faster swim, so a PR must beat every prior time for event+course.
     const sameTimes = existingTimes.filter((t) => t.event === event && t.course === course);
     const isPR = sameTimes.length === 0 || sameTimes.every((t) => totalHundredths < t.time);
 
@@ -971,7 +963,6 @@ function AddTimeModal({
         createdBy: coach?.uid || '',
       });
 
-      // If this is a new PR, un-PR the old ones
       if (isPR && sameTimes.length > 0) {
         const timesRef = collection(db, 'swimmers', swimmerId, 'times');
         const q = query(

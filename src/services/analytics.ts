@@ -27,12 +27,10 @@ export async function getTimeDrops(
 ): Promise<TimeDrop[]> {
   const { swimmerId, group, rangeStart, rangeEnd, maxResults = 100 } = options;
 
-  // If specific swimmer, get their times
   if (swimmerId) {
     return getSwimmerTimeDrops(swimmerId, rangeStart, rangeEnd);
   }
 
-  // If group, get all swimmers in group then aggregate
   const swimmerSnap = await getDocs(
     query(
       collection(db, 'swimmers'),
@@ -72,7 +70,6 @@ async function getSwimmerTimeDrops(
     const time = data.time as number;
     const created = data.createdAt instanceof Timestamp ? data.createdAt.toDate() : new Date();
 
-    // Date range filter
     if (rangeStart && created < new Date(rangeStart)) {
       bestByEvent[key] = Math.min(bestByEvent[key] ?? Infinity, time);
       continue;
@@ -119,7 +116,6 @@ export async function getAttendanceCorrelation(
   cutoff.setDate(cutoff.getDate() - rangeDays);
   const cutoffStr = cutoff.toISOString().split('T')[0];
 
-  // Get swimmers
   const swimmerSnap = await getDocs(
     query(
       collection(db, 'swimmers'),
@@ -128,7 +124,6 @@ export async function getAttendanceCorrelation(
     ),
   );
 
-  // Get attendance records in range
   const attendanceSnap = await getDocs(
     query(
       collection(db, 'attendance'),
@@ -143,7 +138,7 @@ export async function getAttendanceCorrelation(
     attendanceBySwimmer[sid] = (attendanceBySwimmer[sid] || 0) + 1;
   }
 
-  // Count unique practice dates for denominator
+  // Denominator = distinct practice dates, not total records.
   const uniqueDates = new Set(attendanceSnap.docs.map((d) => d.data().practiceDate));
   const totalPractices = Math.max(uniqueDates.size, 1);
 
@@ -154,7 +149,6 @@ export async function getAttendanceCorrelation(
     const sid = swimmerDoc.id;
     const count = attendanceBySwimmer[sid] || 0;
 
-    // Get time drops for this swimmer
     const drops = await getSwimmerTimeDrops(sid, cutoffStr);
     const avgDrop =
       drops.length > 0 ? drops.reduce((sum, d) => sum + d.dropPercent, 0) / drops.length : 0;

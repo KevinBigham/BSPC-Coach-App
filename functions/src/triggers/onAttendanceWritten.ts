@@ -8,7 +8,6 @@ import {
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
 
-/** Milliseconds in one day */
 const DAY_MS = 86_400_000;
 
 /**
@@ -18,7 +17,6 @@ export const onAttendanceWritten = onDocumentWritten('attendance/{recordId}', as
   const after = event.data?.after?.data();
   const before = event.data?.before?.data();
 
-  // Determine the swimmer affected
   const swimmerId = (after?.swimmerId ?? before?.swimmerId) as string | undefined;
   if (!swimmerId) return;
 

@@ -25,14 +25,12 @@ export async function approveVideoDraft(
   coachUid: string,
   coachName: string,
 ): Promise<void> {
-  // Mark draft as approved
   await updateDoc(doc(db, 'video_sessions', sessionId, 'drafts', draft.id), {
     approved: true,
     reviewedBy: coachUid,
     reviewedAt: serverTimestamp(),
   });
 
-  // Create swimmer note from the draft
   const noteContent = [
     draft.observation,
     draft.diagnosis ? `Diagnosis: ${draft.diagnosis}` : '',

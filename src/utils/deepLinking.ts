@@ -25,18 +25,16 @@ export interface DeepLinkResult {
 export function parseDeepLink(url: string): DeepLinkResult | null {
   if (!url) return null;
 
-  // Strip scheme
   let path = url;
   if (path.startsWith(SCHEME)) {
     path = path.slice(SCHEME.length);
   } else if (path.startsWith('bspc-coach:')) {
-    // Handle bspc-coach:/ (single slash variant)
+    // Tolerate single-slash `bspc-coach:/` variant produced by some OS share sheets.
     path = path.replace(/^bspc-coach:\/*/, '');
   } else {
     return null;
   }
 
-  // Strip trailing slash and query string (preserve query for future use)
   const queryIndex = path.indexOf('?');
   const query = queryIndex >= 0 ? path.slice(queryIndex + 1) : '';
   if (queryIndex >= 0) path = path.slice(0, queryIndex);
