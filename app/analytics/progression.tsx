@@ -8,10 +8,11 @@ import { subscribeTimes } from '../../src/services/times';
 import { formatShortDate } from '../../src/utils/date';
 import ProgressionChart, { type ProgressionDataPoint } from '../../src/components/ProgressionChart';
 import type { SwimTime } from '../../src/types/firestore.types';
+import { withScreenErrorBoundary } from '../../src/components/ScreenErrorBoundary';
 
 type TimeWithId = SwimTime & { id: string };
 
-export default function ProgressionScreen() {
+function ProgressionScreen() {
   const swimmers = useSwimmersStore((s) => s.swimmers);
   const [selectedSwimmerId, setSelectedSwimmerId] = useState<string | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<string>(EVENTS[1]); // default 50 Free
@@ -205,3 +206,5 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 });
+
+export default withScreenErrorBoundary(ProgressionScreen, 'ProgressionScreen');

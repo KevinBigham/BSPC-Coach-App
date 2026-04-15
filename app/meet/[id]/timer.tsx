@@ -1,12 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Alert,
-  ScrollView,
-} from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView } from 'react-native';
 import { useLocalSearchParams, Stack, router } from 'expo-router';
 import { useLiveMeetStore } from '../../../src/stores/liveMeetStore';
 import {
@@ -17,13 +10,23 @@ import {
 } from '../../../src/services/liveMeet';
 import LaneSplitButton from '../../../src/components/LaneSplitButton';
 import PRCelebration from '../../../src/components/PRCelebration';
-import { formatTimerDisplay, formatSplitDisplay, msToHundredths } from '../../../src/utils/meetTiming';
+import {
+  formatTimerDisplay,
+  formatSplitDisplay,
+  msToHundredths,
+} from '../../../src/utils/meetTiming';
 import { colors, spacing, fontSize, borderRadius, fontFamily } from '../../../src/config/theme';
+import { tapMedium, notifySuccess } from '../../../src/utils/haptics';
+import { withScreenErrorBoundary } from '../../../src/components/ScreenErrorBoundary';
 
 const LANE_COUNT = 8;
 
-export default function TimerScreen() {
-  const { id: meetId, eventId, eventName } = useLocalSearchParams<{
+function TimerScreen() {
+  const {
+    id: meetId,
+    eventId,
+    eventName,
+  } = useLocalSearchParams<{
     id: string;
     eventId: string;
     eventName: string;
@@ -79,44 +82,47 @@ export default function TimerScreen() {
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
   }, []);
 
-  const handleLaneSplit = useCallback(async (lane: number) => {
-    if (!isRunning || !meetId || !eventId || !startTimeRef.current) return;
+  const handleLaneSplit = useCallback(
+    async (lane: number) => {
+      if (!isRunning || !meetId || !eventId || !startTimeRef.current) return;
+      tapMedium();
 
-    const time = msToHundredths(Date.now() - startTimeRef.current);
-    const laneSplits = splits.filter((s) => s.lane === lane);
-    const splitNumber = laneSplits.length + 1;
+      const time = msToHundredths(Date.now() - startTimeRef.current);
+      const laneSplits = splits.filter((s) => s.lane === lane);
+      const splitNumber = laneSplits.length + 1;
 
-    const assignment = store.laneAssignments[lane];
+      const assignment = store.laneAssignments[lane];
 
-    await recordSplit(
-      meetId,
-      eventId,
-      lane,
-      time,
-      splitNumber,
-      assignment?.swimmerId,
-      assignment?.swimmerName,
-    );
-  }, [isRunning, meetId, eventId, splits, store.laneAssignments]);
+      await recordSplit(
+        meetId,
+        eventId,
+        lane,
+        time,
+        splitNumber,
+        assignment?.swimmerId,
+        assignment?.swimmerName,
+      );
+    },
+    [isRunning, meetId, eventId, splits, store.laneAssignments],
+  );
 
   const handleFinish = useCallback(async () => {
     if (!meetId || !eventId) return;
 
-    Alert.alert(
-      'Finish Event',
-      'Stop the timer and finalize this event?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Finish',
-          onPress: async () => {
-            handleStop();
-            await finishEvent(meetId, eventId);
-            router.push(`/meet/${meetId}/results?eventId=${eventId}&eventName=${encodeURIComponent(eventName || '')}`);
-          },
+    Alert.alert('Finish Event', 'Stop the timer and finalize this event?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Finish',
+        onPress: async () => {
+          handleStop();
+          await finishEvent(meetId, eventId);
+          notifySuccess();
+          router.push(
+            `/meet/${meetId}/results?eventId=${eventId}&eventName=${encodeURIComponent(eventName || '')}`,
+          );
         },
-      ],
-    );
+      },
+    ]);
   }, [meetId, eventId, eventName]);
 
   // Group splits by lane
@@ -179,9 +185,10 @@ export default function TimerScreen() {
         <ScrollView style={styles.laneArea} contentContainerStyle={styles.laneGrid}>
           {Array.from({ length: LANE_COUNT }, (_, i) => i + 1).map((lane) => {
             const laneSplits = splitsByLane[lane] || [];
-            const lastSplit = laneSplits.length > 0
-              ? laneSplits.reduce((a, b) => (a.splitNumber > b.splitNumber ? a : b))
-              : null;
+            const lastSplit =
+              laneSplits.length > 0
+                ? laneSplits.reduce((a, b) => (a.splitNumber > b.splitNumber ? a : b))
+                : null;
 
             return (
               <View key={lane} style={styles.laneCell}>
@@ -292,3 +299,5 @@ const styles = StyleSheet.create({
     width: '23.5%',
   },
 });
+
+export default withScreenErrorBoundary(TimerScreen, 'TimerScreen');

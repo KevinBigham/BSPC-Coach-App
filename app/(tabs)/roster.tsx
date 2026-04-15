@@ -31,6 +31,7 @@ import type {
   AttendanceAggregation,
   SwimmerAggregation,
 } from '../../src/types/firestore.types';
+import { withScreenErrorBoundary } from '../../src/components/ScreenErrorBoundary';
 
 type SortOption = 'az' | 'za' | 'group' | 'newest';
 const SORT_LABELS: Record<SortOption, string> = {
@@ -40,7 +41,7 @@ const SORT_LABELS: Record<SortOption, string> = {
   newest: 'Newest',
 };
 
-export default function RosterScreen() {
+function RosterScreen() {
   const params = useLocalSearchParams<{ group?: string }>();
   const { isAdmin } = useAuth();
   const activeSwimmers = useSwimmersStore((s) => s.swimmers);
@@ -554,3 +555,5 @@ const styles = StyleSheet.create({
   },
   fabText: { color: colors.bgDeep, fontSize: 28, fontWeight: '400', marginTop: -2 },
 });
+
+export default withScreenErrorBoundary(RosterScreen, 'RosterScreen');

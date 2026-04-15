@@ -12,18 +12,26 @@ import { useLocalSearchParams, router } from 'expo-router';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../../src/config/firebase';
 import { useAuth } from '../../src/contexts/AuthContext';
-import { colors, spacing, fontSize, borderRadius, fontFamily, groupColors } from '../../src/config/theme';
+import {
+  colors,
+  spacing,
+  fontSize,
+  borderRadius,
+  fontFamily,
+  groupColors,
+} from '../../src/config/theme';
 import { GROUPS, type Group } from '../../src/config/constants';
 import { useSwimmersStore } from '../../src/stores/swimmersStore';
 import { subscribeEntries, addEntriesBatch, removeEntry } from '../../src/services/meets';
 import { formatTime, calculateAge } from '../../src/data/timeStandards';
 import type { Meet, MeetEntry } from '../../src/types/meet.types';
 import type { Swimmer } from '../../src/types/firestore.types';
+import { withScreenErrorBoundary } from '../../src/components/ScreenErrorBoundary';
 
 type MeetWithId = Meet & { id: string };
 type EntryWithId = MeetEntry & { id: string };
 
-export default function EntriesScreen() {
+function EntriesScreen() {
   const { meetId } = useLocalSearchParams<{ meetId: string }>();
   const { coach } = useAuth();
   const swimmers = useSwimmersStore((s) => s.swimmers);
@@ -56,9 +64,8 @@ export default function EntriesScreen() {
   }, [meetId]);
 
   const filteredSwimmers = useMemo(() => {
-    const filtered = filterGroup === 'All'
-      ? swimmers
-      : swimmers.filter((s) => s.group === filterGroup);
+    const filtered =
+      filterGroup === 'All' ? swimmers : swimmers.filter((s) => s.group === filterGroup);
     return filtered.sort((a, b) => a.lastName.localeCompare(b.lastName));
   }, [swimmers, filterGroup]);
 
@@ -96,9 +103,10 @@ export default function EntriesScreen() {
         const swimmer = swimmers.find((s) => s.id === swimmerId);
         if (!swimmer) continue;
 
-        const dob = swimmer.dateOfBirth instanceof Date
-          ? swimmer.dateOfBirth
-          : (swimmer.dateOfBirth as any)?.toDate?.() || new Date();
+        const dob =
+          swimmer.dateOfBirth instanceof Date
+            ? swimmer.dateOfBirth
+            : (swimmer.dateOfBirth as any)?.toDate?.() || new Date();
         const age = calculateAge(dob);
         const eventNum = meet.events.find((e) => e.name === eventName)?.number || 0;
 
@@ -149,14 +157,21 @@ export default function EntriesScreen() {
       </View>
 
       {/* Group Filter */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterBar} contentContainerStyle={styles.filterContent}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.filterBar}
+        contentContainerStyle={styles.filterContent}
+      >
         {['All' as const, ...GROUPS].map((g) => (
           <TouchableOpacity
             key={g}
             style={[styles.filterChip, filterGroup === g && styles.filterChipActive]}
             onPress={() => setFilterGroup(g)}
           >
-            <Text style={[styles.filterChipText, filterGroup === g && styles.filterChipTextActive]}>{g}</Text>
+            <Text style={[styles.filterChipText, filterGroup === g && styles.filterChipTextActive]}>
+              {g}
+            </Text>
           </TouchableOpacity>
         ))}
       </ScrollView>
@@ -167,7 +182,9 @@ export default function EntriesScreen() {
           <Text style={[styles.swimmerHeader, styles.colHeader]}>SWIMMER</Text>
           {individualEvents.map((e) => (
             <View key={e.name} style={styles.eventHeader}>
-              <Text style={styles.colHeader} numberOfLines={2}>{e.name}</Text>
+              <Text style={styles.colHeader} numberOfLines={2}>
+                {e.name}
+              </Text>
             </View>
           ))}
         </View>
@@ -179,7 +196,12 @@ export default function EntriesScreen() {
               <Text style={styles.swimmerName} numberOfLines={1}>
                 {swimmer.lastName}, {swimmer.firstName}
               </Text>
-              <Text style={[styles.swimmerGroup, { color: groupColors[swimmer.group] || colors.textSecondary }]}>
+              <Text
+                style={[
+                  styles.swimmerGroup,
+                  { color: groupColors[swimmer.group] || colors.textSecondary },
+                ]}
+              >
                 {swimmer.group}
               </Text>
             </View>
@@ -211,37 +233,113 @@ export default function EntriesScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bgBase },
-  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.bgBase },
+  centered: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.bgBase,
+  },
   // Top Bar
-  topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: spacing.lg, backgroundColor: colors.bgDeep, borderBottomWidth: 2, borderBottomColor: colors.purple },
-  cancelText: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.sm, color: colors.textSecondary },
-  title: { fontFamily: fontFamily.heading, fontSize: fontSize.xl, color: colors.text, letterSpacing: 1 },
-  saveText: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.sm, color: colors.accent, letterSpacing: 1 },
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: spacing.lg,
+    backgroundColor: colors.bgDeep,
+    borderBottomWidth: 2,
+    borderBottomColor: colors.purple,
+  },
+  cancelText: {
+    fontFamily: fontFamily.bodySemi,
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+  },
+  title: {
+    fontFamily: fontFamily.heading,
+    fontSize: fontSize.xl,
+    color: colors.text,
+    letterSpacing: 1,
+  },
+  saveText: {
+    fontFamily: fontFamily.bodySemi,
+    fontSize: fontSize.sm,
+    color: colors.accent,
+    letterSpacing: 1,
+  },
   // Filter
-  filterBar: { backgroundColor: colors.bgElevated, borderBottomWidth: 1, borderBottomColor: colors.border, maxHeight: 48 },
+  filterBar: {
+    backgroundColor: colors.bgElevated,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    maxHeight: 48,
+  },
   filterContent: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, gap: spacing.sm },
-  filterChip: { paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderRadius: borderRadius.sm, backgroundColor: colors.bgDeep, borderWidth: 1, borderColor: colors.border },
+  filterChip: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.sm,
+    backgroundColor: colors.bgDeep,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
   filterChipActive: { backgroundColor: colors.purple, borderColor: colors.purpleLight },
-  filterChipText: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.sm, color: colors.textSecondary },
+  filterChipText: {
+    fontFamily: fontFamily.bodySemi,
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+  },
   filterChipTextActive: { color: colors.text },
   // Scroll
   scroll: { flex: 1 },
   scrollContent: { paddingBottom: 100 },
   // Header Row
-  headerRow: { flexDirection: 'row', alignItems: 'flex-end', paddingVertical: spacing.sm, paddingHorizontal: spacing.sm, backgroundColor: colors.bgElevated, borderBottomWidth: 2, borderBottomColor: colors.border },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    backgroundColor: colors.bgElevated,
+    borderBottomWidth: 2,
+    borderBottomColor: colors.border,
+  },
   swimmerHeader: { width: 120 },
   eventHeader: { width: 50, alignItems: 'center' },
-  colHeader: { fontFamily: fontFamily.pixel, fontSize: 6, color: colors.textSecondary, letterSpacing: 1, textAlign: 'center' },
+  colHeader: {
+    fontFamily: fontFamily.pixel,
+    fontSize: 6,
+    color: colors.textSecondary,
+    letterSpacing: 1,
+    textAlign: 'center',
+  },
   // Swimmer Row
-  swimmerRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.sm, paddingHorizontal: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.borderLight },
+  swimmerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderLight,
+  },
   swimmerInfo: { width: 120 },
   swimmerName: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.xs, color: colors.text },
   swimmerGroup: { fontFamily: fontFamily.pixel, fontSize: fontSize.pixel },
   // Checkbox
-  checkbox: { width: 50, height: 32, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border, borderRadius: borderRadius.xs, backgroundColor: colors.bgDeep, marginHorizontal: 0 },
+  checkbox: {
+    width: 50,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: borderRadius.xs,
+    backgroundColor: colors.bgDeep,
+    marginHorizontal: 0,
+  },
   checkboxActive: { backgroundColor: colors.purple, borderColor: colors.purpleLight },
   checkmark: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.md, color: colors.text },
   // Empty
   empty: { alignItems: 'center', paddingVertical: spacing.xxxl },
   emptyText: { fontFamily: fontFamily.body, fontSize: fontSize.sm, color: colors.textSecondary },
 });
+
+export default withScreenErrorBoundary(EntriesScreen, 'EntriesScreen');

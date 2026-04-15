@@ -6,10 +6,11 @@ import { colors, spacing, fontSize, borderRadius, fontFamily } from '../../src/c
 import { subscribeEventsForDate } from '../../src/services/calendar';
 import EventCard from '../../src/components/EventCard';
 import type { CalendarEvent } from '../../src/types/firestore.types';
+import { withScreenErrorBoundary } from '../../src/components/ScreenErrorBoundary';
 
 type EventWithId = CalendarEvent & { id: string };
 
-export default function DayDetailScreen() {
+function DayDetailScreen() {
   const { date } = useLocalSearchParams<{ date: string }>();
   const { coach } = useAuth();
   const [events, setEvents] = useState<EventWithId[]>([]);
@@ -32,7 +33,9 @@ export default function DayDetailScreen() {
     <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.scroll}>
         <Text style={styles.date}>{displayDate}</Text>
-        <Text style={styles.eventCount}>{events.length} event{events.length !== 1 ? 's' : ''}</Text>
+        <Text style={styles.eventCount}>
+          {events.length} event{events.length !== 1 ? 's' : ''}
+        </Text>
 
         {events.map((event) => (
           <EventCard
@@ -62,11 +65,46 @@ export default function DayDetailScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bgBase },
   scroll: { padding: spacing.lg, paddingBottom: 100 },
-  date: { fontFamily: fontFamily.heading, fontSize: fontSize.xxl, color: colors.text, letterSpacing: 1, marginBottom: spacing.xs },
-  eventCount: { fontFamily: fontFamily.statMono, fontSize: fontSize.sm, color: colors.textSecondary, marginBottom: spacing.lg },
+  date: {
+    fontFamily: fontFamily.heading,
+    fontSize: fontSize.xxl,
+    color: colors.text,
+    letterSpacing: 1,
+    marginBottom: spacing.xs,
+  },
+  eventCount: {
+    fontFamily: fontFamily.statMono,
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    marginBottom: spacing.lg,
+  },
   empty: { alignItems: 'center', paddingVertical: spacing.xxxl },
-  emptyTitle: { fontFamily: fontFamily.heading, fontSize: fontSize.xl, color: colors.text, marginBottom: spacing.sm },
-  emptyText: { fontFamily: fontFamily.body, fontSize: fontSize.sm, color: colors.textSecondary, marginBottom: spacing.lg },
-  addBtn: { paddingHorizontal: spacing.xl, paddingVertical: spacing.md, borderRadius: borderRadius.sm, borderWidth: 2, borderColor: colors.purple, borderStyle: 'dashed' },
-  addBtnText: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.md, color: colors.accent, letterSpacing: 1 },
+  emptyTitle: {
+    fontFamily: fontFamily.heading,
+    fontSize: fontSize.xl,
+    color: colors.text,
+    marginBottom: spacing.sm,
+  },
+  emptyText: {
+    fontFamily: fontFamily.body,
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    marginBottom: spacing.lg,
+  },
+  addBtn: {
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.sm,
+    borderWidth: 2,
+    borderColor: colors.purple,
+    borderStyle: 'dashed',
+  },
+  addBtnText: {
+    fontFamily: fontFamily.bodySemi,
+    fontSize: fontSize.md,
+    color: colors.accent,
+    letterSpacing: 1,
+  },
 });
+
+export default withScreenErrorBoundary(DayDetailScreen, 'DayDetailScreen');

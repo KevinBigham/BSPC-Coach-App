@@ -45,6 +45,13 @@ export function notifyError(): void {
   }
 }
 
+/** Heavy notification — celebration overlays and major milestones */
+export function notifyHeavy(): void {
+  if (isHapticsSupported) {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+  }
+}
+
 /** Selection changed — picker, group selector */
 export function selectionChanged(): void {
   if (isHapticsSupported) {

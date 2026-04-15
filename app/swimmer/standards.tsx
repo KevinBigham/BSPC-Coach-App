@@ -6,7 +6,11 @@ import { db } from '../../src/config/firebase';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { colors, spacing, fontSize, borderRadius, fontFamily } from '../../src/config/theme';
 import { STANDARD_LEVELS, COURSES, type Course } from '../../src/config/constants';
-import { standardColors, standardBgColors, standardBorderColors } from '../../src/config/standardColors';
+import {
+  standardColors,
+  standardBgColors,
+  standardBorderColors,
+} from '../../src/config/standardColors';
 import {
   getAgeGroup,
   calculateAge,
@@ -18,9 +22,15 @@ import {
 import { subscribeGoals, setGoal } from '../../src/services/goals';
 import StandardBadge from '../../src/components/StandardBadge';
 import GoalCard from '../../src/components/GoalCard';
-import type { Swimmer, SwimTime, SwimmerGoal, StandardLevel } from '../../src/types/firestore.types';
+import type {
+  Swimmer,
+  SwimTime,
+  SwimmerGoal,
+  StandardLevel,
+} from '../../src/types/firestore.types';
+import { withScreenErrorBoundary } from '../../src/components/ScreenErrorBoundary';
 
-export default function StandardsScreen() {
+function StandardsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { coach } = useAuth();
   const [swimmer, setSwimmer] = useState<Swimmer | null>(null);
@@ -37,7 +47,12 @@ export default function StandardsScreen() {
 
   useEffect(() => {
     if (!id) return;
-    const { collection: col, query: q, orderBy, onSnapshot: onSnap } = require('firebase/firestore');
+    const {
+      collection: col,
+      query: q,
+      orderBy,
+      onSnapshot: onSnap,
+    } = require('firebase/firestore');
     const timesQuery = q(col(db, 'swimmers', id, 'times'), orderBy('createdAt', 'desc'));
     return onSnap(timesQuery, (snap: any) => {
       setTimes(snap.docs.map((d: any) => ({ id: d.id, ...d.data() })));
@@ -51,9 +66,10 @@ export default function StandardsScreen() {
 
   const age = useMemo(() => {
     if (!swimmer?.dateOfBirth) return 14;
-    const dob = swimmer.dateOfBirth instanceof Date
-      ? swimmer.dateOfBirth
-      : (swimmer.dateOfBirth as any)?.toDate?.() || new Date();
+    const dob =
+      swimmer.dateOfBirth instanceof Date
+        ? swimmer.dateOfBirth
+        : (swimmer.dateOfBirth as any)?.toDate?.() || new Date();
     return calculateAge(dob);
   }, [swimmer]);
 
@@ -106,8 +122,12 @@ export default function StandardsScreen() {
       <ScrollView contentContainerStyle={styles.scroll}>
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.name}>{swimmer.firstName} {swimmer.lastName}</Text>
-          <Text style={styles.info}>{ageGroup} · {gender === 'M' ? 'Male' : 'Female'} · Age {age}</Text>
+          <Text style={styles.name}>
+            {swimmer.firstName} {swimmer.lastName}
+          </Text>
+          <Text style={styles.info}>
+            {ageGroup} · {gender === 'M' ? 'Male' : 'Female'} · Age {age}
+          </Text>
         </View>
 
         {/* Course Selector */}
@@ -118,7 +138,9 @@ export default function StandardsScreen() {
               style={[styles.courseChip, course === c && styles.courseChipActive]}
               onPress={() => setCourse(c)}
             >
-              <Text style={[styles.courseChipText, course === c && styles.courseChipTextActive]}>{c}</Text>
+              <Text style={[styles.courseChipText, course === c && styles.courseChipTextActive]}>
+                {c}
+              </Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -159,7 +181,11 @@ export default function StandardsScreen() {
             </View>
             {STANDARD_LEVELS.map((level) => (
               <View key={level} style={styles.gridStdCol}>
-                <Text style={[styles.gridHeaderText, { color: standardColors[level as StandardLevel] }]}>{level}</Text>
+                <Text
+                  style={[styles.gridHeaderText, { color: standardColors[level as StandardLevel] }]}
+                >
+                  {level}
+                </Text>
               </View>
             ))}
           </View>
@@ -176,13 +202,12 @@ export default function StandardsScreen() {
                   <Text style={styles.gridEventText}>{event}</Text>
                 </View>
                 <View style={styles.gridPrCol}>
-                  <Text style={styles.gridPrText}>
-                    {pr ? formatTime(pr) : '—'}
-                  </Text>
+                  <Text style={styles.gridPrText}>{pr ? formatTime(pr) : '—'}</Text>
                 </View>
                 {STANDARD_LEVELS.map((level) => {
                   const stdTime = standards?.[level as StandardLevel];
-                  const isAchieved = achieved && STANDARD_LEVELS.indexOf(achieved) >= STANDARD_LEVELS.indexOf(level);
+                  const isAchieved =
+                    achieved && STANDARD_LEVELS.indexOf(achieved) >= STANDARD_LEVELS.indexOf(level);
 
                   return (
                     <TouchableOpacity
@@ -225,31 +250,86 @@ const styles = StyleSheet.create({
   scroll: { padding: spacing.lg, paddingBottom: 100 },
   // Header
   header: { marginBottom: spacing.lg },
-  name: { fontFamily: fontFamily.heading, fontSize: fontSize.xxxl, color: colors.text, letterSpacing: 2 },
+  name: {
+    fontFamily: fontFamily.heading,
+    fontSize: fontSize.xxxl,
+    color: colors.text,
+    letterSpacing: 2,
+  },
   info: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.sm, color: colors.textSecondary },
   // Course
   courseRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg },
-  courseChip: { flex: 1, padding: spacing.md, borderRadius: borderRadius.sm, backgroundColor: colors.bgDeep, borderWidth: 1, borderColor: colors.border, alignItems: 'center' },
+  courseChip: {
+    flex: 1,
+    padding: spacing.md,
+    borderRadius: borderRadius.sm,
+    backgroundColor: colors.bgDeep,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+  },
   courseChipActive: { backgroundColor: colors.purple, borderColor: colors.purpleLight },
-  courseChipText: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.sm, color: colors.textSecondary },
+  courseChipText: {
+    fontFamily: fontFamily.bodySemi,
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+  },
   courseChipTextActive: { color: colors.text },
   // Summary
   summaryRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg },
-  summaryBox: { flex: 1, alignItems: 'center', backgroundColor: colors.bgDeep, borderRadius: borderRadius.md, padding: spacing.sm, borderWidth: 1, borderColor: colors.border },
+  summaryBox: {
+    flex: 1,
+    alignItems: 'center',
+    backgroundColor: colors.bgDeep,
+    borderRadius: borderRadius.md,
+    padding: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
   summaryNum: { fontFamily: fontFamily.stat, fontSize: fontSize.xxl, marginBottom: 4 },
   // Section
   section: { marginBottom: spacing.xl },
-  sectionTitle: { fontFamily: fontFamily.heading, fontSize: fontSize.xl, color: colors.text, letterSpacing: 1, marginBottom: spacing.sm },
+  sectionTitle: {
+    fontFamily: fontFamily.heading,
+    fontSize: fontSize.xl,
+    color: colors.text,
+    letterSpacing: 1,
+    marginBottom: spacing.sm,
+  },
   // Grid
-  gridHeaderRow: { flexDirection: 'row', paddingVertical: spacing.sm, borderBottomWidth: 2, borderBottomColor: colors.border },
+  gridHeaderRow: {
+    flexDirection: 'row',
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 2,
+    borderBottomColor: colors.border,
+  },
   gridEventCol: { width: 80 },
   gridPrCol: { width: 60, alignItems: 'center' },
   gridStdCol: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 2 },
-  gridHeaderText: { fontFamily: fontFamily.pixel, fontSize: fontSize.pixel, color: colors.textSecondary, letterSpacing: 1 },
-  gridRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.borderLight },
+  gridHeaderText: {
+    fontFamily: fontFamily.pixel,
+    fontSize: fontSize.pixel,
+    color: colors.textSecondary,
+    letterSpacing: 1,
+  },
+  gridRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderLight,
+  },
   gridEventText: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.xs, color: colors.text },
   gridPrText: { fontFamily: fontFamily.statMono, fontSize: fontSize.xs, color: colors.accent },
   gridStdText: { fontFamily: fontFamily.statMono, fontSize: 8, color: colors.textSecondary },
   // Hint
-  hint: { fontFamily: fontFamily.body, fontSize: fontSize.xs, color: colors.textSecondary, textAlign: 'center', marginTop: spacing.lg },
+  hint: {
+    fontFamily: fontFamily.body,
+    fontSize: fontSize.xs,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginTop: spacing.lg,
+  },
 });
+
+export default withScreenErrorBoundary(StandardsScreen, 'StandardsScreen');

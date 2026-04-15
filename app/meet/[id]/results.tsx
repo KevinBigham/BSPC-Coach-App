@@ -1,19 +1,22 @@
 import { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  StyleSheet,
-} from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { useLocalSearchParams, Stack, router } from 'expo-router';
 import { subscribeSplits, type Split } from '../../../src/services/liveMeet';
 import { useLiveMeetStore } from '../../../src/stores/liveMeetStore';
-import { formatSplitDisplay, calculatePlacement, placementSuffix } from '../../../src/utils/meetTiming';
+import {
+  formatSplitDisplay,
+  calculatePlacement,
+  placementSuffix,
+} from '../../../src/utils/meetTiming';
 import { colors, spacing, fontSize, borderRadius, fontFamily } from '../../../src/config/theme';
+import { withScreenErrorBoundary } from '../../../src/components/ScreenErrorBoundary';
 
-export default function ResultsScreen() {
-  const { id: meetId, eventId, eventName } = useLocalSearchParams<{
+function ResultsScreen() {
+  const {
+    id: meetId,
+    eventId,
+    eventName,
+  } = useLocalSearchParams<{
     id: string;
     eventId: string;
     eventName: string;
@@ -49,7 +52,10 @@ export default function ResultsScreen() {
       lane: parseInt(lane, 10),
       split,
       place: placements[parseInt(lane, 10)],
-      swimmerName: split.swimmerName || store.laneAssignments[parseInt(lane, 10)]?.swimmerName || `Lane ${lane}`,
+      swimmerName:
+        split.swimmerName ||
+        store.laneAssignments[parseInt(lane, 10)]?.swimmerName ||
+        `Lane ${lane}`,
     }));
 
   return (
@@ -83,12 +89,7 @@ export default function ResultsScreen() {
               ]}
             >
               <View style={styles.placeSection}>
-                <Text
-                  style={[
-                    styles.placeText,
-                    isFirst && styles.placeTextFirst,
-                  ]}
-                >
+                <Text style={[styles.placeText, isFirst && styles.placeTextFirst]}>
                   {placementSuffix(result.place)}
                 </Text>
               </View>
@@ -96,12 +97,7 @@ export default function ResultsScreen() {
                 <Text style={styles.resultName}>{result.swimmerName}</Text>
                 <Text style={styles.resultLane}>Lane {result.lane}</Text>
               </View>
-              <Text
-                style={[
-                  styles.resultTime,
-                  isFirst && styles.resultTimeFirst,
-                ]}
-              >
+              <Text style={[styles.resultTime, isFirst && styles.resultTimeFirst]}>
                 {formatSplitDisplay(result.split.time)}
               </Text>
             </View>
@@ -132,9 +128,7 @@ export default function ResultsScreen() {
                     {laneSplits.map((s, i) => (
                       <View key={s.id} style={styles.splitRow}>
                         <Text style={styles.splitLabel}>Split {i + 1}</Text>
-                        <Text style={styles.splitTime}>
-                          {formatSplitDisplay(s.time)}
-                        </Text>
+                        <Text style={styles.splitTime}>{formatSplitDisplay(s.time)}</Text>
                         {i > 0 && (
                           <Text style={styles.splitDiff}>
                             (+{formatSplitDisplay(s.time - laneSplits[i - 1].time)})
@@ -165,8 +159,20 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bgBase },
   content: { padding: spacing.lg, paddingBottom: 40 },
   header: { marginBottom: spacing.xl },
-  pixelLabel: { fontFamily: fontFamily.pixel, fontSize: 8, letterSpacing: 1, color: colors.gold, marginBottom: spacing.xs },
-  heading: { fontFamily: fontFamily.heading, fontSize: 32, fontWeight: '700', letterSpacing: 2, color: colors.text },
+  pixelLabel: {
+    fontFamily: fontFamily.pixel,
+    fontSize: 8,
+    letterSpacing: 1,
+    color: colors.gold,
+    marginBottom: spacing.xs,
+  },
+  heading: {
+    fontFamily: fontFamily.heading,
+    fontSize: 32,
+    fontWeight: '700',
+    letterSpacing: 2,
+    color: colors.text,
+  },
   resultCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -278,3 +284,5 @@ const styles = StyleSheet.create({
     letterSpacing: 2,
   },
 });
+
+export default withScreenErrorBoundary(ResultsScreen, 'ResultsScreen');

@@ -8,12 +8,13 @@ import { subscribeTimes } from '../../src/services/times';
 import { formatShortDate } from '../../src/utils/date';
 import SplitComparisonChart, { type RaceData } from '../../src/components/SplitComparisonChart';
 import type { SwimTime } from '../../src/types/firestore.types';
+import { withScreenErrorBoundary } from '../../src/components/ScreenErrorBoundary';
 
 type TimeWithId = SwimTime & { id: string };
 
 const MAX_COMPARE = 3;
 
-export default function SplitComparisonScreen() {
+function SplitComparisonScreen() {
   const swimmers = useSwimmersStore((s) => s.swimmers);
   const [selectedSwimmerId, setSelectedSwimmerId] = useState<string | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<string>(EVENTS[1]); // default 50 Free
@@ -204,3 +205,5 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 });
+
+export default withScreenErrorBoundary(SplitComparisonScreen, 'SplitComparisonScreen');

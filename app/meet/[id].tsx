@@ -4,7 +4,14 @@ import { useLocalSearchParams, router } from 'expo-router';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../../src/config/firebase';
 import { useAuth } from '../../src/contexts/AuthContext';
-import { colors, spacing, fontSize, borderRadius, fontFamily, groupColors } from '../../src/config/theme';
+import {
+  colors,
+  spacing,
+  fontSize,
+  borderRadius,
+  fontFamily,
+  groupColors,
+} from '../../src/config/theme';
 import {
   subscribeEntries,
   subscribeRelays,
@@ -19,13 +26,14 @@ import { formatTime } from '../../src/data/timeStandards';
 import { formatRelayLeg, estimateRelayTime } from '../../src/utils/relay';
 import PsychSheet from '../../src/components/PsychSheet';
 import type { Meet, MeetEntry, Relay } from '../../src/types/meet.types';
+import { withScreenErrorBoundary } from '../../src/components/ScreenErrorBoundary';
 
 type MeetWithId = Meet & { id: string };
 type EntryWithId = MeetEntry & { id: string };
 type RelayWithId = Relay & { id: string };
 type Tab = 'overview' | 'entries' | 'relays' | 'psych_sheet';
 
-export default function MeetDetailScreen() {
+function MeetDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { coach } = useAuth();
   const [meet, setMeet] = useState<MeetWithId | null>(null);
@@ -101,7 +109,12 @@ export default function MeetDetailScreen() {
   return (
     <View style={styles.container}>
       {/* Tabs */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabBar} contentContainerStyle={styles.tabBarContent}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.tabBar}
+        contentContainerStyle={styles.tabBarContent}
+      >
         {tabs.map((t) => (
           <TouchableOpacity
             key={t.key}
@@ -156,8 +169,18 @@ export default function MeetDetailScreen() {
             {meet.groups.length > 0 && (
               <View style={styles.groupsRow}>
                 {meet.groups.map((g) => (
-                  <View key={g} style={[styles.groupChip, { borderColor: groupColors[g] || colors.border }]}>
-                    <Text style={[styles.groupChipText, { color: groupColors[g] || colors.textSecondary }]}>{g}</Text>
+                  <View
+                    key={g}
+                    style={[styles.groupChip, { borderColor: groupColors[g] || colors.border }]}
+                  >
+                    <Text
+                      style={[
+                        styles.groupChipText,
+                        { color: groupColors[g] || colors.textSecondary },
+                      ]}
+                    >
+                      {g}
+                    </Text>
                   </View>
                 ))}
               </View>
@@ -179,7 +202,9 @@ export default function MeetDetailScreen() {
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.actionBtn}
-                onPress={() => router.push({ pathname: '/meet/relay-builder', params: { meetId: id } })}
+                onPress={() =>
+                  router.push({ pathname: '/meet/relay-builder', params: { meetId: id } })
+                }
               >
                 <Text style={styles.actionBtnText}>BUILD RELAYS</Text>
               </TouchableOpacity>
@@ -200,7 +225,9 @@ export default function MeetDetailScreen() {
                   style={[styles.startBtn, { backgroundColor: colors.gold }]}
                   onPress={() => router.push(`/meet/${id}/live`)}
                 >
-                  <Text style={[styles.startBtnText, { color: colors.bgDeep }]}>LIVE TIMING MODE</Text>
+                  <Text style={[styles.startBtnText, { color: colors.bgDeep }]}>
+                    LIVE TIMING MODE
+                  </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.startBtn, { backgroundColor: colors.goldDark }]}
@@ -243,11 +270,17 @@ export default function MeetDetailScreen() {
                 {eventEntries.map((entry) => (
                   <View key={entry.id} style={styles.entryRow}>
                     <Text style={styles.entryName}>{entry.swimmerName}</Text>
-                    <Text style={[styles.entryGroup, { color: groupColors[entry.group] || colors.textSecondary }]}>
+                    <Text
+                      style={[
+                        styles.entryGroup,
+                        { color: groupColors[entry.group] || colors.textSecondary },
+                      ]}
+                    >
                       {entry.group}
                     </Text>
                     <Text style={styles.entrySeed}>
-                      {entry.seedTimeDisplay || (entry.seedTime ? formatTime(entry.seedTime) : 'NT')}
+                      {entry.seedTimeDisplay ||
+                        (entry.seedTime ? formatTime(entry.seedTime) : 'NT')}
                     </Text>
                   </View>
                 ))}
@@ -268,7 +301,9 @@ export default function MeetDetailScreen() {
           <>
             <TouchableOpacity
               style={styles.manageBtn}
-              onPress={() => router.push({ pathname: '/meet/relay-builder', params: { meetId: id } })}
+              onPress={() =>
+                router.push({ pathname: '/meet/relay-builder', params: { meetId: id } })
+              }
             >
               <Text style={styles.manageBtnText}>+ BUILD RELAY</Text>
             </TouchableOpacity>
@@ -287,7 +322,8 @@ export default function MeetDetailScreen() {
                 <View style={styles.relayFooter}>
                   <Text style={styles.relayEstLabel}>EST. TIME</Text>
                   <Text style={styles.relayEstTime}>
-                    {relay.estimatedTimeDisplay || (relay.estimatedTime ? formatTime(relay.estimatedTime) : 'N/A')}
+                    {relay.estimatedTimeDisplay ||
+                      (relay.estimatedTime ? formatTime(relay.estimatedTime) : 'N/A')}
                   </Text>
                 </View>
               </View>
@@ -303,9 +339,7 @@ export default function MeetDetailScreen() {
         )}
 
         {/* Psych Sheet Tab */}
-        {tab === 'psych_sheet' && (
-          <PsychSheet psychSheet={psychSheet} meetName={meet.name} />
-        )}
+        {tab === 'psych_sheet' && <PsychSheet psychSheet={psychSheet} meetName={meet.name} />}
       </ScrollView>
     </View>
   );
@@ -323,69 +357,283 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bgBase },
   // Tabs
-  tabBar: { backgroundColor: colors.bgElevated, borderBottomWidth: 1, borderBottomColor: colors.border, maxHeight: 48 },
+  tabBar: {
+    backgroundColor: colors.bgElevated,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    maxHeight: 48,
+  },
   tabBarContent: { paddingHorizontal: spacing.md, gap: spacing.xs },
-  tab: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderBottomWidth: 2, borderBottomColor: 'transparent' },
+  tab: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
   tabActive: { borderBottomColor: colors.accent },
-  tabText: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.xs, color: colors.textSecondary, letterSpacing: 1 },
+  tabText: {
+    fontFamily: fontFamily.bodySemi,
+    fontSize: fontSize.xs,
+    color: colors.textSecondary,
+    letterSpacing: 1,
+  },
   tabTextActive: { color: colors.accent },
   // Scroll
   scroll: { flex: 1 },
   scrollContent: { padding: spacing.lg, paddingBottom: 100 },
   // Overview
-  statusBadge: { alignSelf: 'flex-start', paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderRadius: borderRadius.xs, borderWidth: 1, backgroundColor: 'rgba(0,0,0,0.3)', marginBottom: spacing.sm },
+  statusBadge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.xs,
+    borderWidth: 1,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    marginBottom: spacing.sm,
+  },
   statusText: { fontFamily: fontFamily.pixel, fontSize: fontSize.pixel, letterSpacing: 1 },
-  meetName: { fontFamily: fontFamily.heading, fontSize: fontSize.xxxl, color: colors.text, letterSpacing: 2 },
-  meetDate: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.md, color: colors.textSecondary, marginBottom: spacing.lg },
+  meetName: {
+    fontFamily: fontFamily.heading,
+    fontSize: fontSize.xxxl,
+    color: colors.text,
+    letterSpacing: 2,
+  },
+  meetDate: {
+    fontFamily: fontFamily.bodySemi,
+    fontSize: fontSize.md,
+    color: colors.textSecondary,
+    marginBottom: spacing.lg,
+  },
   // Info Card
-  infoCard: { backgroundColor: colors.bgDeep, borderRadius: borderRadius.md, padding: spacing.lg, borderWidth: 1, borderColor: colors.border, marginBottom: spacing.lg },
-  infoRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.borderLight },
-  infoLabel: { fontFamily: fontFamily.pixel, fontSize: fontSize.pixel, color: colors.textSecondary, letterSpacing: 1 },
+  infoCard: {
+    backgroundColor: colors.bgDeep,
+    borderRadius: borderRadius.md,
+    padding: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginBottom: spacing.lg,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderLight,
+  },
+  infoLabel: {
+    fontFamily: fontFamily.pixel,
+    fontSize: fontSize.pixel,
+    color: colors.textSecondary,
+    letterSpacing: 1,
+  },
   infoValue: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.sm, color: colors.text },
   // Stats
   statsRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg },
-  statBox: { flex: 1, alignItems: 'center', backgroundColor: colors.bgDeep, borderRadius: borderRadius.md, padding: spacing.md, borderWidth: 1, borderColor: colors.border },
+  statBox: {
+    flex: 1,
+    alignItems: 'center',
+    backgroundColor: colors.bgDeep,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
   statNum: { fontFamily: fontFamily.stat, fontSize: fontSize.xxl, color: colors.accent },
-  statLabel: { fontFamily: fontFamily.pixel, fontSize: fontSize.pixel, color: colors.textSecondary, letterSpacing: 1 },
+  statLabel: {
+    fontFamily: fontFamily.pixel,
+    fontSize: fontSize.pixel,
+    color: colors.textSecondary,
+    letterSpacing: 1,
+  },
   // Groups
   groupsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.lg },
-  groupChip: { paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderRadius: borderRadius.sm, borderWidth: 1, backgroundColor: 'rgba(0,0,0,0.3)' },
+  groupChip: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.sm,
+    borderWidth: 1,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+  },
   groupChipText: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.sm },
   // Notes
-  notesCard: { backgroundColor: colors.bgDeep, borderRadius: borderRadius.md, padding: spacing.lg, borderWidth: 1, borderColor: colors.border, marginBottom: spacing.lg },
+  notesCard: {
+    backgroundColor: colors.bgDeep,
+    borderRadius: borderRadius.md,
+    padding: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginBottom: spacing.lg,
+  },
   notes: { fontFamily: fontFamily.body, fontSize: fontSize.md, color: colors.text, lineHeight: 22 },
   // Actions
   actionsRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg },
-  actionBtn: { flex: 1, padding: spacing.md, borderRadius: borderRadius.sm, borderWidth: 2, borderColor: colors.purple, alignItems: 'center' },
-  actionBtnText: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.sm, color: colors.accent, letterSpacing: 1 },
-  startBtn: { backgroundColor: colors.purple, padding: spacing.lg, borderRadius: borderRadius.md, alignItems: 'center', marginBottom: spacing.md },
-  startBtnText: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.md, color: colors.text, letterSpacing: 1 },
-  importBtn: { padding: spacing.md, borderRadius: borderRadius.sm, borderWidth: 1, borderColor: colors.gold, alignItems: 'center', marginBottom: spacing.md },
-  importBtnText: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.md, color: colors.gold, letterSpacing: 1 },
-  deleteBtn: { padding: spacing.md, borderRadius: borderRadius.sm, borderWidth: 1, borderColor: colors.error, alignItems: 'center' },
+  actionBtn: {
+    flex: 1,
+    padding: spacing.md,
+    borderRadius: borderRadius.sm,
+    borderWidth: 2,
+    borderColor: colors.purple,
+    alignItems: 'center',
+  },
+  actionBtnText: {
+    fontFamily: fontFamily.bodySemi,
+    fontSize: fontSize.sm,
+    color: colors.accent,
+    letterSpacing: 1,
+  },
+  startBtn: {
+    backgroundColor: colors.purple,
+    padding: spacing.lg,
+    borderRadius: borderRadius.md,
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  startBtnText: {
+    fontFamily: fontFamily.bodySemi,
+    fontSize: fontSize.md,
+    color: colors.text,
+    letterSpacing: 1,
+  },
+  importBtn: {
+    padding: spacing.md,
+    borderRadius: borderRadius.sm,
+    borderWidth: 1,
+    borderColor: colors.gold,
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  importBtnText: {
+    fontFamily: fontFamily.bodySemi,
+    fontSize: fontSize.md,
+    color: colors.gold,
+    letterSpacing: 1,
+  },
+  deleteBtn: {
+    padding: spacing.md,
+    borderRadius: borderRadius.sm,
+    borderWidth: 1,
+    borderColor: colors.error,
+    alignItems: 'center',
+  },
   deleteBtnText: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.md, color: colors.error },
   // Entries Tab
-  manageBtn: { padding: spacing.lg, borderRadius: borderRadius.md, borderWidth: 2, borderColor: colors.purple, borderStyle: 'dashed', alignItems: 'center', marginBottom: spacing.lg },
-  manageBtnText: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.md, color: colors.accent, letterSpacing: 1 },
-  eventBlock: { backgroundColor: colors.bgDeep, borderRadius: borderRadius.md, borderWidth: 1, borderColor: colors.border, marginBottom: spacing.md, overflow: 'hidden' },
-  eventHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: spacing.md, backgroundColor: colors.bgSurface },
+  manageBtn: {
+    padding: spacing.lg,
+    borderRadius: borderRadius.md,
+    borderWidth: 2,
+    borderColor: colors.purple,
+    borderStyle: 'dashed',
+    alignItems: 'center',
+    marginBottom: spacing.lg,
+  },
+  manageBtnText: {
+    fontFamily: fontFamily.bodySemi,
+    fontSize: fontSize.md,
+    color: colors.accent,
+    letterSpacing: 1,
+  },
+  eventBlock: {
+    backgroundColor: colors.bgDeep,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginBottom: spacing.md,
+    overflow: 'hidden',
+  },
+  eventHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: spacing.md,
+    backgroundColor: colors.bgSurface,
+  },
   eventName: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.md, color: colors.text },
-  eventCount: { fontFamily: fontFamily.statMono, fontSize: fontSize.xs, color: colors.textSecondary },
-  entryRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.sm, paddingHorizontal: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.borderLight },
-  entryName: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.sm, color: colors.text, flex: 1 },
-  entryGroup: { fontFamily: fontFamily.pixel, fontSize: fontSize.pixel, width: 60, textAlign: 'center' },
-  entrySeed: { fontFamily: fontFamily.statMono, fontSize: fontSize.sm, color: colors.accent, width: 65, textAlign: 'right' },
+  eventCount: {
+    fontFamily: fontFamily.statMono,
+    fontSize: fontSize.xs,
+    color: colors.textSecondary,
+  },
+  entryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderLight,
+  },
+  entryName: {
+    fontFamily: fontFamily.bodySemi,
+    fontSize: fontSize.sm,
+    color: colors.text,
+    flex: 1,
+  },
+  entryGroup: {
+    fontFamily: fontFamily.pixel,
+    fontSize: fontSize.pixel,
+    width: 60,
+    textAlign: 'center',
+  },
+  entrySeed: {
+    fontFamily: fontFamily.statMono,
+    fontSize: fontSize.sm,
+    color: colors.accent,
+    width: 65,
+    textAlign: 'right',
+  },
   // Relays Tab
-  relayCard: { backgroundColor: colors.bgDeep, borderRadius: borderRadius.md, padding: spacing.lg, borderWidth: 1, borderColor: colors.border, marginBottom: spacing.md },
-  relayHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm },
+  relayCard: {
+    backgroundColor: colors.bgDeep,
+    borderRadius: borderRadius.md,
+    padding: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginBottom: spacing.md,
+  },
+  relayHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
   relayEvent: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.md, color: colors.text },
-  relayTeam: { fontFamily: fontFamily.pixel, fontSize: fontSize.pixel, color: colors.gold, letterSpacing: 1 },
-  relayLeg: { fontFamily: fontFamily.body, fontSize: fontSize.sm, color: colors.textSecondary, paddingVertical: 2 },
-  relayFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: spacing.sm, paddingTop: spacing.sm, borderTopWidth: 1, borderTopColor: colors.borderLight },
-  relayEstLabel: { fontFamily: fontFamily.pixel, fontSize: fontSize.pixel, color: colors.gold, letterSpacing: 1 },
+  relayTeam: {
+    fontFamily: fontFamily.pixel,
+    fontSize: fontSize.pixel,
+    color: colors.gold,
+    letterSpacing: 1,
+  },
+  relayLeg: {
+    fontFamily: fontFamily.body,
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    paddingVertical: 2,
+  },
+  relayFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: spacing.sm,
+    paddingTop: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.borderLight,
+  },
+  relayEstLabel: {
+    fontFamily: fontFamily.pixel,
+    fontSize: fontSize.pixel,
+    color: colors.gold,
+    letterSpacing: 1,
+  },
   relayEstTime: { fontFamily: fontFamily.stat, fontSize: fontSize.xl, color: colors.accent },
   // Empty
   empty: { alignItems: 'center', paddingVertical: spacing.xxxl },
-  emptyTitle: { fontFamily: fontFamily.heading, fontSize: fontSize.xl, color: colors.text, marginBottom: spacing.sm },
+  emptyTitle: {
+    fontFamily: fontFamily.heading,
+    fontSize: fontSize.xl,
+    color: colors.text,
+    marginBottom: spacing.sm,
+  },
   emptyText: { fontFamily: fontFamily.body, fontSize: fontSize.sm, color: colors.textSecondary },
 });
+
+export default withScreenErrorBoundary(MeetDetailScreen, 'MeetDetailScreen');

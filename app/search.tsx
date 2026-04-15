@@ -22,8 +22,16 @@ import {
 } from '../src/services/search';
 import { getMeetStatusColor, getMeetStatusLabel } from '../src/services/meets';
 import type { Meet } from '../src/types/meet.types';
-import { colors, spacing, fontSize, borderRadius, fontFamily, groupColors } from '../src/config/theme';
+import {
+  colors,
+  spacing,
+  fontSize,
+  borderRadius,
+  fontFamily,
+  groupColors,
+} from '../src/config/theme';
 import type { Swimmer } from '../src/types/firestore.types';
+import { withScreenErrorBoundary } from '../src/components/ScreenErrorBoundary';
 
 type SwimmerWithId = Swimmer & { id: string };
 
@@ -34,7 +42,7 @@ const EVENT_TYPE_COLORS: Record<string, string> = {
   deadline: colors.error,
 };
 
-export default function SearchScreen() {
+function SearchScreen() {
   const { coach } = useAuth();
   const [query, setQuery] = useState('');
   const [swimmers, setSwimmers] = useState<SwimmerWithId[]>([]);
@@ -86,10 +94,14 @@ export default function SearchScreen() {
         setSearchingAsync(false);
       }, 300);
     },
-    [swimmers]
+    [swimmers],
   );
 
-  const hasResults = swimmerResults.length > 0 || noteResults.length > 0 || meetResults.length > 0 || eventResults.length > 0;
+  const hasResults =
+    swimmerResults.length > 0 ||
+    noteResults.length > 0 ||
+    meetResults.length > 0 ||
+    eventResults.length > 0;
 
   return (
     <>
@@ -107,10 +119,7 @@ export default function SearchScreen() {
             returnKeyType="search"
           />
           {query.length > 0 && (
-            <TouchableOpacity
-              style={styles.clearBtn}
-              onPress={() => handleSearch('')}
-            >
+            <TouchableOpacity style={styles.clearBtn} onPress={() => handleSearch('')}>
               <Text style={styles.clearBtnText}>✕</Text>
             </TouchableOpacity>
           )}
@@ -141,12 +150,20 @@ export default function SearchScreen() {
                   onPress={() => router.push(`/swimmer/${s.id}`)}
                 >
                   <View style={styles.swimmerAvatar}>
-                    <Text style={styles.swimmerAvatarText}>{s.firstName[0]}{s.lastName[0]}</Text>
+                    <Text style={styles.swimmerAvatarText}>
+                      {s.firstName[0]}
+                      {s.lastName[0]}
+                    </Text>
                   </View>
                   <View style={styles.swimmerInfo}>
                     <Text style={styles.swimmerName}>{s.displayName}</Text>
                     <View style={styles.swimmerMeta}>
-                      <View style={[styles.groupDot, { backgroundColor: groupColors[s.group] || colors.purple }]} />
+                      <View
+                        style={[
+                          styles.groupDot,
+                          { backgroundColor: groupColors[s.group] || colors.purple },
+                        ]}
+                      />
                       <Text style={styles.swimmerGroup}>{s.group}</Text>
                       {s.usaSwimmingId && (
                         <Text style={styles.swimmerUss}>USA #{s.usaSwimmingId}</Text>
@@ -205,7 +222,8 @@ export default function SearchScreen() {
                     <View style={styles.eventInfo}>
                       <Text style={styles.eventTitle}>{evt.title}</Text>
                       <Text style={styles.eventDetail}>
-                        {evt.startDate}{evt.location ? ` | ${evt.location}` : ''}
+                        {evt.startDate}
+                        {evt.location ? ` | ${evt.location}` : ''}
                       </Text>
                     </View>
                     <View style={[styles.eventTypeBadge, { borderColor: typeColor }]}>
@@ -268,10 +286,28 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bgBase },
 
   // Search Bar
-  searchBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bgDeep, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.border },
-  searchInput: { flex: 1, fontFamily: fontFamily.body, fontSize: fontSize.md, color: colors.text, paddingVertical: spacing.md },
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.bgDeep,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  searchInput: {
+    flex: 1,
+    fontFamily: fontFamily.body,
+    fontSize: fontSize.md,
+    color: colors.text,
+    paddingVertical: spacing.md,
+  },
   clearBtn: { padding: spacing.sm },
-  clearBtnText: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.md, color: colors.textSecondary },
+  clearBtnText: {
+    fontFamily: fontFamily.bodySemi,
+    fontSize: fontSize.md,
+    color: colors.textSecondary,
+  },
 
   // Results
   results: { flex: 1 },
@@ -279,49 +315,162 @@ const styles = StyleSheet.create({
 
   // Empty
   emptyContainer: { alignItems: 'center', paddingVertical: spacing.xxxl },
-  emptyTitle: { fontFamily: fontFamily.pixel, fontSize: fontSize.pixelLg, color: colors.accent, letterSpacing: 2, marginBottom: spacing.md },
-  emptyHint: { fontFamily: fontFamily.body, fontSize: fontSize.sm, color: colors.textSecondary, textAlign: 'center', lineHeight: 20 },
-  noResults: { fontFamily: fontFamily.body, fontSize: fontSize.sm, color: colors.textSecondary, textAlign: 'center', paddingVertical: spacing.xxl },
+  emptyTitle: {
+    fontFamily: fontFamily.pixel,
+    fontSize: fontSize.pixelLg,
+    color: colors.accent,
+    letterSpacing: 2,
+    marginBottom: spacing.md,
+  },
+  emptyHint: {
+    fontFamily: fontFamily.body,
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  noResults: {
+    fontFamily: fontFamily.body,
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    paddingVertical: spacing.xxl,
+  },
 
   // Sections
-  sectionTitle: { fontFamily: fontFamily.heading, fontSize: fontSize.xl, color: colors.text, letterSpacing: 1, marginBottom: spacing.sm },
+  sectionTitle: {
+    fontFamily: fontFamily.heading,
+    fontSize: fontSize.xl,
+    color: colors.text,
+    letterSpacing: 1,
+    marginBottom: spacing.sm,
+  },
 
   // Swimmer Results
-  swimmerRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bgDeep, padding: spacing.md, borderRadius: borderRadius.md, marginBottom: spacing.sm, borderWidth: 1, borderColor: colors.border },
-  swimmerAvatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.gold, alignItems: 'center', justifyContent: 'center', marginRight: spacing.md },
-  swimmerAvatarText: { fontFamily: fontFamily.heading, fontSize: fontSize.md, color: colors.bgDeep },
+  swimmerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.bgDeep,
+    padding: spacing.md,
+    borderRadius: borderRadius.md,
+    marginBottom: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  swimmerAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.gold,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing.md,
+  },
+  swimmerAvatarText: {
+    fontFamily: fontFamily.heading,
+    fontSize: fontSize.md,
+    color: colors.bgDeep,
+  },
   swimmerInfo: { flex: 1 },
   swimmerName: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.md, color: colors.text },
   swimmerMeta: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: 2 },
   groupDot: { width: 8, height: 8, borderRadius: 4 },
   swimmerGroup: { fontFamily: fontFamily.body, fontSize: fontSize.xs, color: colors.textSecondary },
-  swimmerUss: { fontFamily: fontFamily.statMono, fontSize: fontSize.xs, color: colors.textSecondary },
+  swimmerUss: {
+    fontFamily: fontFamily.statMono,
+    fontSize: fontSize.xs,
+    color: colors.textSecondary,
+  },
 
   // Meet Results
-  meetRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bgDeep, padding: spacing.lg, borderRadius: borderRadius.md, marginBottom: spacing.sm, borderWidth: 1, borderColor: colors.border },
+  meetRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.bgDeep,
+    padding: spacing.lg,
+    borderRadius: borderRadius.md,
+    marginBottom: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
   meetStatusDot: { width: 8, height: 8, borderRadius: 4, marginRight: spacing.md },
   meetInfo: { flex: 1 },
   meetName: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.md, color: colors.text },
-  meetDetail: { fontFamily: fontFamily.body, fontSize: fontSize.xs, color: colors.textSecondary, marginTop: 2 },
+  meetDetail: {
+    fontFamily: fontFamily.body,
+    fontSize: fontSize.xs,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
   meetStatusLabel: { fontFamily: fontFamily.pixel, fontSize: fontSize.pixel, letterSpacing: 1 },
 
   // Calendar Event Results
-  eventRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bgDeep, padding: spacing.lg, borderRadius: borderRadius.md, marginBottom: spacing.sm, borderWidth: 1, borderColor: colors.border },
+  eventRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.bgDeep,
+    padding: spacing.lg,
+    borderRadius: borderRadius.md,
+    marginBottom: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
   eventInfo: { flex: 1 },
   eventTitle: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.md, color: colors.text },
-  eventDetail: { fontFamily: fontFamily.body, fontSize: fontSize.xs, color: colors.textSecondary, marginTop: 2 },
-  eventTypeBadge: { paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: borderRadius.xs, borderWidth: 1, backgroundColor: 'rgba(0,0,0,0.3)' },
+  eventDetail: {
+    fontFamily: fontFamily.body,
+    fontSize: fontSize.xs,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  eventTypeBadge: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: borderRadius.xs,
+    borderWidth: 1,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+  },
   eventTypeText: { fontFamily: fontFamily.pixel, fontSize: fontSize.pixel, letterSpacing: 1 },
 
   // Note Results
-  loadingRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.md },
+  loadingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.md,
+  },
   loadingText: { fontFamily: fontFamily.body, fontSize: fontSize.sm, color: colors.textSecondary },
-  noteRow: { backgroundColor: colors.bgDeep, padding: spacing.lg, borderRadius: borderRadius.md, marginBottom: spacing.sm, borderWidth: 1, borderColor: colors.border },
-  noteContent: { fontFamily: fontFamily.body, fontSize: fontSize.sm, color: colors.text, lineHeight: 20 },
+  noteRow: {
+    backgroundColor: colors.bgDeep,
+    padding: spacing.lg,
+    borderRadius: borderRadius.md,
+    marginBottom: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  noteContent: {
+    fontFamily: fontFamily.body,
+    fontSize: fontSize.sm,
+    color: colors.text,
+    lineHeight: 20,
+  },
   noteFooter: { flexDirection: 'row', justifyContent: 'space-between', marginTop: spacing.sm },
   noteCoach: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.xs, color: colors.accent },
   noteDate: { fontFamily: fontFamily.statMono, fontSize: fontSize.xs, color: colors.textSecondary },
   noteTagRow: { flexDirection: 'row', gap: spacing.xs, marginTop: spacing.sm },
-  noteTag: { backgroundColor: 'rgba(74, 14, 120, 0.3)', paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: borderRadius.xs, borderWidth: 1, borderColor: colors.purple },
-  noteTagText: { fontFamily: fontFamily.pixel, fontSize: fontSize.pixel, color: colors.purpleLight },
+  noteTag: {
+    backgroundColor: 'rgba(74, 14, 120, 0.3)',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: borderRadius.xs,
+    borderWidth: 1,
+    borderColor: colors.purple,
+  },
+  noteTagText: {
+    fontFamily: fontFamily.pixel,
+    fontSize: fontSize.pixel,
+    color: colors.purpleLight,
+  },
 });
+
+export default withScreenErrorBoundary(SearchScreen, 'SearchScreen');

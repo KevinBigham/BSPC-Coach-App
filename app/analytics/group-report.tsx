@@ -26,8 +26,9 @@ import {
 import { GROUPS, type Group } from '../../src/config/constants';
 import { exportGroupReportDocx } from '../../src/services/docxExport';
 import { useSwimmersStore } from '../../src/stores/swimmersStore';
+import { withScreenErrorBoundary } from '../../src/components/ScreenErrorBoundary';
 
-export default function GroupReportScreen() {
+function GroupReportScreen() {
   const swimmers = useSwimmersStore((s) => s.swimmers);
   const [reports, setReports] = useState<GroupProgressReport[]>([]);
   const [loading, setLoading] = useState(true);
@@ -318,3 +319,5 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xxl,
   },
 });
+
+export default withScreenErrorBoundary(GroupReportScreen, 'GroupReportScreen');

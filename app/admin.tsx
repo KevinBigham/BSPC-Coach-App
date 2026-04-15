@@ -9,20 +9,22 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { router } from 'expo-router';
-import {
-  collection,
-  onSnapshot,
-  updateDoc,
-  doc,
-  serverTimestamp,
-} from 'firebase/firestore';
+import { collection, onSnapshot, updateDoc, doc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../src/config/firebase';
 import { useAuth } from '../src/contexts/AuthContext';
-import { colors, spacing, fontSize, borderRadius, fontFamily, groupColors } from '../src/config/theme';
+import {
+  colors,
+  spacing,
+  fontSize,
+  borderRadius,
+  fontFamily,
+  groupColors,
+} from '../src/config/theme';
 import { GROUPS, type Group } from '../src/config/constants';
 import type { Coach } from '../src/types/firestore.types';
+import { withScreenErrorBoundary } from '../src/components/ScreenErrorBoundary';
 
-export default function AdminScreen() {
+function AdminScreen() {
   const { isAdmin, coach: currentCoach } = useAuth();
   const [coaches, setCoaches] = useState<(Coach & { uid: string })[]>([]);
   const [loading, setLoading] = useState(true);
@@ -35,9 +37,7 @@ export default function AdminScreen() {
       return;
     }
     return onSnapshot(collection(db, 'coaches'), (snapshot) => {
-      setCoaches(
-        snapshot.docs.map((d) => ({ uid: d.id, ...d.data() } as Coach & { uid: string }))
-      );
+      setCoaches(snapshot.docs.map((d) => ({ uid: d.id, ...d.data() }) as Coach & { uid: string }));
       setLoading(false);
     });
   }, [isAdmin]);
@@ -62,7 +62,7 @@ export default function AdminScreen() {
             });
           },
         },
-      ]
+      ],
     );
   };
 
@@ -116,7 +116,8 @@ export default function AdminScreen() {
               </View>
               <View style={styles.coachInfo}>
                 <Text style={styles.coachName}>
-                  {c.displayName?.toUpperCase()}{isMe ? ' (YOU)' : ''}
+                  {c.displayName?.toUpperCase()}
+                  {isMe ? ' (YOU)' : ''}
                 </Text>
                 <Text style={styles.coachEmail}>{c.email}</Text>
               </View>
@@ -143,13 +144,20 @@ export default function AdminScreen() {
                         style={[
                           styles.groupChip,
                           {
-                            backgroundColor: isAssigned ? (groupColors[g] || colors.purple) : colors.bgBase,
+                            backgroundColor: isAssigned
+                              ? groupColors[g] || colors.purple
+                              : colors.bgBase,
                             borderColor: groupColors[g] || colors.border,
                           },
                         ]}
                         onPress={() => toggleGroup(c.uid, c.groups || [], g)}
                       >
-                        <Text style={[styles.groupChipText, { color: isAssigned ? colors.bgDeep : colors.text }]}>
+                        <Text
+                          style={[
+                            styles.groupChipText,
+                            { color: isAssigned ? colors.bgDeep : colors.text },
+                          ]}
+                        >
                           {g}
                         </Text>
                       </TouchableOpacity>
@@ -163,8 +171,13 @@ export default function AdminScreen() {
             {!isEditing && (c.groups || []).length > 0 && (
               <View style={styles.groupTags}>
                 {c.groups.map((g) => (
-                  <View key={g} style={[styles.groupTag, { borderColor: groupColors[g] || colors.border }]}>
-                    <Text style={[styles.groupTagText, { color: groupColors[g] || colors.accent }]}>{g}</Text>
+                  <View
+                    key={g}
+                    style={[styles.groupTag, { borderColor: groupColors[g] || colors.border }]}
+                  >
+                    <Text style={[styles.groupTagText, { color: groupColors[g] || colors.accent }]}>
+                      {g}
+                    </Text>
                   </View>
                 ))}
               </View>
@@ -178,32 +191,106 @@ export default function AdminScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bgBase },
-  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.bgBase },
+  centered: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.bgBase,
+  },
   content: { padding: spacing.lg, gap: spacing.lg, paddingBottom: spacing.xxxl },
   // Stats
   statRow: { flexDirection: 'row', gap: spacing.sm },
-  statBox: { flex: 1, backgroundColor: colors.bgDeep, borderRadius: borderRadius.lg, padding: spacing.lg, alignItems: 'center', borderWidth: 1, borderColor: colors.border },
+  statBox: {
+    flex: 1,
+    backgroundColor: colors.bgDeep,
+    borderRadius: borderRadius.lg,
+    padding: spacing.lg,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
   statNum: { fontFamily: fontFamily.stat, fontSize: fontSize.xxxl, color: colors.accent },
-  statLabel: { fontFamily: fontFamily.pixel, fontSize: fontSize.pixel, color: colors.textSecondary, letterSpacing: 1, marginTop: spacing.xs },
+  statLabel: {
+    fontFamily: fontFamily.pixel,
+    fontSize: fontSize.pixel,
+    color: colors.textSecondary,
+    letterSpacing: 1,
+    marginTop: spacing.xs,
+  },
   // Coach Card
-  coachCard: { backgroundColor: colors.bgDeep, borderRadius: borderRadius.lg, padding: spacing.lg, borderWidth: 1, borderColor: colors.border },
+  coachCard: {
+    backgroundColor: colors.bgDeep,
+    borderRadius: borderRadius.lg,
+    padding: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
   coachHeader: { flexDirection: 'row', alignItems: 'center' },
-  coachAvatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.purple, alignItems: 'center', justifyContent: 'center', marginRight: spacing.md },
+  coachAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.purple,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing.md,
+  },
   coachAvatarText: { fontFamily: fontFamily.heading, color: colors.gold, fontSize: fontSize.lg },
   coachInfo: { flex: 1 },
-  coachName: { fontFamily: fontFamily.heading, fontSize: fontSize.lg, color: colors.text, letterSpacing: 1 },
-  coachEmail: { fontFamily: fontFamily.body, fontSize: fontSize.xs, color: colors.textSecondary, marginTop: 2 },
-  roleBadge: { paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderRadius: borderRadius.xs, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bgBase },
+  coachName: {
+    fontFamily: fontFamily.heading,
+    fontSize: fontSize.lg,
+    color: colors.text,
+    letterSpacing: 1,
+  },
+  coachEmail: {
+    fontFamily: fontFamily.body,
+    fontSize: fontSize.xs,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  roleBadge: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.xs,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.bgBase,
+  },
   roleBadgeAdmin: { borderColor: colors.gold, backgroundColor: 'rgba(255, 215, 0, 0.1)' },
   roleText: { fontFamily: fontFamily.pixel, fontSize: fontSize.pixel, color: colors.textSecondary },
   roleTextAdmin: { color: colors.gold },
   // Groups
-  groupSection: { marginTop: spacing.lg, paddingTop: spacing.md, borderTopWidth: 1, borderTopColor: colors.border },
-  groupSectionTitle: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.xs, color: colors.textSecondary, letterSpacing: 1, marginBottom: spacing.sm },
+  groupSection: {
+    marginTop: spacing.lg,
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  groupSectionTitle: {
+    fontFamily: fontFamily.bodySemi,
+    fontSize: fontSize.xs,
+    color: colors.textSecondary,
+    letterSpacing: 1,
+    marginBottom: spacing.sm,
+  },
   groupGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  groupChip: { paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, borderRadius: borderRadius.sm, borderWidth: 2 },
+  groupChip: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.sm,
+    borderWidth: 2,
+  },
   groupChipText: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.sm },
   groupTags: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.sm },
-  groupTag: { paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: borderRadius.xs, borderWidth: 1, backgroundColor: 'rgba(0,0,0,0.3)' },
+  groupTag: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: borderRadius.xs,
+    borderWidth: 1,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+  },
   groupTagText: { fontFamily: fontFamily.pixel, fontSize: fontSize.pixel },
 });
+
+export default withScreenErrorBoundary(AdminScreen, 'AdminScreen');

@@ -12,12 +12,20 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { useAuth } from '../../../src/contexts/AuthContext';
-import { colors, spacing, fontSize, borderRadius, fontFamily, groupColors } from '../../../src/config/theme';
+import {
+  colors,
+  spacing,
+  fontSize,
+  borderRadius,
+  fontFamily,
+  groupColors,
+} from '../../../src/config/theme';
 import { GROUPS, CALENDAR_EVENT_TYPES, type Group } from '../../../src/config/constants';
 import { addEvent, getEventTypeColor, getEventTypeLabel } from '../../../src/services/calendar';
 import type { CalendarEventType } from '../../../src/types/firestore.types';
+import { withScreenErrorBoundary } from '../../../src/components/ScreenErrorBoundary';
 
-export default function NewEventScreen() {
+function NewEventScreen() {
   const { coach } = useAuth();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -30,9 +38,7 @@ export default function NewEventScreen() {
   const [saving, setSaving] = useState(false);
 
   const toggleGroup = (g: Group) => {
-    setGroups((prev) =>
-      prev.includes(g) ? prev.filter((x) => x !== g) : [...prev, g],
-    );
+    setGroups((prev) => (prev.includes(g) ? prev.filter((x) => x !== g) : [...prev, g]));
   };
 
   const handleSave = async () => {
@@ -71,7 +77,10 @@ export default function NewEventScreen() {
   };
 
   return (
-    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
         {/* Event Type */}
         <Text style={styles.label}>EVENT TYPE</Text>
@@ -81,7 +90,10 @@ export default function NewEventScreen() {
             return (
               <TouchableOpacity
                 key={t}
-                style={[styles.typeChip, type === t && { backgroundColor: typeColor, borderColor: typeColor }]}
+                style={[
+                  styles.typeChip,
+                  type === t && { backgroundColor: typeColor, borderColor: typeColor },
+                ]}
                 onPress={() => setType(t)}
               >
                 <Text style={[styles.typeChipText, type === t && styles.typeChipTextActive]}>
@@ -169,16 +181,14 @@ export default function NewEventScreen() {
               key={g}
               style={[
                 styles.groupChip,
-                groups.includes(g) && { backgroundColor: groupColors[g] || colors.purple, borderColor: groupColors[g] || colors.purple },
+                groups.includes(g) && {
+                  backgroundColor: groupColors[g] || colors.purple,
+                  borderColor: groupColors[g] || colors.purple,
+                },
               ]}
               onPress={() => toggleGroup(g)}
             >
-              <Text
-                style={[
-                  styles.groupChipText,
-                  groups.includes(g) && { color: colors.bgDeep },
-                ]}
-              >
+              <Text style={[styles.groupChipText, groups.includes(g) && { color: colors.bgDeep }]}>
                 {g}
               </Text>
             </TouchableOpacity>
@@ -201,20 +211,68 @@ export default function NewEventScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bgBase },
   scroll: { padding: spacing.lg, paddingBottom: 100 },
-  label: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.xs, color: colors.textSecondary, letterSpacing: 1, marginTop: spacing.lg, marginBottom: spacing.xs },
-  input: { backgroundColor: colors.bgDeep, borderRadius: borderRadius.sm, padding: spacing.md, fontSize: fontSize.md, fontFamily: fontFamily.body, color: colors.text, borderWidth: 1, borderColor: colors.border },
+  label: {
+    fontFamily: fontFamily.bodySemi,
+    fontSize: fontSize.xs,
+    color: colors.textSecondary,
+    letterSpacing: 1,
+    marginTop: spacing.lg,
+    marginBottom: spacing.xs,
+  },
+  input: {
+    backgroundColor: colors.bgDeep,
+    borderRadius: borderRadius.sm,
+    padding: spacing.md,
+    fontSize: fontSize.md,
+    fontFamily: fontFamily.body,
+    color: colors.text,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
   // Type
   typeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  typeChip: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: borderRadius.sm, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bgDeep },
-  typeChipText: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.xs, color: colors.textSecondary, letterSpacing: 1 },
+  typeChip: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.bgDeep,
+  },
+  typeChipText: {
+    fontFamily: fontFamily.bodySemi,
+    fontSize: fontSize.xs,
+    color: colors.textSecondary,
+    letterSpacing: 1,
+  },
   typeChipTextActive: { color: colors.text },
   // Time
   timeRow: { flexDirection: 'row', gap: spacing.md },
   // Groups
   groupsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  groupChip: { paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, borderRadius: borderRadius.sm, borderWidth: 2, borderColor: colors.border, backgroundColor: colors.bgDeep },
+  groupChip: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.sm,
+    borderWidth: 2,
+    borderColor: colors.border,
+    backgroundColor: colors.bgDeep,
+  },
   groupChipText: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.sm, color: colors.text },
   // Save
-  saveBtn: { backgroundColor: colors.purple, padding: spacing.lg, borderRadius: borderRadius.md, alignItems: 'center', marginTop: spacing.xl },
-  saveBtnText: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.md, color: colors.text, letterSpacing: 1 },
+  saveBtn: {
+    backgroundColor: colors.purple,
+    padding: spacing.lg,
+    borderRadius: borderRadius.md,
+    alignItems: 'center',
+    marginTop: spacing.xl,
+  },
+  saveBtnText: {
+    fontFamily: fontFamily.bodySemi,
+    fontSize: fontSize.md,
+    color: colors.text,
+    letterSpacing: 1,
+  },
 });
+
+export default withScreenErrorBoundary(NewEventScreen, 'NewEventScreen');

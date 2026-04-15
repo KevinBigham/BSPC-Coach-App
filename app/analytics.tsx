@@ -3,6 +3,7 @@ import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-nati
 import { router, Stack } from 'expo-router';
 import { colors, spacing, fontSize, borderRadius, fontFamily } from '../src/config/theme';
 import { GROUPS, type Group } from '../src/config/constants';
+import { withScreenErrorBoundary } from '../src/components/ScreenErrorBoundary';
 
 interface AnalyticsCard {
   title: string;
@@ -44,7 +45,7 @@ const CARDS: AnalyticsCard[] = [
   },
 ];
 
-export default function AnalyticsScreen() {
+function AnalyticsScreen() {
   return (
     <>
       <Stack.Screen
@@ -139,3 +140,5 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
 });
+
+export default withScreenErrorBoundary(AnalyticsScreen, 'AnalyticsScreen');

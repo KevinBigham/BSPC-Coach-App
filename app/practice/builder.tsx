@@ -25,8 +25,10 @@ import { usePracticeStore } from '../../src/stores/practiceStore';
 import { addPracticePlan, updatePracticePlan } from '../../src/services/practicePlans';
 import SetBlock from '../../src/components/SetBlock';
 import { exportPracticePlanDocx } from '../../src/services/docxExport';
+import { notifySuccess } from '../../src/utils/haptics';
+import { withScreenErrorBoundary } from '../../src/components/ScreenErrorBoundary';
 
-export default function PracticeBuilderScreen() {
+function PracticeBuilderScreen() {
   const { coach } = useAuth();
   const params = useLocalSearchParams<{ planId?: string }>();
   const [saving, setSaving] = useState(false);
@@ -48,6 +50,7 @@ export default function PracticeBuilderScreen() {
       } else {
         await addPracticePlan(planData, coach.uid);
       }
+      notifySuccess();
       store.reset();
       router.back();
     } catch (err: any) {
@@ -441,3 +444,5 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
 });
+
+export default withScreenErrorBoundary(PracticeBuilderScreen, 'PracticeBuilderScreen');

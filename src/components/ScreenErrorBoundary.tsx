@@ -7,6 +7,7 @@ import { logger } from '../utils/logger';
 
 interface Props {
   children: React.ReactNode;
+  name?: string;
   screenName?: string;
 }
 
@@ -23,7 +24,7 @@ export class ScreenErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
-    logger.error(`Screen crash: ${this.props.screenName || 'unknown'}`, {
+    logger.error(`Screen crash: ${this.props.name || this.props.screenName || 'unknown'}`, {
       error: error.message,
       stack: error.stack,
       componentStack: info.componentStack,
@@ -68,6 +69,23 @@ export class ScreenErrorBoundary extends Component<Props, State> {
 
     return this.props.children;
   }
+}
+
+export function withScreenErrorBoundary<P extends object>(
+  WrappedComponent: React.ComponentType<P>,
+  name: string,
+) {
+  function ScreenBoundaryWrapper(props: P) {
+    return (
+      <ScreenErrorBoundary name={name}>
+        <WrappedComponent {...props} />
+      </ScreenErrorBoundary>
+    );
+  }
+
+  ScreenBoundaryWrapper.displayName = `${name}Wrapped`;
+
+  return ScreenBoundaryWrapper;
 }
 
 const styles = StyleSheet.create({

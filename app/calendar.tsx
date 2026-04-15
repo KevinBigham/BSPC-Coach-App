@@ -7,20 +7,27 @@ import { useCalendarStore } from '../src/stores/calendarStore';
 import { subscribeEvents, getEventTypeColor, getEventTypeLabel } from '../src/services/calendar';
 import CalendarMonth from '../src/components/CalendarMonth';
 import EventCard from '../src/components/EventCard';
+import { withScreenErrorBoundary } from '../src/components/ScreenErrorBoundary';
 
-const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const MONTH_NAMES = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+];
 
-export default function CalendarScreen() {
+function CalendarScreen() {
   const { coach } = useAuth();
-  const {
-    selectedDate,
-    viewMonth,
-    events,
-    setSelectedDate,
-    setEvents,
-    navigateMonth,
-    goToToday,
-  } = useCalendarStore();
+  const { selectedDate, viewMonth, events, setSelectedDate, setEvents, navigateMonth, goToToday } =
+    useCalendarStore();
 
   useEffect(() => {
     return subscribeEvents(viewMonth, setEvents);
@@ -31,9 +38,7 @@ export default function CalendarScreen() {
   const month = parseInt(monthStr) - 1;
 
   // Events for selected date
-  const dateEvents = selectedDate
-    ? events.filter((e) => e.startDate === selectedDate)
-    : [];
+  const dateEvents = selectedDate ? events.filter((e) => e.startDate === selectedDate) : [];
 
   return (
     <View style={styles.container}>
@@ -55,7 +60,9 @@ export default function CalendarScreen() {
             <Text style={styles.navBtnText}>◀</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={goToToday}>
-            <Text style={styles.monthTitle}>{MONTH_NAMES[month]} {year}</Text>
+            <Text style={styles.monthTitle}>
+              {MONTH_NAMES[month]} {year}
+            </Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={() => navigateMonth(1)} style={styles.navBtn}>
             <Text style={styles.navBtnText}>▶</Text>
@@ -82,7 +89,9 @@ export default function CalendarScreen() {
                   day: 'numeric',
                 })}
               </Text>
-              <Text style={styles.eventCount}>{dateEvents.length} event{dateEvents.length !== 1 ? 's' : ''}</Text>
+              <Text style={styles.eventCount}>
+                {dateEvents.length} event{dateEvents.length !== 1 ? 's' : ''}
+              </Text>
             </View>
 
             {dateEvents.length > 0 ? (
@@ -120,9 +129,7 @@ export default function CalendarScreen() {
                 onPress={() => router.push(`/calendar/event/${event.id}`)}
               />
             ))}
-          {events.length === 0 && (
-            <Text style={styles.emptyText}>No events this month</Text>
-          )}
+          {events.length === 0 && <Text style={styles.emptyText}>No events this month</Text>}
         </View>
       </ScrollView>
     </View>
@@ -142,29 +149,100 @@ const styles = StyleSheet.create({
     borderBottomWidth: 2,
     borderBottomColor: colors.purple,
   },
-  pixelLabel: { fontFamily: fontFamily.pixel, fontSize: fontSize.pixel, color: colors.gold, letterSpacing: 1, marginBottom: spacing.xs },
-  screenTitle: { fontFamily: fontFamily.heading, fontSize: fontSize.xxxl, color: colors.text, letterSpacing: 2 },
-  addBtn: { backgroundColor: colors.purple, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, borderRadius: borderRadius.sm },
-  addBtnText: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.sm, color: colors.text, letterSpacing: 1 },
+  pixelLabel: {
+    fontFamily: fontFamily.pixel,
+    fontSize: fontSize.pixel,
+    color: colors.gold,
+    letterSpacing: 1,
+    marginBottom: spacing.xs,
+  },
+  screenTitle: {
+    fontFamily: fontFamily.heading,
+    fontSize: fontSize.xxxl,
+    color: colors.text,
+    letterSpacing: 2,
+  },
+  addBtn: {
+    backgroundColor: colors.purple,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.sm,
+  },
+  addBtnText: {
+    fontFamily: fontFamily.bodySemi,
+    fontSize: fontSize.sm,
+    color: colors.text,
+    letterSpacing: 1,
+  },
   // Scroll
   scroll: { flex: 1 },
   scrollContent: { padding: spacing.lg, paddingBottom: 100 },
   // Month Nav
-  monthNav: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md },
+  monthNav: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
   navBtn: { padding: spacing.sm },
   navBtnText: { fontFamily: fontFamily.heading, fontSize: fontSize.xl, color: colors.accent },
-  monthTitle: { fontFamily: fontFamily.heading, fontSize: fontSize.xxl, color: colors.text, letterSpacing: 1 },
+  monthTitle: {
+    fontFamily: fontFamily.heading,
+    fontSize: fontSize.xxl,
+    color: colors.text,
+    letterSpacing: 1,
+  },
   // Date Section
   dateSection: { marginTop: spacing.lg },
-  dateSectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: spacing.sm },
+  dateSectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'baseline',
+    marginBottom: spacing.sm,
+  },
   dateSectionTitle: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.md, color: colors.text },
-  eventCount: { fontFamily: fontFamily.statMono, fontSize: fontSize.xs, color: colors.textSecondary },
+  eventCount: {
+    fontFamily: fontFamily.statMono,
+    fontSize: fontSize.xs,
+    color: colors.textSecondary,
+  },
   noEvents: { alignItems: 'center', paddingVertical: spacing.xl },
-  noEventsText: { fontFamily: fontFamily.body, fontSize: fontSize.sm, color: colors.textSecondary, marginBottom: spacing.md },
-  addEventBtn: { paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, borderRadius: borderRadius.sm, borderWidth: 1, borderColor: colors.purple, borderStyle: 'dashed' },
-  addEventBtnText: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.sm, color: colors.accent, letterSpacing: 1 },
+  noEventsText: {
+    fontFamily: fontFamily.body,
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    marginBottom: spacing.md,
+  },
+  addEventBtn: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.sm,
+    borderWidth: 1,
+    borderColor: colors.purple,
+    borderStyle: 'dashed',
+  },
+  addEventBtnText: {
+    fontFamily: fontFamily.bodySemi,
+    fontSize: fontSize.sm,
+    color: colors.accent,
+    letterSpacing: 1,
+  },
   // Upcoming
   upcomingSection: { marginTop: spacing.xl },
-  sectionTitle: { fontFamily: fontFamily.heading, fontSize: fontSize.xl, color: colors.text, letterSpacing: 1, marginBottom: spacing.sm },
-  emptyText: { fontFamily: fontFamily.body, fontSize: fontSize.sm, color: colors.textSecondary, textAlign: 'center', paddingVertical: spacing.xl },
+  sectionTitle: {
+    fontFamily: fontFamily.heading,
+    fontSize: fontSize.xl,
+    color: colors.text,
+    letterSpacing: 1,
+    marginBottom: spacing.sm,
+  },
+  emptyText: {
+    fontFamily: fontFamily.body,
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    paddingVertical: spacing.xl,
+  },
 });
+
+export default withScreenErrorBoundary(CalendarScreen, 'CalendarScreen');

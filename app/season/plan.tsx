@@ -18,6 +18,7 @@ import { GROUPS } from '../../src/config/constants';
 import type { SeasonPhase, SeasonPhaseType } from '../../src/types/firestore.types';
 import type { Group } from '../../src/config/constants';
 import { colors, spacing, fontSize, borderRadius, fontFamily } from '../../src/config/theme';
+import { withScreenErrorBoundary } from '../../src/components/ScreenErrorBoundary';
 
 const PHASE_TYPES: { value: SeasonPhaseType; label: string }[] = [
   { value: 'base', label: 'Base Training' },
@@ -38,7 +39,7 @@ const DEFAULT_PHASE: SeasonPhase = {
   focusAreas: [],
 };
 
-export default function SeasonPlanScreen() {
+function SeasonPlanScreen() {
   const { user } = useAuth();
   const { activePlan, create, update, remove } = useSeasonStore();
   const isEditing = !!activePlan;
@@ -442,3 +443,5 @@ const styles = StyleSheet.create({
     color: colors.bgBase,
   },
 });
+
+export default withScreenErrorBoundary(SeasonPlanScreen, 'SeasonPlanScreen');

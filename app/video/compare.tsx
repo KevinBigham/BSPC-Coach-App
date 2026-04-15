@@ -5,8 +5,9 @@ import { Video as VideoIcon } from 'lucide-react-native';
 import { useSwimmersStore } from '../../src/stores/swimmersStore';
 import VideoComparison from '../../src/components/VideoComparison';
 import { colors, spacing, fontSize, borderRadius, fontFamily } from '../../src/config/theme';
+import { withScreenErrorBoundary } from '../../src/components/ScreenErrorBoundary';
 
-export default function VideoCompareScreen() {
+function VideoCompareScreen() {
   const { swimmerId: paramSwimmerId } = useLocalSearchParams<{ swimmerId?: string }>();
   const swimmers = useSwimmersStore((s) => s.swimmers);
   const [selectedSwimmerId, setSelectedSwimmerId] = useState<string | null>(paramSwimmerId ?? null);
@@ -159,3 +160,5 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 });
+
+export default withScreenErrorBoundary(VideoCompareScreen, 'VideoCompareScreen');

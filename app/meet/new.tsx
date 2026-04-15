@@ -12,12 +12,26 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { useAuth } from '../../src/contexts/AuthContext';
-import { colors, spacing, fontSize, borderRadius, fontFamily, groupColors } from '../../src/config/theme';
-import { GROUPS, COURSES, STANDARD_MEET_EVENTS, type Group, type Course } from '../../src/config/constants';
+import {
+  colors,
+  spacing,
+  fontSize,
+  borderRadius,
+  fontFamily,
+  groupColors,
+} from '../../src/config/theme';
+import {
+  GROUPS,
+  COURSES,
+  STANDARD_MEET_EVENTS,
+  type Group,
+  type Course,
+} from '../../src/config/constants';
 import { addMeet } from '../../src/services/meets';
 import type { MeetEvent } from '../../src/types/meet.types';
+import { withScreenErrorBoundary } from '../../src/components/ScreenErrorBoundary';
 
-export default function NewMeetScreen() {
+function NewMeetScreen() {
   const { coach } = useAuth();
   const [name, setName] = useState('');
   const [location, setLocation] = useState('');
@@ -32,9 +46,7 @@ export default function NewMeetScreen() {
   const [saving, setSaving] = useState(false);
 
   const toggleGroup = (g: Group) => {
-    setGroups((prev) =>
-      prev.includes(g) ? prev.filter((x) => x !== g) : [...prev, g],
-    );
+    setGroups((prev) => (prev.includes(g) ? prev.filter((x) => x !== g) : [...prev, g]));
   };
 
   const toggleEvent = (eventName: string) => {
@@ -97,7 +109,10 @@ export default function NewMeetScreen() {
   };
 
   return (
-    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
         {/* Name */}
         <Text style={styles.label}>MEET NAME *</Text>
@@ -129,7 +144,9 @@ export default function NewMeetScreen() {
               style={[styles.courseChip, course === c && styles.courseChipActive]}
               onPress={() => setCourse(c)}
             >
-              <Text style={[styles.courseChipText, course === c && styles.courseChipTextActive]}>{c}</Text>
+              <Text style={[styles.courseChipText, course === c && styles.courseChipTextActive]}>
+                {c}
+              </Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -192,11 +209,16 @@ export default function NewMeetScreen() {
               key={g}
               style={[
                 styles.groupChip,
-                groups.includes(g) && { backgroundColor: groupColors[g] || colors.purple, borderColor: groupColors[g] },
+                groups.includes(g) && {
+                  backgroundColor: groupColors[g] || colors.purple,
+                  borderColor: groupColors[g],
+                },
               ]}
               onPress={() => toggleGroup(g)}
             >
-              <Text style={[styles.groupChipText, groups.includes(g) && { color: colors.bgDeep }]}>{g}</Text>
+              <Text style={[styles.groupChipText, groups.includes(g) && { color: colors.bgDeep }]}>
+                {g}
+              </Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -213,7 +235,11 @@ export default function NewMeetScreen() {
               style={[
                 styles.eventChip,
                 selectedEvents.has(e.name) && styles.eventChipActive,
-                e.isRelay && selectedEvents.has(e.name) && { backgroundColor: colors.gold, borderColor: colors.gold },
+                e.isRelay &&
+                  selectedEvents.has(e.name) && {
+                    backgroundColor: colors.gold,
+                    borderColor: colors.gold,
+                  },
               ]}
               onPress={() => toggleEvent(e.name)}
             >
@@ -257,29 +283,99 @@ export default function NewMeetScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bgBase },
   scroll: { padding: spacing.lg, paddingBottom: 100 },
-  label: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.xs, color: colors.textSecondary, letterSpacing: 1, marginTop: spacing.lg, marginBottom: spacing.xs },
-  input: { backgroundColor: colors.bgDeep, borderRadius: borderRadius.sm, padding: spacing.md, fontSize: fontSize.md, fontFamily: fontFamily.body, color: colors.text, borderWidth: 1, borderColor: colors.border },
+  label: {
+    fontFamily: fontFamily.bodySemi,
+    fontSize: fontSize.xs,
+    color: colors.textSecondary,
+    letterSpacing: 1,
+    marginTop: spacing.lg,
+    marginBottom: spacing.xs,
+  },
+  input: {
+    backgroundColor: colors.bgDeep,
+    borderRadius: borderRadius.sm,
+    padding: spacing.md,
+    fontSize: fontSize.md,
+    fontFamily: fontFamily.body,
+    color: colors.text,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
   // Course
   courseRow: { flexDirection: 'row', gap: spacing.sm },
-  courseChip: { flex: 1, padding: spacing.md, borderRadius: borderRadius.sm, backgroundColor: colors.bgDeep, borderWidth: 1, borderColor: colors.border, alignItems: 'center' },
+  courseChip: {
+    flex: 1,
+    padding: spacing.md,
+    borderRadius: borderRadius.sm,
+    backgroundColor: colors.bgDeep,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+  },
   courseChipActive: { backgroundColor: colors.purple, borderColor: colors.purpleLight },
-  courseChipText: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.sm, color: colors.textSecondary },
+  courseChipText: {
+    fontFamily: fontFamily.bodySemi,
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+  },
   courseChipTextActive: { color: colors.text },
   // Dates
   dateRow: { flexDirection: 'row', gap: spacing.md },
   // Groups
   groupsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  groupChip: { paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, borderRadius: borderRadius.sm, borderWidth: 2, borderColor: colors.border, backgroundColor: colors.bgDeep },
+  groupChip: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.sm,
+    borderWidth: 2,
+    borderColor: colors.border,
+    backgroundColor: colors.bgDeep,
+  },
   groupChipText: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.sm, color: colors.text },
   // Events
-  quickBtn: { backgroundColor: colors.purple, padding: spacing.md, borderRadius: borderRadius.sm, alignItems: 'center', marginBottom: spacing.sm },
-  quickBtnText: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.sm, color: colors.text, letterSpacing: 1 },
+  quickBtn: {
+    backgroundColor: colors.purple,
+    padding: spacing.md,
+    borderRadius: borderRadius.sm,
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  quickBtnText: {
+    fontFamily: fontFamily.bodySemi,
+    fontSize: fontSize.sm,
+    color: colors.text,
+    letterSpacing: 1,
+  },
   eventsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  eventChip: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: borderRadius.sm, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bgDeep },
+  eventChip: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.bgDeep,
+  },
   eventChipActive: { backgroundColor: colors.purple, borderColor: colors.purpleLight },
-  eventChipText: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.xs, color: colors.textSecondary },
+  eventChipText: {
+    fontFamily: fontFamily.bodySemi,
+    fontSize: fontSize.xs,
+    color: colors.textSecondary,
+  },
   eventChipTextActive: { color: colors.text },
   // Save
-  saveBtn: { backgroundColor: colors.purple, padding: spacing.lg, borderRadius: borderRadius.md, alignItems: 'center', marginTop: spacing.xl },
-  saveBtnText: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.md, color: colors.text, letterSpacing: 1 },
+  saveBtn: {
+    backgroundColor: colors.purple,
+    padding: spacing.lg,
+    borderRadius: borderRadius.md,
+    alignItems: 'center',
+    marginTop: spacing.xl,
+  },
+  saveBtnText: {
+    fontFamily: fontFamily.bodySemi,
+    fontSize: fontSize.md,
+    color: colors.text,
+    letterSpacing: 1,
+  },
 });
+
+export default withScreenErrorBoundary(NewMeetScreen, 'NewMeetScreen');

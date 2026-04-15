@@ -21,8 +21,9 @@ import { usePracticeStore } from '../../src/stores/practiceStore';
 import type { PracticePlan } from '../../src/types/firestore.types';
 import { colors, spacing, fontSize, borderRadius, fontFamily } from '../../src/config/theme';
 import { GROUPS, type Group } from '../../src/config/constants';
+import { withScreenErrorBoundary } from '../../src/components/ScreenErrorBoundary';
 
-export default function WorkoutLibraryScreen() {
+function WorkoutLibraryScreen() {
   const [workouts, setWorkouts] = useState<(PracticePlan & { id: string })[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchText, setSearchText] = useState('');
@@ -107,10 +108,7 @@ export default function WorkoutLibraryScreen() {
         </ScrollView>
 
         {/* AI Generate Button */}
-        <TouchableOpacity
-          style={styles.aiBtn}
-          onPress={() => router.push('/practice/ai-generate')}
-        >
+        <TouchableOpacity style={styles.aiBtn} onPress={() => router.push('/practice/ai-generate')}>
           <Text style={styles.aiBtnLabel}>AI POWERED</Text>
           <Text style={styles.aiBtnText}>GENERATE PRACTICE</Text>
           <Text style={styles.aiBtnDesc}>Let AI build a practice plan based on your needs</Text>
@@ -132,12 +130,12 @@ export default function WorkoutLibraryScreen() {
                 >
                   <View style={styles.workoutHeader}>
                     <Text style={styles.workoutTitle}>{workout.title}</Text>
-                    {workout.group && (
-                      <Text style={styles.workoutGroup}>{workout.group}</Text>
-                    )}
+                    {workout.group && <Text style={styles.workoutGroup}>{workout.group}</Text>}
                   </View>
                   {workout.description && (
-                    <Text style={styles.workoutDesc} numberOfLines={2}>{workout.description}</Text>
+                    <Text style={styles.workoutDesc} numberOfLines={2}>
+                      {workout.description}
+                    </Text>
                   )}
                   <View style={styles.workoutMeta}>
                     <Text style={styles.metaStat}>{yardage.toLocaleString()} yds</Text>
@@ -149,9 +147,7 @@ export default function WorkoutLibraryScreen() {
                 </TouchableOpacity>
               );
             })}
-            {filtered.length === 0 && (
-              <Text style={styles.emptyText}>No workouts found</Text>
-            )}
+            {filtered.length === 0 && <Text style={styles.emptyText}>No workouts found</Text>}
           </>
         )}
       </ScrollView>
@@ -285,3 +281,5 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xxl,
   },
 });
+
+export default withScreenErrorBoundary(WorkoutLibraryScreen, 'WorkoutLibraryScreen');

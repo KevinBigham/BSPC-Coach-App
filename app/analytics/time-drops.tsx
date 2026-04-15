@@ -8,10 +8,16 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Stack } from 'expo-router';
-import { getTimeDrops, formatTime, formatDropPercent, type TimeDrop } from '../../src/services/analytics';
+import {
+  getTimeDrops,
+  formatTime,
+  formatDropPercent,
+  type TimeDrop,
+} from '../../src/services/analytics';
 import TimeDropChart from '../../src/components/charts/TimeDropChart';
 import { colors, spacing, fontSize, borderRadius, fontFamily } from '../../src/config/theme';
 import { GROUPS, type Group } from '../../src/config/constants';
+import { withScreenErrorBoundary } from '../../src/components/ScreenErrorBoundary';
 
 const RANGE_OPTIONS = [
   { label: '30 DAYS', days: 30 },
@@ -19,7 +25,7 @@ const RANGE_OPTIONS = [
   { label: 'SEASON', days: 365 },
 ];
 
-export default function TimeDropsScreen() {
+function TimeDropsScreen() {
   const [drops, setDrops] = useState<TimeDrop[]>([]);
   const [loading, setLoading] = useState(true);
   const [group, setGroup] = useState<Group | undefined>(undefined);
@@ -38,7 +44,9 @@ export default function TimeDropsScreen() {
     setLoading(false);
   }, [group, rangeDays]);
 
-  useEffect(() => { loadData(); }, [loadData]);
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const chartData = drops.slice(0, 10).map((d) => ({
     label: `${d.swimmerName.split(' ')[0]} - ${d.event}`,
@@ -87,7 +95,9 @@ export default function TimeDropsScreen() {
               style={[styles.rangeChip, rangeDays === opt.days && styles.rangeChipActive]}
               onPress={() => setRangeDays(opt.days)}
             >
-              <Text style={[styles.rangeChipText, rangeDays === opt.days && styles.rangeChipTextActive]}>
+              <Text
+                style={[styles.rangeChipText, rangeDays === opt.days && styles.rangeChipTextActive]}
+              >
                 {opt.label}
               </Text>
             </TouchableOpacity>
@@ -111,7 +121,9 @@ export default function TimeDropsScreen() {
                 <View key={i} style={styles.dropRow}>
                   <View style={styles.dropInfo}>
                     <Text style={styles.dropName}>{d.swimmerName}</Text>
-                    <Text style={styles.dropEvent}>{d.event} ({d.course})</Text>
+                    <Text style={styles.dropEvent}>
+                      {d.event} ({d.course})
+                    </Text>
                   </View>
                   <View style={styles.dropTimes}>
                     <Text style={styles.dropOld}>{formatTime(d.oldTime)}</Text>
@@ -254,3 +266,5 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xxl,
   },
 });
+
+export default withScreenErrorBoundary(TimeDropsScreen, 'TimeDropsScreen');
