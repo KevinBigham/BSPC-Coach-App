@@ -28,6 +28,7 @@ import { colors, spacing, fontSize, borderRadius, fontFamily } from '../src/conf
 import { formatRelativeTime, toDateSafe, type FirestoreTimestampLike } from '../src/utils/date';
 import type { Message } from '../src/types/firestore.types';
 import { withScreenErrorBoundary } from '../src/components/ScreenErrorBoundary';
+import { logger } from '../src/utils/logger';
 
 function MessagesScreen() {
   const { coach } = useAuth();
@@ -56,8 +57,12 @@ function MessagesScreen() {
           await updateDoc(doc(db, 'coach_chat', msg.id), {
             [`readBy.${coach.uid}`]: serverTimestamp(),
           });
-        } catch {
-          // Silently fail — non-critical
+        } catch (err) {
+          // Read-receipt write is non-critical to UX; log and continue.
+          logger.warn('Failed to mark message as read', {
+            messageId: msg.id,
+            error: err instanceof Error ? err.message : String(err),
+          });
         }
       }
     });
@@ -80,7 +85,9 @@ function MessagesScreen() {
         flatListRef.current?.scrollToEnd({ animated: true });
       }, 200);
     } catch (err: unknown) {
-      console.error('Send failed:', err);
+      logger.error('Send message failed', {
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
     setSending(false);
   };

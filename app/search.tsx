@@ -32,6 +32,7 @@ import {
 } from '../src/config/theme';
 import type { Swimmer } from '../src/types/firestore.types';
 import { withScreenErrorBoundary } from '../src/components/ScreenErrorBoundary';
+import { logger } from '../src/utils/logger';
 
 type SwimmerWithId = Swimmer & { id: string };
 
@@ -86,7 +87,11 @@ function SearchScreen() {
           setNoteResults(notes);
           setMeetResults(meets);
           setEventResults(events);
-        } catch {
+        } catch (err) {
+          logger.error('Search failed', {
+            query: text,
+            error: err instanceof Error ? err.message : String(err),
+          });
           setNoteResults([]);
           setMeetResults([]);
           setEventResults([]);

@@ -28,7 +28,8 @@ export default function LoginScreen() {
     try {
       await signIn(email.trim(), password);
     } catch {
-      // Error is handled by AuthContext
+      // AuthContext already sets state.error (displayed via `error` prop).
+      // Swallow the rethrow here so it doesn't surface as an unhandled rejection.
     }
   };
 
@@ -100,9 +101,7 @@ export default function LoginScreen() {
           <Text style={styles.forgotLink}>Forgot Password?</Text>
         </TouchableOpacity>
 
-        <Text style={styles.footerText}>
-          Contact your admin for account access
-        </Text>
+        <Text style={styles.footerText}>Contact your admin for account access</Text>
       </View>
     </KeyboardAvoidingView>
   );
