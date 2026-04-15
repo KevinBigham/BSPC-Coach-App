@@ -5,15 +5,16 @@ import { colors, spacing, fontSize, borderRadius, fontFamily } from '../../src/c
 import { EVENTS } from '../../src/config/constants';
 import { useSwimmersStore } from '../../src/stores/swimmersStore';
 import { subscribeTimes } from '../../src/services/times';
-import { formatShortDate } from '../../src/utils/date';
+import { formatShortDate, toDateSafe, type FirestoreTimestampLike } from '../../src/utils/date';
 import SplitComparisonChart, { type RaceData } from '../../src/components/SplitComparisonChart';
 import type { SwimTime } from '../../src/types/firestore.types';
+import { withScreenErrorBoundary } from '../../src/components/ScreenErrorBoundary';
 
 type TimeWithId = SwimTime & { id: string };
 
 const MAX_COMPARE = 3;
 
-export default function SplitComparisonScreen() {
+function SplitComparisonScreen() {
   const swimmers = useSwimmersStore((s) => s.swimmers);
   const [selectedSwimmerId, setSelectedSwimmerId] = useState<string | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<string>(EVENTS[1]); // default 50 Free
@@ -30,19 +31,18 @@ export default function SplitComparisonScreen() {
   }, [selectedSwimmerId]);
 
   const raceData: RaceData[] = useMemo(() => {
-    const toDate = (ts: unknown): Date => {
-      if (ts && typeof ts === 'object' && 'toDate' in ts)
-        return (ts as { toDate: () => Date }).toDate();
-      if (ts instanceof Date) return ts;
-      return new Date(0);
-    };
+    const toDate = (ts: FirestoreTimestampLike): Date => toDateSafe(ts) ?? new Date(0);
 
     return allTimes
       .filter((t) => t.event === selectedEvent && t.splits && t.splits.length > 0)
-      .sort((a, b) => toDate(a.createdAt).getTime() - toDate(b.createdAt).getTime())
+      .sort(
+        (a, b) =>
+          toDate(a.createdAt as FirestoreTimestampLike).getTime() -
+          toDate(b.createdAt as FirestoreTimestampLike).getTime(),
+      )
       .slice(-MAX_COMPARE)
       .map((t) => ({
-        name: t.meetName || formatShortDate(toDate(t.createdAt)),
+        name: t.meetName || formatShortDate(toDate(t.createdAt as FirestoreTimestampLike)),
         splits: t.splits!,
         totalTime: t.time,
       }));
@@ -204,3 +204,5 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 });
+
+export default withScreenErrorBoundary(SplitComparisonScreen, 'SplitComparisonScreen');

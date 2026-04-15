@@ -12,10 +12,18 @@ import { router } from 'expo-router';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../src/config/firebase';
 import { useAuth } from '../../src/contexts/AuthContext';
-import { colors, spacing, fontSize, borderRadius, fontFamily, groupColors } from '../../src/config/theme';
+import {
+  colors,
+  spacing,
+  fontSize,
+  borderRadius,
+  fontFamily,
+  groupColors,
+} from '../../src/config/theme';
 import { GROUPS, type Group } from '../../src/config/constants';
+import { withScreenErrorBoundary } from '../../src/components/ScreenErrorBoundary';
 
-export default function AddSwimmerScreen() {
+function AddSwimmerScreen() {
   const { coach } = useAuth();
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -67,8 +75,8 @@ export default function AddSwimmerScreen() {
 
       const docRef = await addDoc(collection(db, 'swimmers'), swimmerData);
       router.replace(`/swimmer/${docRef.id}`);
-    } catch (err: any) {
-      Alert.alert('Error', err.message);
+    } catch (err: unknown) {
+      Alert.alert('Error', err instanceof Error ? err.message : String(err));
     }
     setSaving(false);
   };
@@ -127,7 +135,9 @@ export default function AddSwimmerScreen() {
             style={[styles.toggleButton, gender === 'F' && styles.toggleActive]}
             onPress={() => setGender('F')}
           >
-            <Text style={[styles.toggleText, gender === 'F' && styles.toggleTextActive]}>Female</Text>
+            <Text style={[styles.toggleText, gender === 'F' && styles.toggleTextActive]}>
+              Female
+            </Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.toggleButton, gender === 'M' && styles.toggleActive]}
@@ -148,17 +158,14 @@ export default function AddSwimmerScreen() {
               style={[
                 styles.groupChip,
                 {
-                  backgroundColor: group === g ? (groupColors[g] || colors.purple) : colors.bgBase,
+                  backgroundColor: group === g ? groupColors[g] || colors.purple : colors.bgBase,
                   borderColor: groupColors[g] || colors.border,
                 },
               ]}
               onPress={() => setGroup(g)}
             >
               <Text
-                style={[
-                  styles.groupChipText,
-                  { color: group === g ? colors.bgDeep : colors.text },
-                ]}
+                style={[styles.groupChipText, { color: group === g ? colors.bgDeep : colors.text }]}
               >
                 {g}
               </Text>
@@ -209,9 +216,7 @@ export default function AddSwimmerScreen() {
         onPress={handleSave}
         disabled={saving}
       >
-        <Text style={styles.saveButtonText}>
-          {saving ? 'SAVING...' : 'ADD SWIMMER'}
-        </Text>
+        <Text style={styles.saveButtonText}>{saving ? 'SAVING...' : 'ADD SWIMMER'}</Text>
       </TouchableOpacity>
     </ScrollView>
   );
@@ -315,3 +320,5 @@ const styles = StyleSheet.create({
     letterSpacing: 2,
   },
 });
+
+export default withScreenErrorBoundary(AddSwimmerScreen, 'AddSwimmerScreen');

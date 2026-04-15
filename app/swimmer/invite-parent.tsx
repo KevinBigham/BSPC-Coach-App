@@ -21,8 +21,9 @@ import {
 import { colors, spacing, fontSize, borderRadius, fontFamily } from '../../src/config/theme';
 import type { Swimmer, ParentInvite } from '../../src/types/firestore.types';
 import { Timestamp } from 'firebase/firestore';
+import { withScreenErrorBoundary } from '../../src/components/ScreenErrorBoundary';
 
-export default function InviteParentScreen() {
+function InviteParentScreen() {
   const { swimmerId, swimmerName: nameParam } = useLocalSearchParams<{
     swimmerId: string;
     swimmerName: string;
@@ -53,56 +54,49 @@ export default function InviteParentScreen() {
     if (!swimmerId || !coach) return;
     setGenerating(true);
     try {
-      await createParentInvite(
-        swimmerId,
-        swimmerName,
-        coach.uid,
-        coach.displayName,
+      await createParentInvite(swimmerId, swimmerName, coach.uid, coach.displayName);
+    } catch (err: unknown) {
+      Alert.alert(
+        'Error',
+        err instanceof Error && err.message ? err.message : 'Failed to generate invite code',
       );
-    } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to generate invite code');
     }
     setGenerating(false);
   }, [swimmerId, swimmerName, coach]);
 
-  const handleShare = useCallback(async (code: string) => {
-    try {
-      await Share.share({
-        message: `You've been invited to view ${swimmerName}'s swim data on the BSPC Parent Portal!\n\nYour invite code: ${code}\n\nSign up at the BSPC Parent Portal and enter this code to link your swimmer.`,
-      });
-    } catch {
-      // user cancelled
-    }
-  }, [swimmerName]);
+  const handleShare = useCallback(
+    async (code: string) => {
+      try {
+        await Share.share({
+          message: `You've been invited to view ${swimmerName}'s swim data on the BSPC Parent Portal!\n\nYour invite code: ${code}\n\nSign up at the BSPC Parent Portal and enter this code to link your swimmer.`,
+        });
+      } catch {
+        // user cancelled
+      }
+    },
+    [swimmerName],
+  );
 
   const handleRevoke = useCallback((inviteId: string) => {
-    Alert.alert(
-      'Revoke Invite',
-      'This will prevent this code from being used. Continue?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Revoke',
-          style: 'destructive',
-          onPress: () => revokeInvite(inviteId),
-        },
-      ],
-    );
+    Alert.alert('Revoke Invite', 'This will prevent this code from being used. Continue?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Revoke',
+        style: 'destructive',
+        onPress: () => revokeInvite(inviteId),
+      },
+    ]);
   }, []);
 
   const activeInvites = invites.filter((i) => {
     if (i.redeemed) return false;
-    const expires = i.expiresAt instanceof Timestamp
-      ? i.expiresAt.toDate()
-      : new Date(i.expiresAt);
+    const expires = i.expiresAt instanceof Timestamp ? i.expiresAt.toDate() : new Date(i.expiresAt);
     return expires > new Date();
   });
 
   const pastInvites = invites.filter((i) => {
     if (i.redeemed) return true;
-    const expires = i.expiresAt instanceof Timestamp
-      ? i.expiresAt.toDate()
-      : new Date(i.expiresAt);
+    const expires = i.expiresAt instanceof Timestamp ? i.expiresAt.toDate() : new Date(i.expiresAt);
     return expires <= new Date();
   });
 
@@ -123,7 +117,8 @@ export default function InviteParentScreen() {
           <Text style={styles.pixelLabel}>PARENT PORTAL</Text>
           <Text style={styles.heading}>INVITE FOR {swimmerName.toUpperCase()}</Text>
           <Text style={styles.subtext}>
-            Generate an invite code so parents can view {swimmerName}'s times, attendance, and progress on the Parent Portal.
+            Generate an invite code so parents can view {swimmerName}'s times, attendance, and
+            progress on the Parent Portal.
           </Text>
         </View>
 
@@ -145,9 +140,10 @@ export default function InviteParentScreen() {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>ACTIVE CODES</Text>
             {activeInvites.map((invite) => {
-              const expires = invite.expiresAt instanceof Timestamp
-                ? invite.expiresAt.toDate()
-                : new Date(invite.expiresAt);
+              const expires =
+                invite.expiresAt instanceof Timestamp
+                  ? invite.expiresAt.toDate()
+                  : new Date(invite.expiresAt);
               const daysLeft = Math.max(0, Math.ceil((expires.getTime() - Date.now()) / 86400000));
               return (
                 <View key={invite.id} style={styles.inviteCard}>
@@ -182,9 +178,7 @@ export default function InviteParentScreen() {
             {pastInvites.map((invite) => (
               <View key={invite.id} style={[styles.inviteCard, styles.pastCard]}>
                 <Text style={[styles.codeText, styles.pastCode]}>{invite.code}</Text>
-                <Text style={styles.pastLabel}>
-                  {invite.redeemed ? 'REDEEMED' : 'EXPIRED'}
-                </Text>
+                <Text style={styles.pastLabel}>{invite.redeemed ? 'REDEEMED' : 'EXPIRED'}</Text>
                 {invite.redeemedBy && (
                   <Text style={styles.expiryText}>Redeemed by parent account</Text>
                 )}
@@ -346,3 +340,5 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
 });
+
+export default withScreenErrorBoundary(InviteParentScreen, 'InviteParentScreen');

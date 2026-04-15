@@ -6,13 +6,11 @@ import type { ToastType } from '../components/Toast';
  */
 let globalShowToast: ((message: string, type?: ToastType) => void) | null = null;
 
-export function setGlobalToast(fn: (message: string, type?: ToastType) => void) {
+export function setGlobalToast(fn: ((message: string, type?: ToastType) => void) | null) {
   globalShowToast = fn;
 }
 
-/**
- * Handle an error: log it and show a toast notification.
- */
+/** Log the error and show an error toast. */
 export function handleError(error: unknown, context?: string): void {
   const message = error instanceof Error ? error.message : String(error);
   const prefix = context ? `[${context}] ` : '';
@@ -24,28 +22,9 @@ export function handleError(error: unknown, context?: string): void {
   }
 }
 
-/**
- * Wrap an async function with error handling.
- * Returns the result on success, null on failure (after showing toast).
- */
-export async function withErrorHandling<T>(
-  fn: () => Promise<T>,
-  context: string,
-): Promise<T | null> {
-  try {
-    return await fn();
-  } catch (error) {
-    handleError(error, context);
-    return null;
-  }
-}
-
 const DEFAULT_RETRY_DELAYS = [1000, 2000, 4000];
 
-/**
- * Retry an async function with exponential backoff.
- * Retries on failure up to `delays.length` times before throwing.
- */
+/** Exponential backoff; throws lastError after delays.length retries. */
 export async function withRetry<T>(
   fn: () => Promise<T>,
   options: { context?: string; delays?: number[] } = {},

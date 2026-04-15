@@ -4,7 +4,6 @@ import * as admin from 'firebase-admin';
 if (!admin.apps.length) admin.initializeApp();
 const messaging = admin.messaging();
 
-/** Valid topic prefixes */
 const VALID_GROUPS = ['Bronze', 'Silver', 'Gold', 'Advanced', 'Platinum', 'Diamond'];
 const VALID_TOPICS = [...VALID_GROUPS.map((g) => `group_${g}`), 'broadcast_all'];
 
@@ -47,7 +46,8 @@ export const manageTopicSubscription = onCall({ maxInstances: 10 }, async (reque
       await messaging.unsubscribeFromTopic([token], topic);
     }
     return { success: true, action, topic };
-  } catch (err: any) {
-    throw new HttpsError('internal', `Failed to ${action} topic: ${err.message}`);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    throw new HttpsError('internal', `Failed to ${action} topic: ${message}`);
   }
 });

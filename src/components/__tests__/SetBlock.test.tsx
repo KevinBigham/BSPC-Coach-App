@@ -1,27 +1,39 @@
 jest.mock('../SetItemRow', () => {
   const React = require('react');
-  const { View, Text } = require('react-native');
+  const { View, Text, TouchableOpacity } = require('react-native');
   return {
     __esModule: true,
     default: ({
       item,
       index,
+      onDelete,
     }: {
       item: { stroke: string; reps: number; distance: number };
       index: number;
+      onDelete: () => void;
     }) =>
       React.createElement(
         View,
         { testID: `set-item-row-${index}` },
         React.createElement(Text, null, `${item.reps}x${item.distance} ${item.stroke}`),
+        React.createElement(
+          TouchableOpacity,
+          { onPress: onDelete },
+          React.createElement(Text, null, `DELETE-${index}`),
+        ),
       ),
   };
 });
+
+jest.mock('../../utils/haptics', () => ({
+  tapLight: jest.fn(),
+}));
 
 import React from 'react';
 import { render, fireEvent } from '@testing-library/react-native';
 import SetBlock from '../SetBlock';
 import type { PracticePlanSet } from '../../types/firestore.types';
+import { tapLight } from '../../utils/haptics';
 
 const makeSet = (overrides?: Partial<PracticePlanSet>): PracticePlanSet => ({
   order: 0,
@@ -77,6 +89,15 @@ describe('SetBlock', () => {
     const { getByText } = render(<SetBlock {...props} />);
     fireEvent.press(getByText('+ ADD ITEM'));
     expect(props.onAddItem).toHaveBeenCalled();
+    expect(tapLight).toHaveBeenCalled();
+  });
+
+  it('calls onRemoveItem when mocked delete control is pressed', () => {
+    const props = defaultProps();
+    const { getByText } = render(<SetBlock {...props} />);
+    fireEvent.press(getByText('DELETE-0'));
+    expect(props.onRemoveItem).toHaveBeenCalledWith(0);
+    expect(tapLight).toHaveBeenCalled();
   });
 
   it('calls onMoveUp when up arrow pressed', () => {

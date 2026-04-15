@@ -16,6 +16,7 @@ import { usePracticeStore } from '../../src/stores/practiceStore';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { colors, spacing, fontSize, borderRadius, fontFamily } from '../../src/config/theme';
 import { GROUPS, type Group } from '../../src/config/constants';
+import { withScreenErrorBoundary } from '../../src/components/ScreenErrorBoundary';
 
 type Focus = AIPracticeRequest['focus'];
 
@@ -31,7 +32,7 @@ const FOCUS_OPTIONS: { key: Focus; label: string; desc: string }[] = [
 const YARDAGE_PRESETS = [2000, 3000, 4000, 5000, 6000] as const;
 const DURATION_PRESETS = [60, 75, 90, 105, 120] as const;
 
-export default function AIGenerateScreen() {
+function AIGenerateScreen() {
   const { coach } = useAuth();
   const store = usePracticeStore();
   const [group, setGroup] = useState<Group>(GROUPS[0]);
@@ -70,11 +71,12 @@ export default function AIGenerateScreen() {
       };
       store.loadPlan(fakePlan);
       router.replace('/practice/builder');
-    } catch (err: any) {
-      Alert.alert(
-        'Generation Failed',
-        err.message || 'Could not generate practice. Make sure Cloud Functions are deployed.',
-      );
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error && err.message
+          ? err.message
+          : 'Could not generate practice. Make sure Cloud Functions are deployed.';
+      Alert.alert('Generation Failed', message);
     }
     setGenerating(false);
   };
@@ -348,3 +350,5 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
 });
+
+export default withScreenErrorBoundary(AIGenerateScreen, 'AIGenerateScreen');

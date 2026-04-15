@@ -1,7 +1,7 @@
 import React from 'react';
 import { Text } from 'react-native';
 import { render, fireEvent } from '@testing-library/react-native';
-import { ScreenErrorBoundary } from '../ScreenErrorBoundary';
+import { ScreenErrorBoundary, withScreenErrorBoundary } from '../ScreenErrorBoundary';
 
 // Silence React error boundary console output
 beforeEach(() => {
@@ -16,6 +16,15 @@ function ThrowingChild({ shouldThrow }: { shouldThrow: boolean }) {
   if (shouldThrow) throw new Error('Screen crash');
   return <Text>Screen content</Text>;
 }
+
+function WrappedThrowingScreen() {
+  return <ThrowingChild shouldThrow={true} />;
+}
+
+const WrappedThrowingScreenWithBoundary = withScreenErrorBoundary(
+  WrappedThrowingScreen,
+  'WrappedThrowingScreen',
+);
 
 describe('ScreenErrorBoundary', () => {
   it('renders children when no error', () => {
@@ -66,5 +75,11 @@ describe('ScreenErrorBoundary', () => {
     );
     // Should not throw when pressing Go Back
     fireEvent.press(getByText('Go Back'));
+  });
+
+  it('renders fallback UI for a wrapped screen instead of propagating', () => {
+    const { getByText } = render(<WrappedThrowingScreenWithBoundary />);
+    expect(getByText('This screen crashed')).toBeTruthy();
+    expect(getByText('Screen crash')).toBeTruthy();
   });
 });

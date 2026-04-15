@@ -5,7 +5,16 @@
 
 import XLSX from 'xlsx';
 import { initializeApp } from 'firebase/app';
-import { getFirestore, collection, query, getDocs, writeBatch, doc, serverTimestamp, limit } from 'firebase/firestore';
+import {
+  getFirestore,
+  collection,
+  query,
+  getDocs,
+  writeBatch,
+  doc,
+  serverTimestamp,
+  limit,
+} from 'firebase/firestore';
 import { config } from 'dotenv';
 
 // Load .env for Firebase config
@@ -31,10 +40,10 @@ interface RosterRow {
   'Last Name'?: string;
   'First Name'?: string;
   'Comp. Category'?: string;
-  'Age'?: number;
-  'Birthdate'?: string;
+  Age?: number;
+  Birthdate?: string;
   'Practice Group'?: string;
-  [key: string]: any;
+  [key: string]: string | number | undefined;
 }
 
 function mapGroup(practiceGroup: string): string | null {
@@ -68,7 +77,9 @@ async function getExistingKeys(): Promise<Set<string>> {
   const keys = new Set<string>();
   snap.forEach((d) => {
     const data = d.data();
-    keys.add(`${data.firstName?.toLowerCase()}|${data.lastName?.toLowerCase()}|${data.group?.toLowerCase()}`);
+    keys.add(
+      `${data.firstName?.toLowerCase()}|${data.lastName?.toLowerCase()}|${data.group?.toLowerCase()}`,
+    );
   });
   return keys;
 }
@@ -91,7 +102,13 @@ async function main() {
 
   // Split rows at "REMOVED FROM ROSTER" marker
   let inRemovedSection = false;
-  const activeRows: { firstName: string; lastName: string; gender: 'M' | 'F'; dateOfBirth: string | null; group: string }[] = [];
+  const activeRows: {
+    firstName: string;
+    lastName: string;
+    gender: 'M' | 'F';
+    dateOfBirth: string | null;
+    group: string;
+  }[] = [];
   const inactiveRows: typeof activeRows = [];
 
   for (const row of rows) {
@@ -113,7 +130,12 @@ async function main() {
     const group = practiceGroup ? mapGroup(practiceGroup) : null;
     if (!group) {
       // Skip rows without a valid group (summary rows, etc.)
-      if (practiceGroup && !['DIAMOND-1', 'DIAMOND-2', 'PLATINUM', 'ADVANCED', 'GOLD', 'SILVER', 'BRONZE'].includes(lastName)) {
+      if (
+        practiceGroup &&
+        !['DIAMOND-1', 'DIAMOND-2', 'PLATINUM', 'ADVANCED', 'GOLD', 'SILVER', 'BRONZE'].includes(
+          lastName,
+        )
+      ) {
         console.warn(`  Skipping "${firstName} ${lastName}": unknown group "${practiceGroup}"`);
       }
       continue;
@@ -176,9 +198,10 @@ async function main() {
 
       try {
         await batch.commit();
-      } catch (err: any) {
-        errors.push(err.message);
-        console.error(`  Batch error: ${err.message}`);
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        errors.push(message);
+        console.error(`  Batch error: ${message}`);
       }
     }
   }

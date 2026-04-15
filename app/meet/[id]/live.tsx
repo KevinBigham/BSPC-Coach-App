@@ -1,12 +1,5 @@
 import { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  StyleSheet,
-  Alert,
-} from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { useLocalSearchParams, Stack, router } from 'expo-router';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../../../src/config/firebase';
@@ -14,8 +7,9 @@ import { subscribeLiveEvents, startEvent, type LiveEvent } from '../../../src/se
 import { useLiveMeetStore } from '../../../src/stores/liveMeetStore';
 import type { Meet } from '../../../src/types/meet.types';
 import { colors, spacing, fontSize, borderRadius, fontFamily } from '../../../src/config/theme';
+import { withScreenErrorBoundary } from '../../../src/components/ScreenErrorBoundary';
 
-export default function LiveMeetScreen() {
+function LiveMeetScreen() {
   const { id: meetId } = useLocalSearchParams<{ id: string }>();
   const [meet, setMeet] = useState<Meet | null>(null);
   const [liveEvents, setLiveEvents] = useState<(LiveEvent & { id: string })[]>([]);
@@ -45,9 +39,12 @@ export default function LiveMeetScreen() {
         1, // heat 1
         1, // total heats
       );
-      router.push(`/meet/${meetId}/timer?eventId=${eventId}&eventName=${encodeURIComponent(event.name)}`);
-    } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to start event');
+      router.push(
+        `/meet/${meetId}/timer?eventId=${eventId}&eventName=${encodeURIComponent(event.name)}`,
+      );
+    } catch (err: unknown) {
+      const message = err instanceof Error && err.message ? err.message : 'Failed to start event';
+      Alert.alert('Error', message);
     }
   };
 
@@ -59,7 +56,9 @@ export default function LiveMeetScreen() {
     );
   }
 
-  const finishedIds = new Set(liveEvents.filter((e) => e.status === 'finished').map((e) => e.eventNumber));
+  const finishedIds = new Set(
+    liveEvents.filter((e) => e.status === 'finished').map((e) => e.eventNumber),
+  );
   const inProgressEvent = liveEvents.find((e) => e.status === 'in_progress');
 
   return (
@@ -78,14 +77,20 @@ export default function LiveMeetScreen() {
         <View style={styles.header}>
           <Text style={styles.pixelLabel}>LIVE MEET</Text>
           <Text style={styles.heading}>{meet.name.toUpperCase()}</Text>
-          <Text style={styles.subtext}>{meet.location} | {meet.course}</Text>
+          <Text style={styles.subtext}>
+            {meet.location} | {meet.course}
+          </Text>
         </View>
 
         {/* In-Progress Event */}
         {inProgressEvent && (
           <TouchableOpacity
             style={styles.activeEventCard}
-            onPress={() => router.push(`/meet/${meetId}/timer?eventId=${inProgressEvent.id}&eventName=${encodeURIComponent(inProgressEvent.eventName)}`)}
+            onPress={() =>
+              router.push(
+                `/meet/${meetId}/timer?eventId=${inProgressEvent.id}&eventName=${encodeURIComponent(inProgressEvent.eventName)}`,
+              )
+            }
           >
             <Text style={styles.activeLabel}>IN PROGRESS</Text>
             <Text style={styles.activeEventName}>{inProgressEvent.eventName}</Text>
@@ -109,7 +114,9 @@ export default function LiveMeetScreen() {
               ]}
               onPress={() => {
                 if (isActive) {
-                  router.push(`/meet/${meetId}/timer?eventId=${inProgressEvent!.id}&eventName=${encodeURIComponent(event.name)}`);
+                  router.push(
+                    `/meet/${meetId}/timer?eventId=${inProgressEvent!.id}&eventName=${encodeURIComponent(event.name)}`,
+                  );
                 } else if (!isFinished) {
                   handleStartEvent(event);
                 }
@@ -139,11 +146,29 @@ export default function LiveMeetScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bgBase },
   content: { padding: spacing.lg, paddingBottom: 40 },
-  loading: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.bgBase },
+  loading: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.bgBase,
+  },
   loadingText: { fontFamily: fontFamily.body, color: colors.textSecondary },
   header: { marginBottom: spacing.xl },
-  pixelLabel: { fontFamily: fontFamily.pixel, fontSize: 8, letterSpacing: 1, color: colors.gold, marginBottom: spacing.xs },
-  heading: { fontFamily: fontFamily.heading, fontSize: 32, fontWeight: '700', letterSpacing: 2, color: colors.text, marginBottom: spacing.xs },
+  pixelLabel: {
+    fontFamily: fontFamily.pixel,
+    fontSize: 8,
+    letterSpacing: 1,
+    color: colors.gold,
+    marginBottom: spacing.xs,
+  },
+  heading: {
+    fontFamily: fontFamily.heading,
+    fontSize: 32,
+    fontWeight: '700',
+    letterSpacing: 2,
+    color: colors.text,
+    marginBottom: spacing.xs,
+  },
   subtext: { fontFamily: fontFamily.body, fontSize: fontSize.sm, color: colors.textSecondary },
   activeEventCard: {
     backgroundColor: colors.bgDeep,
@@ -154,10 +179,35 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xl,
     alignItems: 'center',
   },
-  activeLabel: { fontFamily: fontFamily.pixel, fontSize: 8, letterSpacing: 2, color: colors.gold, marginBottom: spacing.sm },
-  activeEventName: { fontFamily: fontFamily.heading, fontSize: fontSize.xxl, fontWeight: '700', color: colors.text, letterSpacing: 2 },
-  activeHint: { fontFamily: fontFamily.pixel, fontSize: 6, color: colors.textSecondary, marginTop: spacing.sm, letterSpacing: 1 },
-  sectionTitle: { fontFamily: fontFamily.heading, fontSize: fontSize.lg, fontWeight: '700', letterSpacing: 2, color: colors.text, marginBottom: spacing.md },
+  activeLabel: {
+    fontFamily: fontFamily.pixel,
+    fontSize: 8,
+    letterSpacing: 2,
+    color: colors.gold,
+    marginBottom: spacing.sm,
+  },
+  activeEventName: {
+    fontFamily: fontFamily.heading,
+    fontSize: fontSize.xxl,
+    fontWeight: '700',
+    color: colors.text,
+    letterSpacing: 2,
+  },
+  activeHint: {
+    fontFamily: fontFamily.pixel,
+    fontSize: 6,
+    color: colors.textSecondary,
+    marginTop: spacing.sm,
+    letterSpacing: 1,
+  },
+  sectionTitle: {
+    fontFamily: fontFamily.heading,
+    fontSize: fontSize.lg,
+    fontWeight: '700',
+    letterSpacing: 2,
+    color: colors.text,
+    marginBottom: spacing.md,
+  },
   eventRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -183,7 +233,19 @@ const styles = StyleSheet.create({
   eventName: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.md, color: colors.text },
   eventNameFinished: { color: colors.textSecondary },
   eventGender: { fontFamily: fontFamily.body, fontSize: fontSize.xs, color: colors.textSecondary },
-  finishedLabel: { fontFamily: fontFamily.pixel, fontSize: 7, color: colors.textSecondary, letterSpacing: 1 },
-  activeSmallLabel: { fontFamily: fontFamily.pixel, fontSize: 7, color: colors.gold, letterSpacing: 1 },
+  finishedLabel: {
+    fontFamily: fontFamily.pixel,
+    fontSize: 7,
+    color: colors.textSecondary,
+    letterSpacing: 1,
+  },
+  activeSmallLabel: {
+    fontFamily: fontFamily.pixel,
+    fontSize: 7,
+    color: colors.gold,
+    letterSpacing: 1,
+  },
   startLabel: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.sm, color: colors.accent },
 });
+
+export default withScreenErrorBoundary(LiveMeetScreen, 'LiveMeetScreen');

@@ -1,0 +1,10 @@
+appId: com.bspowercats.coach
+---
+- launchApp
+- tapOn: "ROSTER"
+- tapOn: "${BSPC_E2E_SWIMMER}"
+- tapOn: "NOTES"
+- tapOn: "ADD NOTE"
+- inputText: "E2E smoke note"
+- tapOn: "SAVE"
+- assertVisible: "E2E smoke note"

@@ -15,8 +15,9 @@ import { db } from '../../src/config/firebase';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { colors, spacing, fontSize, borderRadius, fontFamily } from '../../src/config/theme';
 import type { MedicalInfo } from '../../src/types/firestore.types';
+import { withScreenErrorBoundary } from '../../src/components/ScreenErrorBoundary';
 
-export default function MedicalScreen() {
+function MedicalScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { coach, isAdmin } = useAuth();
   const [loading, setLoading] = useState(true);
@@ -26,7 +27,10 @@ export default function MedicalScreen() {
   const [conditions, setConditions] = useState('');
   const [medications, setMedications] = useState('');
   const [emergencyNotes, setEmergencyNotes] = useState('');
-  const [lastUpdated, setLastUpdated] = useState<{ by: string; at: Date | null }>({ by: '', at: null });
+  const [lastUpdated, setLastUpdated] = useState<{ by: string; at: Date | null }>({
+    by: '',
+    at: null,
+  });
 
   useEffect(() => {
     if (!isAdmin) {
@@ -49,8 +53,8 @@ export default function MedicalScreen() {
             at: data.updatedAt instanceof Date ? data.updatedAt : null,
           });
         }
-      } catch (err: any) {
-        Alert.alert('Error', err.message);
+      } catch (err: unknown) {
+        Alert.alert('Error', err instanceof Error ? err.message : String(err));
       }
       setLoading(false);
     })();
@@ -60,7 +64,11 @@ export default function MedicalScreen() {
     if (!id || !coach) return;
     setSaving(true);
     try {
-      const toArray = (s: string) => s.split('\n').map((l) => l.trim()).filter(Boolean);
+      const toArray = (s: string) =>
+        s
+          .split('\n')
+          .map((l) => l.trim())
+          .filter(Boolean);
 
       await setDoc(doc(db, 'swimmers', id, 'medical', 'info'), {
         allergies: toArray(allergies),
@@ -73,8 +81,8 @@ export default function MedicalScreen() {
 
       Alert.alert('Saved', 'Medical information updated.');
       router.back();
-    } catch (err: any) {
-      Alert.alert('Error', err.message);
+    } catch (err: unknown) {
+      Alert.alert('Error', err instanceof Error ? err.message : String(err));
     }
     setSaving(false);
   };
@@ -170,18 +178,84 @@ export default function MedicalScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bgBase },
-  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.bgBase },
+  centered: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.bgBase,
+  },
   content: { padding: spacing.lg, gap: spacing.lg, paddingBottom: spacing.xxxl },
-  warningCard: { backgroundColor: 'rgba(244, 63, 94, 0.08)', borderRadius: borderRadius.lg, padding: spacing.lg, borderWidth: 1, borderColor: colors.error, alignItems: 'center' },
-  warningPixel: { fontFamily: fontFamily.pixel, fontSize: fontSize.pixel, color: colors.error, letterSpacing: 1, marginBottom: spacing.sm },
-  warningText: { fontFamily: fontFamily.body, fontSize: fontSize.sm, color: colors.error, textAlign: 'center' },
-  card: { backgroundColor: colors.bgDeep, borderRadius: borderRadius.lg, padding: spacing.lg, borderWidth: 1, borderColor: colors.border },
-  sectionTitle: { fontFamily: fontFamily.heading, fontSize: fontSize.xl, color: colors.text, letterSpacing: 1, marginBottom: spacing.xs },
-  hint: { fontFamily: fontFamily.body, fontSize: fontSize.xs, color: colors.textSecondary, marginBottom: spacing.sm },
-  input: { borderWidth: 1, borderColor: colors.border, borderRadius: borderRadius.sm, padding: spacing.md, fontSize: fontSize.md, fontFamily: fontFamily.body, color: colors.text, backgroundColor: colors.bgBase },
+  warningCard: {
+    backgroundColor: 'rgba(244, 63, 94, 0.08)',
+    borderRadius: borderRadius.lg,
+    padding: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.error,
+    alignItems: 'center',
+  },
+  warningPixel: {
+    fontFamily: fontFamily.pixel,
+    fontSize: fontSize.pixel,
+    color: colors.error,
+    letterSpacing: 1,
+    marginBottom: spacing.sm,
+  },
+  warningText: {
+    fontFamily: fontFamily.body,
+    fontSize: fontSize.sm,
+    color: colors.error,
+    textAlign: 'center',
+  },
+  card: {
+    backgroundColor: colors.bgDeep,
+    borderRadius: borderRadius.lg,
+    padding: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  sectionTitle: {
+    fontFamily: fontFamily.heading,
+    fontSize: fontSize.xl,
+    color: colors.text,
+    letterSpacing: 1,
+    marginBottom: spacing.xs,
+  },
+  hint: {
+    fontFamily: fontFamily.body,
+    fontSize: fontSize.xs,
+    color: colors.textSecondary,
+    marginBottom: spacing.sm,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: borderRadius.sm,
+    padding: spacing.md,
+    fontSize: fontSize.md,
+    fontFamily: fontFamily.body,
+    color: colors.text,
+    backgroundColor: colors.bgBase,
+  },
   multiline: { minHeight: 80, textAlignVertical: 'top' },
-  lastUpdated: { fontFamily: fontFamily.statMono, fontSize: fontSize.xs, color: colors.textSecondary, textAlign: 'center' },
-  saveButton: { backgroundColor: colors.purple, padding: spacing.lg, borderRadius: borderRadius.lg, alignItems: 'center' },
+  lastUpdated: {
+    fontFamily: fontFamily.statMono,
+    fontSize: fontSize.xs,
+    color: colors.textSecondary,
+    textAlign: 'center',
+  },
+  saveButton: {
+    backgroundColor: colors.purple,
+    padding: spacing.lg,
+    borderRadius: borderRadius.lg,
+    alignItems: 'center',
+  },
   saveButtonDisabled: { opacity: 0.6 },
-  saveButtonText: { fontFamily: fontFamily.heading, color: colors.text, fontSize: fontSize.xl, letterSpacing: 2 },
+  saveButtonText: {
+    fontFamily: fontFamily.heading,
+    color: colors.text,
+    fontSize: fontSize.xl,
+    letterSpacing: 2,
+  },
 });
+
+export default withScreenErrorBoundary(MedicalScreen, 'MedicalScreen');

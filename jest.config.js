@@ -25,5 +25,7 @@ module.exports = {
     },
   },
   testPathIgnorePatterns: ['/node_modules/', '/functions/', '/parent-portal/', '/factories/', '/__mocks__/'],
+  modulePathIgnorePatterns: ['<rootDir>/functions/lib/'],
+  watchPathIgnorePatterns: ['<rootDir>/functions/lib/'],
   testMatch: ['**/__tests__/**/*.test.{ts,tsx}', '**/*.test.{ts,tsx}'],
 };

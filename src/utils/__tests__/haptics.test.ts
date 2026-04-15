@@ -7,6 +7,7 @@ import {
   notifySuccess,
   notifyWarning,
   notifyError,
+  notifyHeavy,
   selectionChanged,
 } from '../haptics';
 
@@ -47,6 +48,11 @@ describe('haptics', () => {
   it('notifyError calls notificationAsync with Error type', () => {
     notifyError();
     expect(Haptics.notificationAsync).toHaveBeenCalledWith(Haptics.NotificationFeedbackType.Error);
+  });
+
+  it('notifyHeavy calls impactAsync with Heavy style', () => {
+    notifyHeavy();
+    expect(Haptics.impactAsync).toHaveBeenCalledWith(Haptics.ImpactFeedbackStyle.Heavy);
   });
 
   it('selectionChanged calls selectionAsync', () => {

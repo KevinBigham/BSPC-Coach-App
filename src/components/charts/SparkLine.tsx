@@ -22,24 +22,29 @@ export default function SparkLine({
   color = colors.accent,
   invertTrend = false,
 }: SparkLineProps) {
-  if (data.length < 2) return null;
+  if (data.length === 0) return null;
 
   const min = Math.min(...data);
   const max = Math.max(...data);
   const range = max - min || 1;
+  const pointCount = data.length;
+  const lastValue = data[pointCount - 1];
+  const lastNormalized = (lastValue - min) / range;
+  const lastY = invertTrend ? 1 - lastNormalized : lastNormalized;
 
   return (
-    <View style={[styles.container, { width, height }]}>
+    <View testID="spark-line" style={[styles.container, { width, height }]}>
       {data.map((value, i) => {
         const normalized = (value - min) / range;
         // If inverted (times), lower = better = higher position
-        const y = invertTrend ? normalized : 1 - normalized;
+        const y = invertTrend ? 1 - normalized : normalized;
         const dotBottom = y * (height - 6);
-        const left = (i / (data.length - 1)) * (width - 6);
+        const left = pointCount === 1 ? (width - 6) / 2 : (i / (pointCount - 1)) * (width - 6);
 
         return (
           <View
             key={i}
+            testID={`spark-dot-${i}`}
             style={[
               styles.dot,
               {
@@ -58,7 +63,7 @@ export default function SparkLine({
           {
             backgroundColor: color,
             opacity: 0.2,
-            bottom: ((invertTrend ? (data[data.length - 1] - min) / range : 1 - (data[data.length - 1] - min) / range)) * (height - 6),
+            bottom: lastY * (height - 6),
           },
         ]}
       />

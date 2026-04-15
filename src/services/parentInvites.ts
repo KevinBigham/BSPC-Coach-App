@@ -5,7 +5,6 @@ import {
   updateDoc,
   query,
   where,
-  getDocs,
   onSnapshot,
   serverTimestamp,
   Timestamp,
@@ -13,15 +12,10 @@ import {
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import type { ParentInvite } from '../types/firestore.types';
+import { secureInviteCode } from '../utils/secureRandom';
 
 function generateCode(): string {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no I/O/0/1 to avoid confusion
-  let code = '';
-  for (let i = 0; i < 8; i++) {
-    if (i === 4) code += '-';
-    code += chars[Math.floor(Math.random() * chars.length)];
-  }
-  return code;
+  return secureInviteCode();
 }
 
 export async function createParentInvite(
@@ -52,13 +46,10 @@ export function subscribeInvitesForSwimmer(
   swimmerId: string,
   callback: (invites: (ParentInvite & { id: string })[]) => void,
 ): Unsubscribe {
-  const q = query(
-    collection(db, 'parent_invites'),
-    where('swimmerId', '==', swimmerId),
-  );
+  const q = query(collection(db, 'parent_invites'), where('swimmerId', '==', swimmerId));
   return onSnapshot(q, (snap) => {
     const invites = snap.docs
-      .map((d) => ({ id: d.id, ...d.data() } as ParentInvite & { id: string }))
+      .map((d) => ({ id: d.id, ...d.data() }) as ParentInvite & { id: string })
       .sort((a, b) => {
         const aTime = a.createdAt instanceof Timestamp ? a.createdAt.toMillis() : 0;
         const bTime = b.createdAt instanceof Timestamp ? b.createdAt.toMillis() : 0;

@@ -15,9 +15,6 @@ import type { NotificationRule } from '../types/firestore.types';
 
 type NotificationRuleWithId = NotificationRule & { id: string };
 
-/**
- * Subscribe to notification rules for a coach (real-time)
- */
 export function subscribeNotificationRules(
   coachId: string,
   callback: (rules: NotificationRuleWithId[]) => void,
@@ -32,9 +29,6 @@ export function subscribeNotificationRules(
   });
 }
 
-/**
- * Create a new notification rule
- */
 export async function createNotificationRule(
   rule: Omit<NotificationRule, 'id' | 'createdAt' | 'updatedAt'>,
 ): Promise<string> {
@@ -46,9 +40,6 @@ export async function createNotificationRule(
   return ref.id;
 }
 
-/**
- * Update an existing notification rule
- */
 export async function updateNotificationRule(
   ruleId: string,
   updates: Partial<NotificationRule>,
@@ -59,20 +50,11 @@ export async function updateNotificationRule(
   });
 }
 
-/**
- * Delete a notification rule
- */
 export async function deleteNotificationRule(ruleId: string): Promise<void> {
   await deleteDoc(doc(db, 'notification_rules', ruleId));
 }
 
-/**
- * Pure function: Evaluate attendance streak from practice history.
- * Returns the current consecutive attendance streak count.
- * practiceHistory is an array of date strings ("YYYY-MM-DD") in descending order
- * (most recent first) where the swimmer was present.
- * allPracticeDates is the full list of practice dates in descending order.
- */
+/** Both inputs are "YYYY-MM-DD" arrays in descending order. */
 export function evaluateAttendanceStreak(
   practiceHistory: string[],
   allPracticeDates: string[],
@@ -95,13 +77,7 @@ export function evaluateAttendanceStreak(
   return streak;
 }
 
-/**
- * Pure function: Evaluate whether a swimmer has missed practice
- * for at least `daysSince` calendar days.
- * lastAttendedDate is "YYYY-MM-DD" or null if never attended.
- * currentDate is "YYYY-MM-DD".
- * Returns true if the swimmer has been absent for >= daysSince days.
- */
+/** True when the swimmer has been absent for >= daysSince days. Dates are "YYYY-MM-DD"; lastAttended null = never. */
 export function evaluateMissedPractice(
   lastAttendedDate: string | null,
   currentDate: string,

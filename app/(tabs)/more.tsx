@@ -1,13 +1,8 @@
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  ScrollView,
-} from 'react-native';
-import { router } from 'expo-router';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
+import { router, type Href } from 'expo-router';
 import {
   Users,
+  Bell,
   CalendarDays,
   BarChart3,
   Search,
@@ -16,12 +11,13 @@ import {
   Video,
 } from 'lucide-react-native';
 import { colors, spacing, fontSize, borderRadius, fontFamily } from '../../src/config/theme';
+import { withScreenErrorBoundary } from '../../src/components/ScreenErrorBoundary';
 
 interface MoreItem {
   label: string;
   sublabel: string;
-  icon: React.ComponentType<any>;
-  route: string;
+  icon: React.ComponentType<{ size?: number; color?: string; strokeWidth?: number }>;
+  route: Href;
   iconColor: string;
 }
 
@@ -55,6 +51,13 @@ const ITEMS: MoreItem[] = [
     iconColor: colors.gold,
   },
   {
+    label: 'NOTIFICATION RULES',
+    sublabel: 'Alerts & streaks',
+    icon: Bell,
+    route: '/notification-rules',
+    iconColor: colors.gold,
+  },
+  {
     label: 'SEARCH',
     sublabel: 'Find anything',
     icon: Search,
@@ -77,7 +80,7 @@ const ITEMS: MoreItem[] = [
   },
 ];
 
-export default function MoreScreen() {
+function MoreScreen() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.header}>
@@ -90,7 +93,7 @@ export default function MoreScreen() {
           <TouchableOpacity
             key={item.label}
             style={styles.tile}
-            onPress={() => router.push(item.route as any)}
+            onPress={() => router.push(item.route)}
           >
             <item.icon size={28} color={item.iconColor} strokeWidth={2} />
             <Text style={styles.tileLabel}>{item.label}</Text>
@@ -153,3 +156,5 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 });
+
+export default withScreenErrorBoundary(MoreScreen, 'MoreScreen');

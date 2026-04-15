@@ -11,11 +11,12 @@ import { router } from 'expo-router';
 import { subscribeMeets, getMeetStatusColor, getMeetStatusLabel } from '../../src/services/meets';
 import type { Meet } from '../../src/types/meet.types';
 import { colors, spacing, fontSize, borderRadius, fontFamily } from '../../src/config/theme';
+import { withScreenErrorBoundary } from '../../src/components/ScreenErrorBoundary';
 
 type MeetWithId = Meet & { id: string };
 type FilterStatus = 'all' | 'upcoming' | 'in_progress' | 'completed';
 
-export default function MeetsTabScreen() {
+function MeetsTabScreen() {
   const [meets, setMeets] = useState<MeetWithId[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<FilterStatus>('all');
@@ -28,9 +29,7 @@ export default function MeetsTabScreen() {
     return unsub;
   }, []);
 
-  const filtered = filter === 'all'
-    ? meets
-    : meets.filter((m) => m.status === filter);
+  const filtered = filter === 'all' ? meets : meets.filter((m) => m.status === filter);
 
   const upcomingCount = meets.filter((m) => m.status === 'upcoming').length;
   const inProgressCount = meets.filter((m) => m.status === 'in_progress').length;
@@ -75,9 +74,10 @@ export default function MeetsTabScreen() {
           <>
             {filtered.map((meet) => {
               const statusColor = getMeetStatusColor(meet.status);
-              const daysAway = meet.status === 'upcoming'
-                ? Math.ceil((new Date(meet.startDate).getTime() - Date.now()) / 86400000)
-                : null;
+              const daysAway =
+                meet.status === 'upcoming'
+                  ? Math.ceil((new Date(meet.startDate).getTime() - Date.now()) / 86400000)
+                  : null;
 
               return (
                 <TouchableOpacity
@@ -121,7 +121,9 @@ export default function MeetsTabScreen() {
               <View style={styles.emptyState}>
                 <Text style={styles.emptyTitle}>NO MEETS</Text>
                 <Text style={styles.emptyText}>
-                  {filter === 'all' ? 'Create your first meet' : `No ${filter.replace('_', ' ')} meets`}
+                  {filter === 'all'
+                    ? 'Create your first meet'
+                    : `No ${filter.replace('_', ' ')} meets`}
                 </Text>
               </View>
             )}
@@ -151,7 +153,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   statNum: { fontFamily: fontFamily.stat, fontSize: fontSize.xxl, color: colors.text },
-  statLabel: { fontFamily: fontFamily.pixel, fontSize: 7, letterSpacing: 1, color: colors.gold, marginTop: 2 },
+  statLabel: {
+    fontFamily: fontFamily.pixel,
+    fontSize: 7,
+    letterSpacing: 1,
+    color: colors.gold,
+    marginTop: 2,
+  },
   filterRow: { marginBottom: spacing.lg, flexGrow: 0 },
   chip: {
     paddingHorizontal: spacing.md,
@@ -162,7 +170,12 @@ const styles = StyleSheet.create({
     marginRight: spacing.sm,
   },
   chipActive: { borderColor: colors.accent, backgroundColor: 'rgba(179,136,255,0.1)' },
-  chipText: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.xs, color: colors.textSecondary, letterSpacing: 1 },
+  chipText: {
+    fontFamily: fontFamily.bodySemi,
+    fontSize: fontSize.xs,
+    color: colors.textSecondary,
+    letterSpacing: 1,
+  },
   chipTextActive: { color: colors.accent },
   meetCard: {
     backgroundColor: colors.bgDeep,
@@ -175,10 +188,27 @@ const styles = StyleSheet.create({
   },
   statusBar: { width: 4 },
   meetContent: { flex: 1, padding: spacing.lg },
-  meetHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.xs },
-  meetName: { fontFamily: fontFamily.heading, fontSize: fontSize.xl, fontWeight: '700', letterSpacing: 1, color: colors.text, flex: 1 },
+  meetHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.xs,
+  },
+  meetName: {
+    fontFamily: fontFamily.heading,
+    fontSize: fontSize.xl,
+    fontWeight: '700',
+    letterSpacing: 1,
+    color: colors.text,
+    flex: 1,
+  },
   statusBadge: { fontFamily: fontFamily.pixel, fontSize: 7, letterSpacing: 1 },
-  meetInfo: { fontFamily: fontFamily.body, fontSize: fontSize.xs, color: colors.textSecondary, marginBottom: spacing.sm },
+  meetInfo: {
+    fontFamily: fontFamily.body,
+    fontSize: fontSize.xs,
+    color: colors.textSecondary,
+    marginBottom: spacing.sm,
+  },
   meetFooter: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   meetEvents: { fontFamily: fontFamily.statMono, fontSize: fontSize.xs, color: colors.accent },
   daysAway: { fontFamily: fontFamily.stat, fontSize: fontSize.xs, color: colors.gold },
@@ -188,10 +218,25 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xs,
     borderRadius: borderRadius.sm,
   },
-  liveBtnText: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.xs, color: colors.bgDeep, letterSpacing: 1 },
+  liveBtnText: {
+    fontFamily: fontFamily.bodySemi,
+    fontSize: fontSize.xs,
+    color: colors.bgDeep,
+    letterSpacing: 1,
+  },
   emptyState: { alignItems: 'center', paddingVertical: spacing.xxl },
-  emptyTitle: { fontFamily: fontFamily.heading, fontSize: fontSize.xl, color: colors.text, letterSpacing: 2 },
-  emptyText: { fontFamily: fontFamily.body, fontSize: fontSize.sm, color: colors.textSecondary, marginTop: spacing.sm },
+  emptyTitle: {
+    fontFamily: fontFamily.heading,
+    fontSize: fontSize.xl,
+    color: colors.text,
+    letterSpacing: 2,
+  },
+  emptyText: {
+    fontFamily: fontFamily.body,
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    marginTop: spacing.sm,
+  },
   fab: {
     position: 'absolute',
     bottom: 24,
@@ -210,3 +255,5 @@ const styles = StyleSheet.create({
   },
   fabText: { fontFamily: fontFamily.heading, fontSize: 28, color: colors.text },
 });
+
+export default withScreenErrorBoundary(MeetsTabScreen, 'MeetsTabScreen');

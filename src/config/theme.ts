@@ -47,12 +47,6 @@ export const colors = {
   groupAdvanced: '#3B82F6',
   groupPlatinum: '#A0AEC0',
   groupDiamond: '#8B5CF6',
-
-  // Legacy aliases (dark-adapted)
-  white: '#f0f0f8',
-  black: '#0a0a12',
-  lightPurple: 'rgba(74, 14, 120, 0.3)',
-  yellow: '#ffd700',
 } as const;
 
 export const fontFamily = {

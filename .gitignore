@@ -25,6 +25,7 @@ expo-env.d.ts
 npm-debug.*
 yarn-debug.*
 yarn-error.*
+coverage/
 
 # macOS
 .DS_Store
@@ -48,3 +49,7 @@ google-service-account.json
 
 # Cloud Functions build output
 functions/lib/
+
+# Next.js parent-portal build output
+parent-portal/.next/
+parent-portal/next-env.d.ts

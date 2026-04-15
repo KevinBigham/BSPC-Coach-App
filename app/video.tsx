@@ -10,8 +10,10 @@ import {
 } from 'react-native';
 import { Stack, router } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
+import NetInfo from '@react-native-community/netinfo';
 import { useAuth } from '../src/contexts/AuthContext';
 import { useSwimmersStore } from '../src/stores/swimmersStore';
+import { useVideoStore } from '../src/stores/videoStore';
 import {
   createVideoSession,
   uploadVideo,
@@ -21,29 +23,26 @@ import {
   getVideoStatusColor,
   validateMediaConsent,
 } from '../src/services/video';
-import { filterConsentedSwimmers, hasMediaConsent } from '../src/utils/mediaConsent';
+import { filterConsentedSwimmers } from '../src/utils/mediaConsent';
 import { handleError } from '../src/utils/errorHandler';
 import { useToast } from '../src/contexts/ToastContext';
-import {
-  colors,
-  spacing,
-  fontSize,
-  borderRadius,
-  fontFamily,
-  groupColors,
-} from '../src/config/theme';
+import { enqueueUpload } from '../src/utils/offlineQueue';
+import { colors, spacing, fontSize, borderRadius, fontFamily } from '../src/config/theme';
 import { GROUPS, type Group } from '../src/config/constants';
-import type { VideoSession } from '../src/types/firestore.types';
+import { tapMedium, notifySuccess, notifyWarning } from '../src/utils/haptics';
+import { withScreenErrorBoundary } from '../src/components/ScreenErrorBoundary';
 
-type VideoSessionWithId = VideoSession & { id: string };
+type UploadState = 'idle' | 'uploading' | 'queued';
 
-export default function VideoScreen() {
+function VideoScreen() {
   const { coach } = useAuth();
   const swimmers = useSwimmersStore((s) => s.swimmers);
+  const sessions = useVideoStore((state) => state.sessions);
+  const setSessions = useVideoStore((state) => state.setSessions);
+  const uploadProgress = useVideoStore((state) => state.uploadProgress);
+  const setUploadProgress = useVideoStore((state) => state.setUploadProgress);
   const { showToast } = useToast();
-  const [sessions, setSessions] = useState<VideoSessionWithId[]>([]);
-  const [uploading, setUploading] = useState(false);
-  const [uploadPercent, setUploadPercent] = useState(0);
+  const [uploadState, setUploadState] = useState<UploadState>('idle');
 
   // Swimmer tagging state
   const [selectedSwimmerIds, setSelectedSwimmerIds] = useState<string[]>([]);
@@ -54,7 +53,7 @@ export default function VideoScreen() {
   useEffect(() => {
     if (!coach?.uid) return;
     return subscribeVideoSessions(coach.uid, setSessions);
-  }, [coach?.uid]);
+  }, [coach?.uid, setSessions]);
 
   const pickVideo = async (useCamera: boolean) => {
     const opts: ImagePicker.ImagePickerOptions = {
@@ -82,6 +81,8 @@ export default function VideoScreen() {
 
   const handleUpload = async () => {
     if (!videoUri || !coach?.uid) return;
+    tapMedium();
+
     if (selectedSwimmerIds.length === 0) {
       Alert.alert('Tag Swimmers', 'Select at least one swimmer to analyze');
       return;
@@ -91,6 +92,7 @@ export default function VideoScreen() {
     const swimmersWithIds = swimmers.filter((s): s is typeof s & { id: string } => !!s.id);
     const nonConsented = validateMediaConsent(selectedSwimmerIds, swimmersWithIds);
     if (nonConsented.length > 0) {
+      notifyWarning();
       Alert.alert(
         'Media Consent Required',
         `The following swimmers do not have media consent on file: ${nonConsented.join(', ')}. Remove them or update their consent in the swimmer edit screen.`,
@@ -98,27 +100,60 @@ export default function VideoScreen() {
       return;
     }
 
-    setUploading(true);
-    setUploadPercent(0);
+    setUploadState('uploading');
+    setUploadProgress(0);
+
+    let queuedOffline = false;
 
     try {
-      const date = new Date().toISOString().split('T')[0];
+      const practiceDate = new Date().toISOString().split('T')[0];
       const sessionId = await createVideoSession(
         coach.uid,
         coach.displayName || 'Coach',
         videoDuration,
-        date,
+        practiceDate,
         selectedSwimmerIds,
         (selectedGroup as Group) || undefined,
       );
 
-      const { storagePath } = await uploadVideo(videoUri, coach.uid, date, setUploadPercent);
+      const networkState = await NetInfo.fetch();
+      if (!networkState.isConnected) {
+        queuedOffline = true;
+        await updateVideoSession(sessionId, {
+          status: 'queued',
+        });
+        await enqueueUpload({
+          type: 'video',
+          uri: videoUri,
+          metadata: {
+            date: practiceDate,
+            sessionId,
+            taggedSwimmerIds: selectedSwimmerIds,
+          },
+        });
+
+        setUploadState('queued');
+        setUploadProgress(0);
+        notifySuccess();
+        showToast('Video queued — it will upload when you reconnect', 'success');
+        setVideoUri(null);
+        setSelectedSwimmerIds([]);
+        setSelectedGroup('');
+        setVideoDuration(0);
+        return;
+      }
+
+      const { storagePath } = await uploadVideo(videoUri, coach.uid, practiceDate, (percent) => {
+        setUploadProgress(percent / 100);
+      });
 
       await updateVideoSession(sessionId, {
         storagePath,
         status: 'uploaded',
       });
 
+      setUploadProgress(1);
+      notifySuccess();
       showToast('Video uploaded — AI analysis starting', 'success');
       setVideoUri(null);
       setSelectedSwimmerIds([]);
@@ -126,9 +161,10 @@ export default function VideoScreen() {
       setVideoDuration(0);
     } catch (err) {
       handleError(err, 'Video upload');
+    } finally {
+      setUploadState(queuedOffline ? 'queued' : 'idle');
+      setUploadProgress(0);
     }
-
-    setUploading(false);
   };
 
   const consentedSwimmers = filterConsentedSwimmers(swimmers);
@@ -142,7 +178,7 @@ export default function VideoScreen() {
       <Stack.Screen options={{ title: 'VIDEO ANALYSIS' }} />
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
         {/* Capture Buttons */}
-        {!videoUri && !uploading && (
+        {!videoUri && uploadState === 'idle' && (
           <View style={styles.captureSection}>
             <Text style={styles.sectionTitle}>CAPTURE VIDEO</Text>
             <View style={styles.captureRow}>
@@ -160,7 +196,7 @@ export default function VideoScreen() {
         )}
 
         {/* Upload Form */}
-        {videoUri && !uploading && (
+        {videoUri && uploadState === 'idle' && (
           <View style={styles.uploadSection}>
             <View style={styles.previewCard}>
               <Text style={styles.previewLabel}>VIDEO SELECTED</Text>
@@ -201,8 +237,8 @@ export default function VideoScreen() {
             </Text>
             {nonConsentedCount > 0 && (
               <Text style={styles.consentWarning}>
-                {nonConsentedCount} swimmer{nonConsentedCount !== 1 ? 's' : ''} hidden — no media
-                consent on file
+                {nonConsentedCount} swimmer{nonConsentedCount !== 1 ? 's' : ''} hidden — media
+                consent, Do Not Photograph, or active status blocks tagging
               </Text>
             )}
             <View style={styles.swimmerGrid}>
@@ -241,13 +277,23 @@ export default function VideoScreen() {
         )}
 
         {/* Upload Progress */}
-        {uploading && (
+        {uploadState !== 'idle' && (
           <View style={styles.progressSection}>
-            <ActivityIndicator size="large" color={colors.gold} />
-            <Text style={styles.progressText}>UPLOADING... {Math.round(uploadPercent)}%</Text>
-            <View style={styles.progressTrack}>
-              <View style={[styles.progressFill, { width: `${uploadPercent}%` }]} />
-            </View>
+            {uploadState === 'uploading' ? (
+              <>
+                <ActivityIndicator size="large" color={colors.gold} />
+                <Text style={styles.progressText}>
+                  UPLOADING... {Math.round(uploadProgress * 100)}%
+                </Text>
+                <View style={styles.progressTrack}>
+                  <View
+                    style={[styles.progressFill, { width: `${Math.round(uploadProgress * 100)}%` }]}
+                  />
+                </View>
+              </>
+            ) : (
+              <Text style={styles.progressText}>QUEUED</Text>
+            )}
           </View>
         )}
 
@@ -506,3 +552,5 @@ const styles = StyleSheet.create({
     marginTop: spacing.xs,
   },
 });
+
+export default withScreenErrorBoundary(VideoScreen, 'VideoScreen');

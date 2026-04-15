@@ -12,21 +12,16 @@ import {
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '../../src/contexts/AuthContext';
-import {
-  colors,
-  spacing,
-  fontSize,
-  borderRadius,
-  fontFamily,
-  groupColors,
-} from '../../src/config/theme';
-import { GROUPS, SET_CATEGORIES, type Group, type SetCategory } from '../../src/config/constants';
+import { colors, spacing, fontSize, borderRadius, fontFamily } from '../../src/config/theme';
+import { GROUPS, SET_CATEGORIES, type SetCategory } from '../../src/config/constants';
 import { usePracticeStore } from '../../src/stores/practiceStore';
 import { addPracticePlan, updatePracticePlan } from '../../src/services/practicePlans';
 import SetBlock from '../../src/components/SetBlock';
 import { exportPracticePlanDocx } from '../../src/services/docxExport';
+import { notifySuccess } from '../../src/utils/haptics';
+import { withScreenErrorBoundary } from '../../src/components/ScreenErrorBoundary';
 
-export default function PracticeBuilderScreen() {
+function PracticeBuilderScreen() {
   const { coach } = useAuth();
   const params = useLocalSearchParams<{ planId?: string }>();
   const [saving, setSaving] = useState(false);
@@ -48,10 +43,11 @@ export default function PracticeBuilderScreen() {
       } else {
         await addPracticePlan(planData, coach.uid);
       }
+      notifySuccess();
       store.reset();
       router.back();
-    } catch (err: any) {
-      Alert.alert('Error', err.message);
+    } catch (err: unknown) {
+      Alert.alert('Error', err instanceof Error ? err.message : String(err));
     }
     setSaving(false);
   };
@@ -84,8 +80,8 @@ export default function PracticeBuilderScreen() {
           <TouchableOpacity
             onPress={() => {
               const plan = store.toPlan(coach?.uid || '', coach?.displayName || 'Coach');
-              exportPracticePlanDocx(plan as any).catch((err) =>
-                Alert.alert('Export Error', err.message),
+              exportPracticePlanDocx(plan).catch((err: unknown) =>
+                Alert.alert('Export Error', err instanceof Error ? err.message : String(err)),
               );
             }}
           >
@@ -441,3 +437,5 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
 });
+
+export default withScreenErrorBoundary(PracticeBuilderScreen, 'PracticeBuilderScreen');

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { signIn, signUp } from '@/lib/auth';
+import { getErrorMessage } from '@/lib/errors';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -24,10 +25,11 @@ export default function LoginPage() {
         await signIn(email, password);
       }
       router.push('/dashboard');
-    } catch (err: any) {
-      setError(err.message || 'Authentication failed');
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'Authentication failed'));
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   return (
@@ -35,13 +37,11 @@ export default function LoginPage() {
       <div className="card w-full max-w-md">
         <div className="text-center mb-8">
           <span className="pixel-label">BSPC</span>
-          <h2 className="heading text-4xl mt-2">
-            {isSignUp ? 'CREATE ACCOUNT' : 'SIGN IN'}
-          </h2>
+          <h2 className="heading text-4xl mt-2">{isSignUp ? 'CREATE ACCOUNT' : 'SIGN IN'}</h2>
           <p className="text-[var(--text-secondary)] mt-2">
             {isSignUp
-              ? 'Create an account to view your swimmer\'s progress'
-              : 'Sign in to view your swimmer\'s progress'}
+              ? "Create an account to view your swimmer's progress"
+              : "Sign in to view your swimmer's progress"}
           </p>
         </div>
 
@@ -70,15 +70,9 @@ export default function LoginPage() {
             />
           </div>
 
-          {error && (
-            <p className="text-[var(--error)] text-sm">{error}</p>
-          )}
+          {error && <p className="text-[var(--error)] text-sm">{error}</p>}
 
-          <button
-            type="submit"
-            className="btn-primary w-full text-center"
-            disabled={loading}
-          >
+          <button type="submit" className="btn-primary w-full text-center" disabled={loading}>
             {loading ? 'LOADING...' : isSignUp ? 'CREATE ACCOUNT' : 'SIGN IN'}
           </button>
         </form>
@@ -92,7 +86,10 @@ export default function LoginPage() {
           </button>
         </div>
 
-        <div className="card mt-6 text-center" style={{ borderColor: 'var(--gold)', background: 'rgba(255,215,0,0.05)' }}>
+        <div
+          className="card mt-6 text-center"
+          style={{ borderColor: 'var(--gold)', background: 'rgba(255,215,0,0.05)' }}
+        >
           <span className="pixel-label">HAVE AN INVITE CODE?</span>
           <p className="text-[var(--text-secondary)] text-sm mt-2">
             Sign in first, then enter your invite code to link your swimmer

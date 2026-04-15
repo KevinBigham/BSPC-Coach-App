@@ -1,7 +1,13 @@
-import type { Group, Course, NoteTag, SetCategory } from '../config/constants';
+import type {
+  Group,
+  Course,
+  NoteTag,
+  SetCategory,
+  StandardLevel,
+  CalendarEventType,
+} from '../config/constants';
 
-// Firebase Timestamp placeholder — will be replaced with actual Firebase Timestamp type
-// once @react-native-firebase is installed
+/** Domain alias for a Firestore timestamp — modeled as Date client-side. */
 export type FirebaseTimestamp = Date;
 
 export type CoachRole = 'admin' | 'coach';
@@ -36,6 +42,8 @@ export interface MediaConsent {
   granted: boolean;
   /** Date consent was granted or revoked */
   date: FirebaseTimestamp;
+  /** Optional expiration date for time-limited media releases */
+  expiresAt?: FirebaseTimestamp;
   /** Name of parent/guardian who provided consent */
   grantedBy?: string;
   /** Optional notes (e.g., "revoked 2026-03-01 via email") */
@@ -61,6 +69,8 @@ export interface Swimmer {
   meetSchedule: string[];
   /** COPPA/SafeSport media consent — controls video/photo tagging eligibility */
   mediaConsent?: MediaConsent;
+  /** Hard block for photography/video even if a general media release exists */
+  doNotPhotograph?: boolean;
   createdAt: FirebaseTimestamp;
   updatedAt: FirebaseTimestamp;
   createdBy: string;
@@ -161,22 +171,8 @@ export interface DashboardActivityAggregation {
   updatedAt: FirebaseTimestamp;
 }
 
-export interface RecentActivityItem {
-  type: 'note' | 'attendance' | 'ai_draft' | 'time';
-  summary: string;
-  coachName: string;
-  timestamp: FirebaseTimestamp;
-}
-
-export interface DashboardGlobal {
-  totalActiveSwimmers: number;
-  todayAttendanceCount: number;
-  groupCounts: Record<Group, number>;
-  recentActivity: RecentActivityItem[];
-  updatedAt: FirebaseTimestamp;
-}
-
 export type AudioSessionStatus =
+  | 'queued'
   | 'uploading'
   | 'uploaded'
   | 'transcribing'
@@ -215,6 +211,7 @@ export interface AIDraft {
 }
 
 export type VideoSessionStatus =
+  | 'queued'
   | 'uploading'
   | 'uploaded'
   | 'extracting_frames'
@@ -299,17 +296,6 @@ export interface PracticePlan {
   updatedAt: FirebaseTimestamp;
 }
 
-export interface GroupNote {
-  id?: string;
-  content: string;
-  tags: NoteTag[];
-  group: Group;
-  practiceDate: string;
-  coachId: string;
-  coachName: string;
-  createdAt: FirebaseTimestamp;
-}
-
 export interface Message {
   id?: string;
   content: string;
@@ -331,7 +317,7 @@ export interface Notification {
   createdAt: FirebaseTimestamp;
 }
 
-export type StandardLevel = 'B' | 'BB' | 'A' | 'AA' | 'AAA' | 'AAAA';
+export type { StandardLevel };
 
 export interface SwimmerGoal {
   id?: string;
@@ -349,7 +335,7 @@ export interface SwimmerGoal {
   updatedAt: FirebaseTimestamp;
 }
 
-export type CalendarEventType = 'practice' | 'meet' | 'team_event' | 'fundraiser' | 'social';
+export type { CalendarEventType };
 
 export interface CalendarEvent {
   id?: string;
@@ -383,15 +369,6 @@ export interface RSVP {
   status: RSVPStatus;
   parentName?: string;
   note?: string;
-  updatedAt: FirebaseTimestamp;
-}
-
-export interface Parent {
-  uid: string;
-  email: string;
-  displayName?: string;
-  linkedSwimmerIds: string[];
-  createdAt: FirebaseTimestamp;
   updatedAt: FirebaseTimestamp;
 }
 
@@ -475,10 +452,11 @@ export interface NotificationRule {
 
 export interface ImportJob {
   id?: string;
-  type: 'csv_roster' | 'sdif' | 'cl2';
+  type: 'csv_roster' | 'sdif' | 'hy3' | 'cl2';
   fileName: string;
   storagePath: string;
   status: 'processing' | 'complete' | 'failed';
+  errorMessage?: string;
   summary: {
     recordsProcessed: number;
     swimmersCreated: number;
@@ -488,4 +466,5 @@ export interface ImportJob {
   };
   coachId: string;
   createdAt: FirebaseTimestamp;
+  updatedAt?: FirebaseTimestamp;
 }

@@ -25,10 +25,12 @@ import {
 import { db } from '../src/config/firebase';
 import { useAuth } from '../src/contexts/AuthContext';
 import { colors, spacing, fontSize, borderRadius, fontFamily } from '../src/config/theme';
-import { formatRelativeTime } from '../src/utils/date';
+import { formatRelativeTime, toDateSafe, type FirestoreTimestampLike } from '../src/utils/date';
 import type { Message } from '../src/types/firestore.types';
+import { withScreenErrorBoundary } from '../src/components/ScreenErrorBoundary';
+import { logger } from '../src/utils/logger';
 
-export default function MessagesScreen() {
+function MessagesScreen() {
   const { coach } = useAuth();
   const [messages, setMessages] = useState<(Message & { id: string })[]>([]);
   const [text, setText] = useState('');
@@ -36,11 +38,7 @@ export default function MessagesScreen() {
   const flatListRef = useRef<FlatList>(null);
 
   useEffect(() => {
-    const q = query(
-      collection(db, 'coach_chat'),
-      orderBy('createdAt', 'desc'),
-      limit(100)
-    );
+    const q = query(collection(db, 'coach_chat'), orderBy('createdAt', 'desc'), limit(100));
     return onSnapshot(q, (snapshot) => {
       const msgs = snapshot.docs.map((d) => ({
         id: d.id,
@@ -59,8 +57,12 @@ export default function MessagesScreen() {
           await updateDoc(doc(db, 'coach_chat', msg.id), {
             [`readBy.${coach.uid}`]: serverTimestamp(),
           });
-        } catch {
-          // Silently fail — non-critical
+        } catch (err) {
+          // Read-receipt write is non-critical to UX; log and continue.
+          logger.warn('Failed to mark message as read', {
+            messageId: msg.id,
+            error: err instanceof Error ? err.message : String(err),
+          });
         }
       }
     });
@@ -82,8 +84,10 @@ export default function MessagesScreen() {
       setTimeout(() => {
         flatListRef.current?.scrollToEnd({ animated: true });
       }, 200);
-    } catch (err: any) {
-      console.error('Send failed:', err);
+    } catch (err: unknown) {
+      logger.error('Send message failed', {
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
     setSending(false);
   };
@@ -97,8 +101,8 @@ export default function MessagesScreen() {
         onPress: async () => {
           try {
             await deleteDoc(doc(db, 'coach_chat', msg.id));
-          } catch (err: any) {
-            Alert.alert('Error', err.message);
+          } catch (err: unknown) {
+            Alert.alert('Error', err instanceof Error ? err.message : String(err));
           }
         },
       },
@@ -107,9 +111,7 @@ export default function MessagesScreen() {
 
   const renderMessage = ({ item }: { item: Message & { id: string } }) => {
     const isMe = item.senderId === coach?.uid;
-    const ts = item.createdAt instanceof Date
-      ? item.createdAt
-      : (item.createdAt as any)?.toDate?.() || null;
+    const ts = toDateSafe(item.createdAt as FirestoreTimestampLike);
     const readCount = Object.keys(item.readBy || {}).length;
 
     return (
@@ -119,14 +121,10 @@ export default function MessagesScreen() {
         style={[styles.messageBubble, isMe ? styles.messageMine : styles.messageTheirs]}
       >
         {!isMe && <Text style={styles.senderName}>{item.senderName}</Text>}
-        <Text style={[styles.messageText, isMe && styles.messageTextMine]}>
-          {item.content}
-        </Text>
+        <Text style={[styles.messageText, isMe && styles.messageTextMine]}>{item.content}</Text>
         <View style={styles.messageFooter}>
           {ts && <Text style={styles.messageTime}>{formatRelativeTime(ts)}</Text>}
-          {isMe && readCount > 0 && (
-            <Text style={styles.readReceipt}>Read by {readCount}</Text>
-          )}
+          {isMe && readCount > 0 && <Text style={styles.readReceipt}>Read by {readCount}</Text>}
         </View>
       </TouchableOpacity>
     );
@@ -185,24 +183,122 @@ export default function MessagesScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bgBase },
-  messageList: { padding: spacing.lg, paddingBottom: spacing.sm, flexGrow: 1, justifyContent: 'flex-end' },
-  messageBubble: { maxWidth: '80%', padding: spacing.md, borderRadius: borderRadius.md, marginBottom: spacing.sm },
-  messageMine: { backgroundColor: colors.purple, alignSelf: 'flex-end', borderBottomRightRadius: borderRadius.xs },
-  messageTheirs: { backgroundColor: colors.bgDeep, alignSelf: 'flex-start', borderBottomLeftRadius: borderRadius.xs, borderWidth: 1, borderColor: colors.border },
-  senderName: { fontFamily: fontFamily.pixel, fontSize: fontSize.pixel, color: colors.accent, marginBottom: spacing.xs },
-  messageText: { fontFamily: fontFamily.body, fontSize: fontSize.md, color: colors.text, lineHeight: 20 },
+  messageList: {
+    padding: spacing.lg,
+    paddingBottom: spacing.sm,
+    flexGrow: 1,
+    justifyContent: 'flex-end',
+  },
+  messageBubble: {
+    maxWidth: '80%',
+    padding: spacing.md,
+    borderRadius: borderRadius.md,
+    marginBottom: spacing.sm,
+  },
+  messageMine: {
+    backgroundColor: colors.purple,
+    alignSelf: 'flex-end',
+    borderBottomRightRadius: borderRadius.xs,
+  },
+  messageTheirs: {
+    backgroundColor: colors.bgDeep,
+    alignSelf: 'flex-start',
+    borderBottomLeftRadius: borderRadius.xs,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  senderName: {
+    fontFamily: fontFamily.pixel,
+    fontSize: fontSize.pixel,
+    color: colors.accent,
+    marginBottom: spacing.xs,
+  },
+  messageText: {
+    fontFamily: fontFamily.body,
+    fontSize: fontSize.md,
+    color: colors.text,
+    lineHeight: 20,
+  },
   messageTextMine: { color: colors.text },
-  messageFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: spacing.xs },
-  messageTime: { fontFamily: fontFamily.statMono, fontSize: fontSize.xs, color: colors.textSecondary },
-  readReceipt: { fontFamily: fontFamily.statMono, fontSize: fontSize.xs, color: colors.accent, marginLeft: spacing.sm },
+  messageFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: spacing.xs,
+  },
+  messageTime: {
+    fontFamily: fontFamily.statMono,
+    fontSize: fontSize.xs,
+    color: colors.textSecondary,
+  },
+  readReceipt: {
+    fontFamily: fontFamily.statMono,
+    fontSize: fontSize.xs,
+    color: colors.accent,
+    marginLeft: spacing.sm,
+  },
   hintBar: { padding: spacing.xs, alignItems: 'center', backgroundColor: colors.bgElevated },
-  hintText: { fontFamily: fontFamily.body, fontSize: fontSize.xs, color: colors.textSecondary, fontStyle: 'italic' },
-  inputBar: { flexDirection: 'row', alignItems: 'flex-end', padding: spacing.md, backgroundColor: colors.bgElevated, borderTopWidth: 1, borderTopColor: colors.border, gap: spacing.sm },
-  input: { flex: 1, backgroundColor: colors.bgDeep, borderRadius: borderRadius.md, padding: spacing.md, fontSize: fontSize.md, fontFamily: fontFamily.body, color: colors.text, maxHeight: 100, borderWidth: 1, borderColor: colors.border },
-  sendButton: { backgroundColor: colors.purple, paddingHorizontal: spacing.lg, paddingVertical: spacing.md, borderRadius: borderRadius.md, justifyContent: 'center' },
+  hintText: {
+    fontFamily: fontFamily.body,
+    fontSize: fontSize.xs,
+    color: colors.textSecondary,
+    fontStyle: 'italic',
+  },
+  inputBar: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    padding: spacing.md,
+    backgroundColor: colors.bgElevated,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    gap: spacing.sm,
+  },
+  input: {
+    flex: 1,
+    backgroundColor: colors.bgDeep,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    fontSize: fontSize.md,
+    fontFamily: fontFamily.body,
+    color: colors.text,
+    maxHeight: 100,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  sendButton: {
+    backgroundColor: colors.purple,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.md,
+    justifyContent: 'center',
+  },
   sendButtonDisabled: { opacity: 0.4 },
-  sendButtonText: { fontFamily: fontFamily.heading, fontSize: fontSize.lg, color: colors.text, letterSpacing: 1 },
-  emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingVertical: spacing.xxxl },
-  pixelLabel: { fontFamily: fontFamily.pixel, fontSize: fontSize.pixel, color: colors.gold, letterSpacing: 1, marginBottom: spacing.md },
-  emptyText: { fontFamily: fontFamily.body, fontSize: fontSize.sm, color: colors.textSecondary, textAlign: 'center', paddingHorizontal: spacing.xxl },
+  sendButtonText: {
+    fontFamily: fontFamily.heading,
+    fontSize: fontSize.lg,
+    color: colors.text,
+    letterSpacing: 1,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: spacing.xxxl,
+  },
+  pixelLabel: {
+    fontFamily: fontFamily.pixel,
+    fontSize: fontSize.pixel,
+    color: colors.gold,
+    letterSpacing: 1,
+    marginBottom: spacing.md,
+  },
+  emptyText: {
+    fontFamily: fontFamily.body,
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    paddingHorizontal: spacing.xxl,
+  },
 });
+
+export default withScreenErrorBoundary(MessagesScreen, 'MessagesScreen');

@@ -5,6 +5,7 @@ import { Save, ChevronLeft, FileText } from 'lucide-react-native';
 import { useSeasonStore } from '../../src/stores/seasonStore';
 import type { WeekPlan, SeasonPhaseType } from '../../src/types/firestore.types';
 import { colors, spacing, fontSize, borderRadius, fontFamily } from '../../src/config/theme';
+import { withScreenErrorBoundary } from '../../src/components/ScreenErrorBoundary';
 
 const PHASE_LABELS: Record<SeasonPhaseType, string> = {
   base: 'Base Training',
@@ -16,7 +17,7 @@ const PHASE_LABELS: Record<SeasonPhaseType, string> = {
   recovery: 'Recovery',
 };
 
-export default function WeekDetailScreen() {
+function WeekDetailScreen() {
   const { weekIndex } = useLocalSearchParams<{ weekIndex: string }>();
   const { activePlan, weeks, upsertWeek } = useSeasonStore();
   const index = parseInt(weekIndex ?? '0');
@@ -253,3 +254,5 @@ const styles = StyleSheet.create({
     color: colors.bgBase,
   },
 });
+
+export default withScreenErrorBoundary(WeekDetailScreen, 'WeekDetailScreen');

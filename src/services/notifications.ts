@@ -10,6 +10,7 @@ import {
   updateDoc,
   arrayUnion,
   arrayRemove,
+  type Unsubscribe,
 } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { db, functions } from '../config/firebase';
@@ -52,7 +53,6 @@ export async function registerForPushNotifications(coachUid: string): Promise<st
   const tokenData = await Notifications.getExpoPushTokenAsync();
   const token = tokenData.data;
 
-  // Store token in coach's Firestore doc
   await updateDoc(doc(db, 'coaches', coachUid), {
     fcmTokens: arrayUnion(token),
   });
@@ -75,7 +75,7 @@ export function subscribeNotifications(
   coachId: string,
   callback: (notifications: (Notification & { id: string })[]) => void,
   max = 30,
-) {
+): Unsubscribe {
   const q = query(
     collection(db, 'notifications'),
     where('coachId', '==', coachId),
@@ -89,14 +89,22 @@ export function subscribeNotifications(
   });
 }
 
+export function getUnreadCount(coachId: string, callback: (count: number) => void): Unsubscribe {
+  const q = query(
+    collection(db, 'notifications'),
+    where('coachId', '==', coachId),
+    where('read', '==', false),
+  );
+  return onSnapshot(q, (snapshot) => {
+    callback(snapshot.size);
+  });
+}
+
 export async function markNotificationRead(notificationId: string): Promise<void> {
   await updateDoc(doc(db, 'notifications', notificationId), { read: true });
 }
 
-/**
- * Subscribe a push token to FCM topics for the coach's groups + broadcast.
- * Called after successful push token registration.
- */
+/** Called after successful push token registration. */
 export async function subscribeToGroupTopics(token: string, groups: Group[]): Promise<void> {
   const callable = httpsCallable(functions, 'manageTopicSubscription');
   const topics = [...groups.map((g) => `group_${g}`), 'broadcast_all'];
@@ -110,10 +118,7 @@ export async function subscribeToGroupTopics(token: string, groups: Group[]): Pr
   }
 }
 
-/**
- * Unsubscribe a push token from all group topics + broadcast.
- * Called when a coach signs out or token is invalidated.
- */
+/** Called on sign-out or when a token is invalidated. */
 export async function unsubscribeFromAllTopics(token: string, groups: Group[]): Promise<void> {
   const callable = httpsCallable(functions, 'manageTopicSubscription');
   const topics = [...groups.map((g) => `group_${g}`), 'broadcast_all'];

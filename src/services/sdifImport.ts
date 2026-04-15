@@ -1,16 +1,10 @@
-import {
-  collection,
-  query,
-  where,
-  getDocs,
-  writeBatch,
-  doc,
-  serverTimestamp,
-} from 'firebase/firestore';
-import { db } from '../config/firebase';
-import type { Swimmer, SwimTime } from '../types/firestore.types';
+import { parseSwimTimeString } from '../utils/time';
+import type { SDIFParseResult } from './meetImportTypes';
 
-type SwimmerWithId = Swimmer & { id: string };
+// Re-export shared meet-import types so existing callers can continue to
+// import them from this module. The canonical definitions live in
+// `./meetImportTypes` to avoid a runtime cycle with `meetResultsImport`.
+export type { SDIFRecord, SDIFParseResult, MatchResult, ImportResult } from './meetImportTypes';
 
 // SDIF event code → app event name mapping
 // SDIF uses distance + stroke code: e.g., "0050" + "A" = 50 Free
@@ -30,67 +24,6 @@ const COURSE_CODES: Record<string, 'SCY' | 'SCM' | 'LCM'> = {
   '2': 'SCM',
   '3': 'LCM',
 };
-
-export interface SDIFRecord {
-  firstName: string;
-  lastName: string;
-  usaSwimmingId: string;
-  event: string;
-  time: number; // hundredths
-  timeDisplay: string;
-  course: 'SCY' | 'SCM' | 'LCM';
-  meetName: string;
-  meetDate: string;
-  gender: 'M' | 'F';
-}
-
-export interface SDIFParseResult {
-  meetName: string;
-  meetDate: string;
-  course: 'SCY' | 'SCM' | 'LCM';
-  records: SDIFRecord[];
-  errors: string[];
-}
-
-export interface MatchResult {
-  record: SDIFRecord;
-  matchedSwimmer: SwimmerWithId | null;
-  confidence: 'exact' | 'name' | 'none';
-}
-
-export interface ImportResult {
-  imported: number;
-  prs: number;
-  skipped: number;
-  errors: string[];
-}
-
-function parseSDIFTime(timeStr: string): { hundredths: number; display: string } | null {
-  const cleaned = timeStr.trim();
-  if (!cleaned || cleaned === 'NT' || cleaned === 'NS' || cleaned === 'DQ' || cleaned === 'SCR') {
-    return null;
-  }
-
-  // Formats: "MM:SS.hh", "SS.hh", "M:SS.hh"
-  const colonMatch = cleaned.match(/^(\d+):(\d{2})\.(\d{2})$/);
-  if (colonMatch) {
-    const min = parseInt(colonMatch[1]);
-    const sec = parseInt(colonMatch[2]);
-    const hund = parseInt(colonMatch[3]);
-    const total = min * 6000 + sec * 100 + hund;
-    return { hundredths: total, display: cleaned };
-  }
-
-  const secMatch = cleaned.match(/^(\d+)\.(\d{2})$/);
-  if (secMatch) {
-    const sec = parseInt(secMatch[1]);
-    const hund = parseInt(secMatch[2]);
-    const total = sec * 100 + hund;
-    return { hundredths: total, display: cleaned };
-  }
-
-  return null;
-}
 
 function mapEventCode(distance: string, strokeCode: string): string | null {
   const dist = parseInt(distance);
@@ -158,7 +91,7 @@ export function parseSDIF(content: string): SDIFParseResult {
           continue;
         }
 
-        const parsedTime = parseSDIFTime(timeStr);
+        const parsedTime = parseSwimTimeString(timeStr);
         if (!parsedTime) {
           // Skip NT/NS/DQ/SCR entries silently
           continue;
@@ -192,110 +125,6 @@ function titleCase(str: string): string {
   return str.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-export function matchSwimmers(records: SDIFRecord[], swimmers: SwimmerWithId[]): MatchResult[] {
-  return records.map((record) => {
-    // 1. Exact match on USA Swimming ID
-    if (record.usaSwimmingId) {
-      const exact = swimmers.find((s) => s.usaSwimmingId === record.usaSwimmingId);
-      if (exact) {
-        return { record, matchedSwimmer: exact, confidence: 'exact' as const };
-      }
-    }
-
-    // 2. Name match (case-insensitive)
-    const nameMatch = swimmers.find(
-      (s) =>
-        s.firstName.toLowerCase() === record.firstName.toLowerCase() &&
-        s.lastName.toLowerCase() === record.lastName.toLowerCase(),
-    );
-    if (nameMatch) {
-      return { record, matchedSwimmer: nameMatch, confidence: 'name' as const };
-    }
-
-    return { record, matchedSwimmer: null, confidence: 'none' as const };
-  });
-}
-
-export async function importMeetResults(
-  matches: MatchResult[],
-  coachUid: string,
-): Promise<ImportResult> {
-  const result: ImportResult = { imported: 0, prs: 0, skipped: 0, errors: [] };
-
-  // Group matches by swimmer for efficient PR checking
-  const bySwimmer = new Map<string, MatchResult[]>();
-  for (const match of matches) {
-    if (!match.matchedSwimmer) {
-      result.skipped++;
-      continue;
-    }
-    const key = match.matchedSwimmer.id!;
-    if (!bySwimmer.has(key)) bySwimmer.set(key, []);
-    bySwimmer.get(key)!.push(match);
-  }
-
-  for (const [swimmerId, swimmerMatches] of bySwimmer) {
-    // Fetch existing times for PR comparison
-    const timesRef = collection(db, 'swimmers', swimmerId, 'times');
-    const existingSnap = await getDocs(timesRef);
-    const existingTimes = existingSnap.docs.map((d) => ({
-      id: d.id,
-      ...d.data(),
-    })) as (SwimTime & { id: string })[];
-
-    // Batch write in chunks of 400
-    const chunks: MatchResult[][] = [];
-    for (let i = 0; i < swimmerMatches.length; i += 400) {
-      chunks.push(swimmerMatches.slice(i, i + 400));
-    }
-
-    for (const chunk of chunks) {
-      const batch = writeBatch(db);
-
-      for (const match of chunk) {
-        const rec = match.record;
-        // Check if PR
-        const sameTimes = existingTimes.filter(
-          (t) => t.event === rec.event && t.course === rec.course,
-        );
-        const isPR = sameTimes.length === 0 || sameTimes.every((t) => rec.time < t.time);
-
-        const newRef = doc(collection(db, 'swimmers', swimmerId, 'times'));
-        batch.set(newRef, {
-          event: rec.event,
-          course: rec.course,
-          time: rec.time,
-          timeDisplay: rec.timeDisplay,
-          isPR,
-          meetName: rec.meetName || null,
-          meetDate: rec.meetDate || null,
-          source: 'sdif_import',
-          createdAt: serverTimestamp(),
-          createdBy: coachUid,
-        });
-
-        result.imported++;
-        if (isPR) result.prs++;
-
-        // If new PR, un-PR old ones
-        if (isPR && sameTimes.length > 0) {
-          for (const old of sameTimes) {
-            if (old.isPR) {
-              batch.update(doc(db, 'swimmers', swimmerId, 'times', old.id), { isPR: false });
-            }
-          }
-        }
-      }
-
-      try {
-        await batch.commit();
-      } catch (err: unknown) {
-        result.errors.push(
-          `Batch write failed for swimmer ${swimmerId}: ${err instanceof Error ? err.message : String(err)}`,
-        );
-      }
-    }
-  }
-
-  return result;
-}
+// Re-export the canonical roster matcher from meetResultsImport so existing
+// callers (and tests) can import it from either module without diverging.
+export { matchSwimmersToRoster as matchSwimmers } from './meetResultsImport';

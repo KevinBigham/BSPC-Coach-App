@@ -31,9 +31,6 @@ export interface WorkoutFilters {
   maxYardage?: number;
 }
 
-/**
- * Subscribe to the workout library (template practices)
- */
 export function subscribeWorkouts(
   filters: WorkoutFilters,
   callback: (workouts: (PracticePlan & { id: string })[]) => void,
@@ -43,11 +40,7 @@ export function subscribeWorkouts(
     constraints.push(where('group', '==', filters.group));
   }
 
-  const q = query(
-    collection(db, 'practice_plans'),
-    ...constraints,
-    orderBy('createdAt', 'desc'),
-  );
+  const q = query(collection(db, 'practice_plans'), ...constraints, orderBy('createdAt', 'desc'));
 
   return onSnapshot(q, (snap) => {
     let workouts = snap.docs.map((d) => ({
@@ -55,7 +48,7 @@ export function subscribeWorkouts(
       ...d.data(),
     })) as (PracticePlan & { id: string })[];
 
-    // Client-side filtering for yardage (computed field)
+    // Yardage is a computed field so it cannot be filtered server-side.
     if (filters.minYardage) {
       const min = filters.minYardage;
       workouts = workouts.filter((w) => calculateYardage(w) >= min);
@@ -69,39 +62,27 @@ export function subscribeWorkouts(
   });
 }
 
-/**
- * Tag a workout with additional metadata
- */
-export async function tagWorkout(
-  workoutId: string,
-  tags: string[],
-): Promise<void> {
+export async function tagWorkout(workoutId: string, tags: string[]): Promise<void> {
   await updateDoc(doc(db, 'practice_plans', workoutId), {
     tags,
   });
 }
 
-/**
- * Rate a workout (1-5 stars)
- */
+/** Rating is 1-5 stars, stored in a coachId-keyed map so each coach has one vote. */
 export async function rateWorkout(
   workoutId: string,
   rating: number,
   coachId: string,
 ): Promise<void> {
-  // Store rating as a map keyed by coachId
   await updateDoc(doc(db, 'practice_plans', workoutId), {
     [`ratings.${coachId}`]: rating,
   });
 }
 
-/**
- * Search workouts by title or description
- */
+/** Fetches all templates then filters client-side — Firestore has no full-text search. */
 export async function searchWorkouts(
   searchText: string,
 ): Promise<(PracticePlan & { id: string })[]> {
-  // Firestore doesn't support full-text search, so we fetch templates and filter client-side
   const q = query(
     collection(db, 'practice_plans'),
     where('isTemplate', '==', true),
@@ -111,7 +92,7 @@ export async function searchWorkouts(
   const lower = searchText.toLowerCase();
 
   return snap.docs
-    .map((d) => ({ id: d.id, ...d.data() } as PracticePlan & { id: string }))
+    .map((d) => ({ id: d.id, ...d.data() }) as PracticePlan & { id: string })
     .filter(
       (w) =>
         w.title.toLowerCase().includes(lower) ||
@@ -119,9 +100,6 @@ export async function searchWorkouts(
     );
 }
 
-/**
- * Calculate total yardage for a practice plan
- */
 function calculateYardage(plan: PracticePlan): number {
   let total = 0;
   for (const set of plan.sets) {

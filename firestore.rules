@@ -20,7 +20,7 @@ service cloud.firestore {
 
     // Coaches collection — coaches can read all, only admins can create/update roles
     match /coaches/{coachId} {
-      allow read: if isAuth();
+      allow read: if isAuth() && (request.auth.uid == coachId || isCoach());
       allow create: if isAuth() && request.auth.uid == coachId;
       allow update: if isAuth() && (request.auth.uid == coachId || isAdmin());
       allow delete: if isAdmin();
@@ -104,7 +104,7 @@ service cloud.firestore {
       allow read, write: if isCoach();
 
       match /rsvps/{rsvpId} {
-        allow read, write: if isAuth();
+        allow read, write: if isCoach();
       }
     }
 
@@ -126,9 +126,9 @@ service cloud.firestore {
       }
     }
 
-    // Parent invites — coaches create, parents read
+    // Parent invites — coaches create; parents redeem through Cloud Functions only
     match /parent_invites/{inviteId} {
-      allow read: if isAuth();
+      allow read: if isCoach();
       allow write: if isCoach();
     }
 

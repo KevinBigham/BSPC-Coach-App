@@ -16,9 +16,16 @@ import {
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import type { Swimmer, SwimTime } from '../types/firestore.types';
-import type { SDIFRecord, MatchResult, ImportResult } from './sdifImport';
+import type { SDIFRecord, MatchResult, ImportResult } from './meetImportTypes';
+import { createImportJob, updateImportJob } from './importJobs';
 
 type SwimmerWithId = Swimmer & { id: string };
+type ImportSource = 'sdif_import' | 'hy3_import';
+
+interface MeetImportJobMetadata {
+  fileName: string;
+  storagePath: string;
+}
 
 /**
  * Match parsed records to roster swimmers by USS ID or name.
@@ -57,111 +64,157 @@ export function matchSwimmersToRoster(
 export async function importMatchedResults(
   matches: MatchResult[],
   coachUid: string,
-  source: 'sdif_import' | 'hy3_import' = 'sdif_import',
+  source: ImportSource = 'sdif_import',
   meetId?: string,
+  importJobMetadata?: MeetImportJobMetadata,
 ): Promise<ImportResult> {
   const result: ImportResult = { imported: 0, prs: 0, skipped: 0, errors: [] };
+  const importJobId = await createImportJob({
+    type: source === 'hy3_import' ? 'hy3' : 'sdif',
+    fileName:
+      importJobMetadata?.fileName ??
+      (source === 'hy3_import' ? 'manual-meet-results.hy3' : 'manual-meet-results.sdif'),
+    storagePath:
+      importJobMetadata?.storagePath ??
+      (source === 'hy3_import' ? 'manual/meet-results.hy3' : 'manual/meet-results.sdif'),
+    status: 'processing',
+    summary: {
+      recordsProcessed: matches.length,
+      swimmersCreated: 0,
+      swimmersUpdated: 0,
+      timesImported: 0,
+      errors: [],
+    },
+    coachId: coachUid,
+  });
 
-  // Group matches by swimmer
-  const bySwimmer = new Map<string, MatchResult[]>();
-  for (const match of matches) {
-    if (!match.matchedSwimmer) {
-      result.skipped++;
-      continue;
+  try {
+    // Group matches by swimmer
+    const bySwimmer = new Map<string, MatchResult[]>();
+    for (const match of matches) {
+      if (!match.matchedSwimmer) {
+        result.skipped++;
+        continue;
+      }
+      const key = match.matchedSwimmer.id!;
+      if (!bySwimmer.has(key)) bySwimmer.set(key, []);
+      bySwimmer.get(key)!.push(match);
     }
-    const key = match.matchedSwimmer.id!;
-    if (!bySwimmer.has(key)) bySwimmer.set(key, []);
-    bySwimmer.get(key)!.push(match);
-  }
 
-  for (const [swimmerId, swimmerMatches] of bySwimmer) {
-    // Fetch existing times for PR comparison
-    const timesRef = collection(db, 'swimmers', swimmerId, 'times');
-    const existingSnap = await getDocs(timesRef);
-    const existingTimes = existingSnap.docs.map((d) => ({
-      id: d.id,
-      ...d.data(),
-    })) as (SwimTime & { id: string })[];
+    for (const [swimmerId, swimmerMatches] of bySwimmer) {
+      // Fetch existing times for PR comparison
+      const timesRef = collection(db, 'swimmers', swimmerId, 'times');
+      const existingSnap = await getDocs(timesRef);
+      const existingTimes = existingSnap.docs.map((d) => ({
+        id: d.id,
+        ...d.data(),
+      })) as (SwimTime & { id: string })[];
 
-    // Batch write in chunks of 400
-    const chunks: MatchResult[][] = [];
-    for (let i = 0; i < swimmerMatches.length; i += 400) {
-      chunks.push(swimmerMatches.slice(i, i + 400));
-    }
+      // Batch write in chunks of 400
+      const chunks: MatchResult[][] = [];
+      for (let i = 0; i < swimmerMatches.length; i += 400) {
+        chunks.push(swimmerMatches.slice(i, i + 400));
+      }
 
-    for (const chunk of chunks) {
-      const batch = writeBatch(db);
+      for (const chunk of chunks) {
+        const batch = writeBatch(db);
 
-      for (const match of chunk) {
-        const rec = match.record;
-        const sameTimes = existingTimes.filter(
-          (t) => t.event === rec.event && t.course === rec.course,
-        );
-        const isPR = sameTimes.length === 0 || sameTimes.every((t) => rec.time < t.time);
+        for (const match of chunk) {
+          const rec = match.record;
+          const sameTimes = existingTimes.filter(
+            (t) => t.event === rec.event && t.course === rec.course,
+          );
+          const isPR = sameTimes.length === 0 || sameTimes.every((t) => rec.time < t.time);
 
-        const newRef = doc(collection(db, 'swimmers', swimmerId, 'times'));
-        batch.set(newRef, {
-          event: rec.event,
-          course: rec.course,
-          time: rec.time,
-          timeDisplay: rec.timeDisplay,
-          isPR,
-          meetName: rec.meetName || null,
-          meetDate: rec.meetDate || null,
-          source,
-          createdAt: serverTimestamp(),
-          createdBy: coachUid,
-        });
+          const newRef = doc(collection(db, 'swimmers', swimmerId, 'times'));
+          batch.set(newRef, {
+            event: rec.event,
+            course: rec.course,
+            time: rec.time,
+            timeDisplay: rec.timeDisplay,
+            isPR,
+            meetName: rec.meetName || null,
+            meetDate: rec.meetDate || null,
+            source,
+            createdAt: serverTimestamp(),
+            createdBy: coachUid,
+          });
 
-        result.imported++;
-        if (isPR) result.prs++;
+          result.imported++;
+          if (isPR) result.prs++;
 
-        // Un-PR old times if this is a new PR
-        if (isPR && sameTimes.length > 0) {
-          for (const old of sameTimes) {
-            if (old.isPR) {
-              batch.update(doc(db, 'swimmers', swimmerId, 'times', old.id), { isPR: false });
+          // Un-PR old times if this is a new PR
+          if (isPR && sameTimes.length > 0) {
+            for (const old of sameTimes) {
+              if (old.isPR) {
+                batch.update(doc(db, 'swimmers', swimmerId, 'times', old.id), { isPR: false });
+              }
             }
           }
         }
-      }
 
-      try {
-        await batch.commit();
-      } catch (err: unknown) {
-        result.errors.push(
-          `Batch write failed for swimmer ${swimmerId}: ${err instanceof Error ? err.message : String(err)}`,
-        );
-      }
-    }
-
-    // If linked to a meet, update MeetEntry docs
-    if (meetId) {
-      try {
-        for (const match of swimmerMatches) {
-          const rec = match.record;
-          // Find the MeetEntry for this swimmer + event
-          const entriesQ = query(
-            collection(db, 'meets', meetId, 'entries'),
-            where('swimmerId', '==', swimmerId),
-            where('event', '==', rec.event),
+        try {
+          await batch.commit();
+        } catch (err: unknown) {
+          result.errors.push(
+            `Batch write failed for swimmer ${swimmerId}: ${err instanceof Error ? err.message : String(err)}`,
           );
-          const entriesSnap = await getDocs(entriesQ);
-          for (const entryDoc of entriesSnap.docs) {
-            await updateDoc(entryDoc.ref, {
-              finalTime: rec.time,
-              finalTimeDisplay: rec.timeDisplay,
-              updatedAt: serverTimestamp(),
-            });
-          }
         }
-      } catch (err: unknown) {
-        result.errors.push(
-          `Meet entry update failed: ${err instanceof Error ? err.message : String(err)}`,
-        );
+      }
+
+      // If linked to a meet, update MeetEntry docs
+      if (meetId) {
+        try {
+          for (const match of swimmerMatches) {
+            const rec = match.record;
+            // Find the MeetEntry for this swimmer + event
+            const entriesQ = query(
+              collection(db, 'meets', meetId, 'entries'),
+              where('swimmerId', '==', swimmerId),
+              where('event', '==', rec.event),
+            );
+            const entriesSnap = await getDocs(entriesQ);
+            for (const entryDoc of entriesSnap.docs) {
+              await updateDoc(entryDoc.ref, {
+                finalTime: rec.time,
+                finalTimeDisplay: rec.timeDisplay,
+                updatedAt: serverTimestamp(),
+              });
+            }
+          }
+        } catch (err: unknown) {
+          result.errors.push(
+            `Meet entry update failed: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        }
       }
     }
-  }
 
-  return result;
+    await updateImportJob(importJobId, {
+      status: 'complete',
+      summary: {
+        recordsProcessed: matches.length,
+        swimmersCreated: 0,
+        swimmersUpdated: 0,
+        timesImported: result.imported,
+        errors: result.errors,
+      },
+    });
+
+    return result;
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Meet import failed';
+    await updateImportJob(importJobId, {
+      status: 'failed',
+      errorMessage,
+      summary: {
+        recordsProcessed: matches.length,
+        swimmersCreated: 0,
+        swimmersUpdated: 0,
+        timesImported: result.imported,
+        errors: [...result.errors, errorMessage],
+      },
+    });
+    throw error;
+  }
 }

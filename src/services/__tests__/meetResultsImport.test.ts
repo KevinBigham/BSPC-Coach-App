@@ -24,19 +24,62 @@ jest.mock('firebase/firestore', () => ({
   })),
 }));
 
+jest.mock('../importJobs', () => ({
+  createImportJob: jest.fn().mockResolvedValue('job-1'),
+  updateImportJob: jest.fn().mockResolvedValue(undefined),
+}));
+
 import { matchSwimmersToRoster, importMatchedResults } from '../meetResultsImport';
 import type { SDIFRecord, MatchResult } from '../sdifImport';
+import { createImportJob, updateImportJob } from '../importJobs';
+import type { Swimmer } from '../../types/firestore.types';
 
 const firestore = require('firebase/firestore');
+const mockedCreateImportJob = jest.mocked(createImportJob);
+const mockedUpdateImportJob = jest.mocked(updateImportJob);
 
 beforeEach(() => {
   jest.clearAllMocks();
 });
 
-const swimmers = [
-  { id: 's1', firstName: 'Jane', lastName: 'Doe', usaSwimmingId: 'USS001' },
-  { id: 's2', firstName: 'John', lastName: 'Smith', usaSwimmingId: '' },
-] as any[];
+type SwimmerWithId = Swimmer & { id: string };
+
+function makeSwimmer(overrides: Partial<SwimmerWithId>): SwimmerWithId {
+  return {
+    id: 's1',
+    firstName: 'Jane',
+    lastName: 'Doe',
+    displayName: 'Jane Doe',
+    dateOfBirth: new Date('2012-01-01'),
+    gender: 'F',
+    group: 'Gold',
+    active: true,
+    usaSwimmingId: 'USS001',
+    strengths: [],
+    weaknesses: [],
+    techniqueFocusAreas: [],
+    goals: [],
+    parentContacts: [],
+    meetSchedule: [],
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    createdBy: 'coach-1',
+    ...overrides,
+  };
+}
+
+const swimmers: SwimmerWithId[] = [
+  makeSwimmer({ id: 's1', usaSwimmingId: 'USS001' }),
+  makeSwimmer({
+    id: 's2',
+    firstName: 'John',
+    lastName: 'Smith',
+    displayName: 'John Smith',
+    gender: 'M',
+    usaSwimmingId: '',
+    group: 'Silver',
+  }),
+];
 
 const makeRecord = (overrides?: Partial<SDIFRecord>): SDIFRecord => ({
   firstName: 'Jane',
@@ -145,6 +188,39 @@ describe('importMatchedResults', () => {
     expect(batch.set).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({ source: 'hy3_import' }),
+    );
+  });
+
+  it('creates and completes an import job for meet-result imports', async () => {
+    firestore.getDocs.mockResolvedValue({ docs: [] });
+
+    const matches: MatchResult[] = [
+      { record: makeRecord(), matchedSwimmer: swimmers[0], confidence: 'exact' },
+    ];
+
+    await importMatchedResults(matches, 'coach-1', 'sdif_import', undefined, {
+      fileName: 'session.sdif',
+      storagePath: 'manual/session.sdif',
+    });
+
+    expect(mockedCreateImportJob).toHaveBeenCalledWith(
+      expect.objectContaining({
+        coachId: 'coach-1',
+        type: 'sdif',
+        fileName: 'session.sdif',
+        storagePath: 'manual/session.sdif',
+        status: 'processing',
+      }),
+    );
+    expect(mockedUpdateImportJob).toHaveBeenCalledWith(
+      'job-1',
+      expect.objectContaining({
+        status: 'complete',
+        summary: expect.objectContaining({
+          recordsProcessed: 1,
+          timesImported: 1,
+        }),
+      }),
     );
   });
 });

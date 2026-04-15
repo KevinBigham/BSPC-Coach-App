@@ -1,12 +1,4 @@
-import {
-  collection,
-  query,
-  where,
-  orderBy,
-  getDocs,
-  limit,
-  Timestamp,
-} from 'firebase/firestore';
+import { collection, query, where, orderBy, getDocs, Timestamp } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import type { Group } from '../config/constants';
 
@@ -35,12 +27,10 @@ export async function getTimeDrops(
 ): Promise<TimeDrop[]> {
   const { swimmerId, group, rangeStart, rangeEnd, maxResults = 100 } = options;
 
-  // If specific swimmer, get their times
   if (swimmerId) {
     return getSwimmerTimeDrops(swimmerId, rangeStart, rangeEnd);
   }
 
-  // If group, get all swimmers in group then aggregate
   const swimmerSnap = await getDocs(
     query(
       collection(db, 'swimmers'),
@@ -59,9 +49,7 @@ export async function getTimeDrops(
     }
   }
 
-  return allDrops
-    .sort((a, b) => b.dropPercent - a.dropPercent)
-    .slice(0, maxResults);
+  return allDrops.sort((a, b) => b.dropPercent - a.dropPercent).slice(0, maxResults);
 }
 
 async function getSwimmerTimeDrops(
@@ -80,11 +68,8 @@ async function getSwimmerTimeDrops(
     const data = d.data();
     const key = `${data.event}_${data.course}`;
     const time = data.time as number;
-    const created = data.createdAt instanceof Timestamp
-      ? data.createdAt.toDate()
-      : new Date();
+    const created = data.createdAt instanceof Timestamp ? data.createdAt.toDate() : new Date();
 
-    // Date range filter
     if (rangeStart && created < new Date(rangeStart)) {
       bestByEvent[key] = Math.min(bestByEvent[key] ?? Infinity, time);
       continue;
@@ -131,7 +116,6 @@ export async function getAttendanceCorrelation(
   cutoff.setDate(cutoff.getDate() - rangeDays);
   const cutoffStr = cutoff.toISOString().split('T')[0];
 
-  // Get swimmers
   const swimmerSnap = await getDocs(
     query(
       collection(db, 'swimmers'),
@@ -140,7 +124,6 @@ export async function getAttendanceCorrelation(
     ),
   );
 
-  // Get attendance records in range
   const attendanceSnap = await getDocs(
     query(
       collection(db, 'attendance'),
@@ -155,7 +138,7 @@ export async function getAttendanceCorrelation(
     attendanceBySwimmer[sid] = (attendanceBySwimmer[sid] || 0) + 1;
   }
 
-  // Count unique practice dates for denominator
+  // Denominator = distinct practice dates, not total records.
   const uniqueDates = new Set(attendanceSnap.docs.map((d) => d.data().practiceDate));
   const totalPractices = Math.max(uniqueDates.size, 1);
 
@@ -166,11 +149,9 @@ export async function getAttendanceCorrelation(
     const sid = swimmerDoc.id;
     const count = attendanceBySwimmer[sid] || 0;
 
-    // Get time drops for this swimmer
     const drops = await getSwimmerTimeDrops(sid, cutoffStr);
-    const avgDrop = drops.length > 0
-      ? drops.reduce((sum, d) => sum + d.dropPercent, 0) / drops.length
-      : 0;
+    const avgDrop =
+      drops.length > 0 ? drops.reduce((sum, d) => sum + d.dropPercent, 0) / drops.length : 0;
 
     results.push({
       swimmerId: sid,
@@ -204,14 +185,14 @@ export async function getGroupProgressReport(
   const correlations = await getAttendanceCorrelation(group, rangeDays);
 
   const swimmerCount = correlations.length;
-  const avgAttendance = swimmerCount > 0
-    ? correlations.reduce((s, c) => s + c.attendancePercent, 0) / swimmerCount
-    : 0;
+  const avgAttendance =
+    swimmerCount > 0 ? correlations.reduce((s, c) => s + c.attendancePercent, 0) / swimmerCount : 0;
   const totalDrops = correlations.reduce((s, c) => s + c.prCount, 0);
   const droppersOnly = correlations.filter((c) => c.timeDropPercent > 0);
-  const avgDrop = droppersOnly.length > 0
-    ? droppersOnly.reduce((s, c) => s + c.timeDropPercent, 0) / droppersOnly.length
-    : 0;
+  const avgDrop =
+    droppersOnly.length > 0
+      ? droppersOnly.reduce((s, c) => s + c.timeDropPercent, 0) / droppersOnly.length
+      : 0;
 
   const topDroppers = correlations
     .filter((c) => c.timeDropPercent > 0)
@@ -229,89 +210,14 @@ export async function getGroupProgressReport(
   };
 }
 
-// ── Swimmer Progress Report ─────────────────────────────────────────────
-
-export interface SwimmerProgressReport {
-  swimmerId: string;
-  swimmerName: string;
-  group: string;
-  attendancePercent: number;
-  practiceCount: number;
-  timeDrops: TimeDrop[];
-  prsByEvent: Record<string, { time: number; timeDisplay: string }>;
-  eventCount: number;
-}
-
-export async function getSwimmerProgressReport(
-  swimmerId: string,
-  rangeDays = 90,
-): Promise<SwimmerProgressReport | null> {
-  const swimmerSnap = await getDocs(
-    query(collection(db, 'swimmers'), where('__name__', '==', swimmerId)),
-  );
-  if (swimmerSnap.empty) return null;
-
-  const swimmerData = swimmerSnap.docs[0].data();
-  const cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() - rangeDays);
-  const cutoffStr = cutoff.toISOString().split('T')[0];
-
-  // Attendance
-  const attendanceSnap = await getDocs(
-    query(
-      collection(db, 'attendance'),
-      where('swimmerId', '==', swimmerId),
-      where('practiceDate', '>=', cutoffStr),
-    ),
-  );
-
-  // All attendance for denominator
-  const allAttendanceSnap = await getDocs(
-    query(
-      collection(db, 'attendance'),
-      where('practiceDate', '>=', cutoffStr),
-      orderBy('practiceDate', 'desc'),
-      limit(500),
-    ),
-  );
-  const uniqueDates = new Set(allAttendanceSnap.docs.map((d) => d.data().practiceDate));
-  const totalPractices = Math.max(uniqueDates.size, 1);
-
-  // Time drops
-  const drops = await getSwimmerTimeDrops(swimmerId, cutoffStr);
-
-  // PRs
-  const timesSnap = await getDocs(
-    query(collection(db, 'swimmers', swimmerId, 'times'), orderBy('createdAt', 'asc')),
-  );
-  const prsByEvent: Record<string, { time: number; timeDisplay: string }> = {};
-  for (const d of timesSnap.docs) {
-    const data = d.data();
-    const key = `${data.event} (${data.course})`;
-    if (!prsByEvent[key] || data.time < prsByEvent[key].time) {
-      prsByEvent[key] = { time: data.time, timeDisplay: data.timeDisplay };
-    }
-  }
-
-  return {
-    swimmerId,
-    swimmerName: `${swimmerData.firstName} ${swimmerData.lastName}`,
-    group: swimmerData.group,
-    attendancePercent: (attendanceSnap.size / totalPractices) * 100,
-    practiceCount: attendanceSnap.size,
-    timeDrops: drops,
-    prsByEvent,
-    eventCount: Object.keys(prsByEvent).length,
-  };
-}
-
 // ── Formatting Helpers ──────────────────────────────────────────────────
 
 export function formatTime(hundredths: number): string {
   const mins = Math.floor(hundredths / 6000);
   const secs = Math.floor((hundredths % 6000) / 100);
   const hs = hundredths % 100;
-  if (mins > 0) return `${mins}:${secs.toString().padStart(2, '0')}.${hs.toString().padStart(2, '0')}`;
+  if (mins > 0)
+    return `${mins}:${secs.toString().padStart(2, '0')}.${hs.toString().padStart(2, '0')}`;
   return `${secs}.${hs.toString().padStart(2, '0')}`;
 }
 

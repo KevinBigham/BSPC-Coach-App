@@ -3482,9 +3482,6 @@ const ALL_STANDARDS: Record<Course, Record<Gender, Record<AgeGroup, Record<strin
 
 const LEVEL_INDEX: Record<string, number> = { B: 0, BB: 1, A: 2, AA: 3, AAA: 4, AAAA: 5 };
 
-/**
- * Determine the age group from a swimmer's age
- */
 export function getAgeGroup(age: number): AgeGroup {
   if (age <= 10) return '10&U';
   if (age <= 12) return '11-12';
@@ -3493,9 +3490,6 @@ export function getAgeGroup(age: number): AgeGroup {
   return '17-18';
 }
 
-/**
- * Calculate age from date of birth
- */
 export function calculateAge(dob: Date): number {
   const today = new Date();
   let age = today.getFullYear() - dob.getFullYear();
@@ -3506,9 +3500,6 @@ export function calculateAge(dob: Date): number {
   return age;
 }
 
-/**
- * Get the time standard for a specific level
- */
 export function getStandard(
   course: Course,
   gender: Gender,
@@ -3523,10 +3514,7 @@ export function getStandard(
   return times[LEVEL_INDEX[level]] ?? null;
 }
 
-/**
- * Get the highest standard achieved for a given time
- * Returns null if the time doesn't meet even B standard
- */
+/** Returns highest standard met, or null if slower than B. */
 export function getAchievedStandard(
   course: Course,
   gender: Gender,
@@ -3539,8 +3527,7 @@ export function getAchievedStandard(
   const times = courseData[gender]?.[ageGroup]?.[event];
   if (!times) return null;
 
-  // Check from fastest (AAAA) to slowest (B)
-  // Lower time = faster = better
+  // Check fastest-first; swimming uses lower time = better.
   const levels: StandardLevel[] = ['AAAA', 'AAA', 'AA', 'A', 'BB', 'B'];
   for (const level of levels) {
     const cutoff = times[LEVEL_INDEX[level]];
@@ -3549,9 +3536,6 @@ export function getAchievedStandard(
   return null;
 }
 
-/**
- * Get all standards for an event (returns object with level → time)
- */
 export function getEventStandards(
   course: Course,
   gender: Gender,
@@ -3572,10 +3556,7 @@ export function getEventStandards(
   };
 }
 
-/**
- * Get time needed to cut to reach a target standard
- * Returns negative if already achieved, positive if time to cut
- */
+/** Positive = time still to drop, negative = already achieved. */
 export function getTimeToCut(
   course: Course,
   gender: Gender,
@@ -3589,9 +3570,6 @@ export function getTimeToCut(
   return currentTime - standard; // positive = needs to drop, negative = already achieved
 }
 
-/**
- * Get list of events available for an age group + gender
- */
 export function getAvailableEvents(course: Course, gender: Gender, ageGroup: AgeGroup): string[] {
   const courseData = ALL_STANDARDS[course];
   if (!courseData) return [];
@@ -3600,9 +3578,7 @@ export function getAvailableEvents(course: Course, gender: Gender, ageGroup: Age
   return Object.keys(ageData);
 }
 
-/**
- * Format hundredths of seconds to display string "M:SS.HH" or "SS.HH"
- */
+/** Hundredths -> "M:SS.HH" or "SS.HH". */
 export function formatTime(hundredths: number): string {
   const mins = Math.floor(hundredths / 6000);
   const secs = Math.floor((hundredths % 6000) / 100);

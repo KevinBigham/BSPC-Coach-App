@@ -1,9 +1,8 @@
-import { setGlobalToast, handleError, withErrorHandling } from '../errorHandler';
+import { setGlobalToast, handleError } from '../errorHandler';
 
 describe('setGlobalToast', () => {
   afterEach(() => {
-    // Reset global toast to null between tests
-    setGlobalToast(null as any);
+    setGlobalToast(null);
   });
 
   it('sets the global toast function', () => {
@@ -20,8 +19,7 @@ describe('handleError', () => {
 
   beforeEach(() => {
     consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-    // Reset toast
-    setGlobalToast(null as any);
+    setGlobalToast(null);
   });
 
   afterEach(() => {
@@ -74,48 +72,5 @@ describe('handleError', () => {
   it('handles undefined error value', () => {
     handleError(undefined);
     expect(consoleSpy).toHaveBeenCalledWith('undefined');
-  });
-});
-
-describe('withErrorHandling', () => {
-  let consoleSpy: jest.SpyInstance;
-
-  beforeEach(() => {
-    consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-    setGlobalToast(null as any);
-  });
-
-  afterEach(() => {
-    consoleSpy.mockRestore();
-  });
-
-  it('returns the result on success', async () => {
-    const result = await withErrorHandling(() => Promise.resolve(42), 'Test');
-    expect(result).toBe(42);
-  });
-
-  it('returns null on failure', async () => {
-    const result = await withErrorHandling(() => Promise.reject(new Error('fail')), 'Test');
-    expect(result).toBeNull();
-  });
-
-  it('logs the error on failure', async () => {
-    await withErrorHandling(() => Promise.reject(new Error('fail')), 'FetchData');
-    expect(consoleSpy).toHaveBeenCalledWith('[FetchData] fail');
-  });
-
-  it('shows toast on failure when toast is set', async () => {
-    const mockToast = jest.fn();
-    setGlobalToast(mockToast);
-    await withErrorHandling(() => Promise.reject(new Error('oops')), 'Save');
-    expect(mockToast).toHaveBeenCalledWith('Save: oops', 'error');
-  });
-
-  it('returns resolved value for async functions', async () => {
-    const fn = async () => {
-      return { name: 'Alice' };
-    };
-    const result = await withErrorHandling(fn, 'Load');
-    expect(result).toEqual({ name: 'Alice' });
   });
 });

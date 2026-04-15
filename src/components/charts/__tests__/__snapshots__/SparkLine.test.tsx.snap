@@ -1,0 +1,126 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`SparkLine matches the rendered snapshot 1`] = `
+<View
+  style={
+    [
+      {
+        "position": "relative",
+      },
+      {
+        "height": 40,
+        "width": 120,
+      },
+    ]
+  }
+  testID="spark-line"
+>
+  <View
+    style={
+      [
+        {
+          "borderRadius": 3,
+          "height": 6,
+          "position": "absolute",
+          "width": 6,
+        },
+        {
+          "backgroundColor": "#B388FF",
+          "bottom": 8.5,
+          "left": 0,
+        },
+      ]
+    }
+    testID="spark-dot-0"
+  />
+  <View
+    style={
+      [
+        {
+          "borderRadius": 3,
+          "height": 6,
+          "position": "absolute",
+          "width": 6,
+        },
+        {
+          "backgroundColor": "#B388FF",
+          "bottom": 25.5,
+          "left": 28.5,
+        },
+      ]
+    }
+    testID="spark-dot-1"
+  />
+  <View
+    style={
+      [
+        {
+          "borderRadius": 3,
+          "height": 6,
+          "position": "absolute",
+          "width": 6,
+        },
+        {
+          "backgroundColor": "#B388FF",
+          "bottom": 17,
+          "left": 57,
+        },
+      ]
+    }
+    testID="spark-dot-2"
+  />
+  <View
+    style={
+      [
+        {
+          "borderRadius": 3,
+          "height": 6,
+          "position": "absolute",
+          "width": 6,
+        },
+        {
+          "backgroundColor": "#B388FF",
+          "bottom": 34,
+          "left": 85.5,
+        },
+      ]
+    }
+    testID="spark-dot-3"
+  />
+  <View
+    style={
+      [
+        {
+          "borderRadius": 3,
+          "height": 6,
+          "position": "absolute",
+          "width": 6,
+        },
+        {
+          "backgroundColor": "#B388FF",
+          "bottom": 0,
+          "left": 114,
+        },
+      ]
+    }
+    testID="spark-dot-4"
+  />
+  <View
+    style={
+      [
+        {
+          "height": 1,
+          "left": 0,
+          "position": "absolute",
+          "right": 0,
+        },
+        {
+          "backgroundColor": "#B388FF",
+          "bottom": 0,
+          "opacity": 0.2,
+        },
+      ]
+    }
+  />
+</View>
+`;

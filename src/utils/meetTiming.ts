@@ -1,7 +1,4 @@
-/**
- * Format hundredths of seconds for display
- * e.g., 6523 -> "1:05.23"
- */
+/** Hundredths -> "M:SS.HH" (e.g. 6523 -> "1:05.23"). */
 export function formatSplitDisplay(hundredths: number): string {
   const mins = Math.floor(hundredths / 6000);
   const secs = Math.floor((hundredths % 6000) / 100);
@@ -12,9 +9,7 @@ export function formatSplitDisplay(hundredths: number): string {
   return `${secs}.${hs.toString().padStart(2, '0')}`;
 }
 
-/**
- * Format running timer display (MM:SS.HH)
- */
+/** Hundredths -> "MM:SS.HH" (always zero-padded). */
 export function formatTimerDisplay(hundredths: number): string {
   const mins = Math.floor(hundredths / 6000);
   const secs = Math.floor((hundredths % 6000) / 100);
@@ -22,20 +17,12 @@ export function formatTimerDisplay(hundredths: number): string {
   return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}.${hs.toString().padStart(2, '0')}`;
 }
 
-/**
- * Convert elapsed milliseconds to hundredths of a second
- */
 export function msToHundredths(ms: number): number {
   return Math.round(ms / 10);
 }
 
-/**
- * Calculate placements from final times
- * Returns map of lane -> place (1-indexed)
- */
-export function calculatePlacement(
-  laneTimes: Record<number, number>,
-): Record<number, number> {
+/** Returns map of lane -> 1-indexed place. */
+export function calculatePlacement(laneTimes: Record<number, number>): Record<number, number> {
   const entries = Object.entries(laneTimes)
     .map(([lane, time]) => ({ lane: parseInt(lane, 10), time }))
     .sort((a, b) => a.time - b.time);
@@ -47,21 +34,12 @@ export function calculatePlacement(
   return placements;
 }
 
-/**
- * Detect if a time is a PR given existing times for the same event
- */
-export function detectPR(
-  time: number,
-  existingTimes: number[],
-): boolean {
+export function detectPR(time: number, existingTimes: number[]): boolean {
   if (existingTimes.length === 0) return true;
   const currentBest = Math.min(...existingTimes);
   return time < currentBest;
 }
 
-/**
- * Get placement suffix (1st, 2nd, 3rd, etc.)
- */
 export function placementSuffix(place: number): string {
   if (place === 1) return '1st';
   if (place === 2) return '2nd';

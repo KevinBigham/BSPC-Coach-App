@@ -31,7 +31,9 @@ import {
 import { exportAttendanceCSV, shareCSV } from '../../src/services/export';
 import { useSwimmersStore } from '../../src/stores/swimmersStore';
 import { useAttendanceStore } from '../../src/stores/attendanceStore';
+import { tapLight, tapMedium, notifySuccess, notifyError } from '../../src/utils/haptics';
 import type { Swimmer, AttendanceRecord, AttendanceStatus } from '../../src/types/firestore.types';
+import { withScreenErrorBoundary } from '../../src/components/ScreenErrorBoundary';
 
 type FilterGroup = Group | 'All';
 
@@ -43,7 +45,7 @@ const STATUSES: { value: AttendanceStatus; label: string; color: string }[] = [
   { value: 'injured', label: 'Injured', color: colors.error },
 ];
 
-export default function AttendanceScreen() {
+function AttendanceScreen() {
   const { coach } = useAuth();
   const swimmers = useSwimmersStore((s) => s.swimmers);
   const todayRecords = useAttendanceStore((s) => s.todayRecords);
@@ -87,23 +89,45 @@ export default function AttendanceScreen() {
     if (!coach) return;
     const record = getRecord(swimmer.id);
 
-    if (!record) {
-      await checkIn(swimmer, { uid: coach.uid, displayName: coach.displayName }, today);
-    } else if (!record.departedAt) {
-      // Show checkout modal
-      setCheckoutModal({ swimmer, recordId: record.id! });
-      setCheckoutStatus('normal');
-      setCheckoutNote('');
-    } else {
-      // Re-check-in
-      await checkIn(swimmer, { uid: coach.uid, displayName: coach.displayName }, today);
+    try {
+      if (!record) {
+        tapMedium();
+        await checkIn(swimmer, { uid: coach.uid, displayName: coach.displayName }, today);
+        notifySuccess();
+      } else if (!record.departedAt) {
+        tapLight();
+        // Show checkout modal
+        setCheckoutModal({ swimmer, recordId: record.id! });
+        setCheckoutStatus('normal');
+        setCheckoutNote('');
+      } else {
+        tapMedium();
+        await checkIn(swimmer, { uid: coach.uid, displayName: coach.displayName }, today);
+        notifySuccess();
+      }
+    } catch (error) {
+      notifyError();
+      Alert.alert(
+        'Attendance Error',
+        error instanceof Error ? error.message : 'Unable to update attendance.',
+      );
     }
   };
 
   const handleCheckout = async () => {
     if (!checkoutModal) return;
-    await checkOut(checkoutModal.recordId, checkoutStatus, checkoutNote.trim() || undefined);
-    setCheckoutModal(null);
+    try {
+      tapLight();
+      await checkOut(checkoutModal.recordId, checkoutStatus, checkoutNote.trim() || undefined);
+      notifySuccess();
+      setCheckoutModal(null);
+    } catch (error) {
+      notifyError();
+      Alert.alert(
+        'Attendance Error',
+        error instanceof Error ? error.message : 'Unable to check swimmer out.',
+      );
+    }
   };
 
   const handleBatchCheckIn = () => {
@@ -120,11 +144,21 @@ export default function AttendanceScreen() {
           text: 'Check In All',
           onPress: async () => {
             if (!coach) return;
-            await batchCheckIn(
-              uncheckedSwimmers,
-              { uid: coach.uid, displayName: coach.displayName },
-              today,
-            );
+            try {
+              tapMedium();
+              await batchCheckIn(
+                uncheckedSwimmers,
+                { uid: coach.uid, displayName: coach.displayName },
+                today,
+              );
+              notifySuccess();
+            } catch (error) {
+              notifyError();
+              Alert.alert(
+                'Attendance Error',
+                error instanceof Error ? error.message : 'Unable to batch check in swimmers.',
+              );
+            }
           },
         },
       ],
@@ -547,3 +581,5 @@ const styles = StyleSheet.create({
   },
   modalCheckoutText: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.md, color: colors.text },
 });
+
+export default withScreenErrorBoundary(AttendanceScreen, 'AttendanceScreen');

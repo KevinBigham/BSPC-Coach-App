@@ -25,6 +25,8 @@ import { useAuth } from '../../src/contexts/AuthContext';
 import { useToast } from '../../src/contexts/ToastContext';
 import { handleError } from '../../src/utils/errorHandler';
 import { colors, spacing, fontSize, borderRadius, fontFamily } from '../../src/config/theme';
+import { useVideoStore } from '../../src/stores/videoStore';
+import { withScreenErrorBoundary } from '../../src/components/ScreenErrorBoundary';
 import type { VideoSession } from '../../src/types/firestore.types';
 
 const PHASE_COLORS: Record<string, string> = {
@@ -37,12 +39,13 @@ const PHASE_COLORS: Record<string, string> = {
   general: colors.textSecondary,
 };
 
-export default function VideoDetailScreen() {
+function VideoDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { coach } = useAuth();
   const { showToast } = useToast();
-  const [session, setSession] = useState<(VideoSession & { id: string }) | null>(null);
+  const session = useVideoStore((state) => state.selectedSession);
+  const setSelectedSession = useVideoStore((state) => state.setSelectedSession);
   const [drafts, setDrafts] = useState<VideoDraft[]>([]);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState<Set<string>>(new Set());
@@ -51,7 +54,7 @@ export default function VideoDetailScreen() {
     if (!id) return;
     const unsubSession = onSnapshot(doc(db, 'video_sessions', id), (snap) => {
       if (snap.exists()) {
-        setSession({ id: snap.id, ...snap.data() } as VideoSession & { id: string });
+        setSelectedSession({ id: snap.id, ...snap.data() } as VideoSession & { id: string });
       }
       setLoading(false);
     });
@@ -59,8 +62,9 @@ export default function VideoDetailScreen() {
     return () => {
       unsubSession();
       unsubDrafts();
+      setSelectedSession(null);
     };
-  }, [id]);
+  }, [id, setSelectedSession]);
 
   const handleApprove = async (draft: VideoDraft) => {
     if (!coach || !id) return;
@@ -504,3 +508,5 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
 });
+
+export default withScreenErrorBoundary(VideoDetailScreen, 'VideoDetailScreen');

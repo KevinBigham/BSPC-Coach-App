@@ -1,13 +1,12 @@
-import { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
-import { router, Stack } from 'expo-router';
+import { router, Stack, type Href } from 'expo-router';
 import { colors, spacing, fontSize, borderRadius, fontFamily } from '../src/config/theme';
-import { GROUPS, type Group } from '../src/config/constants';
+import { withScreenErrorBoundary } from '../src/components/ScreenErrorBoundary';
 
 interface AnalyticsCard {
   title: string;
   description: string;
-  route: string;
+  route: Href;
   accent: string;
 }
 
@@ -44,7 +43,7 @@ const CARDS: AnalyticsCard[] = [
   },
 ];
 
-export default function AnalyticsScreen() {
+function AnalyticsScreen() {
   return (
     <>
       <Stack.Screen
@@ -70,7 +69,7 @@ export default function AnalyticsScreen() {
             <TouchableOpacity
               key={card.title}
               style={styles.card}
-              onPress={() => router.push(card.route as any)}
+              onPress={() => router.push(card.route)}
             >
               <View style={[styles.cardAccent, { backgroundColor: card.accent }]} />
               <Text style={styles.cardTitle}>{card.title}</Text>
@@ -139,3 +138,5 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
 });
+
+export default withScreenErrorBoundary(AnalyticsScreen, 'AnalyticsScreen');

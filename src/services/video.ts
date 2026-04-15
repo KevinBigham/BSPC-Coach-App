@@ -9,10 +9,9 @@ import {
   doc,
   serverTimestamp,
   limit as firestoreLimit,
-  deleteDoc,
   type Unsubscribe,
 } from 'firebase/firestore';
-import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
+import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../config/firebase';
 import type {
   VideoSession,
@@ -21,7 +20,7 @@ import type {
   Swimmer,
 } from '../types/firestore.types';
 import type { Group } from '../config/constants';
-import { hasMediaConsent } from '../utils/mediaConsent';
+import { canTagOrUploadMedia } from '../utils/mediaConsent';
 
 type VideoSessionWithId = VideoSession & { id: string };
 
@@ -66,7 +65,7 @@ export function validateMediaConsent(
 ): string[] {
   return taggedSwimmerIds
     .map((id) => swimmers.find((s) => s.id === id))
-    .filter((s): s is Swimmer & { id: string } => !!s && !hasMediaConsent(s))
+    .filter((s): s is Swimmer & { id: string } => !!s && !canTagOrUploadMedia(s).allowed)
     .map((s) => s.displayName);
 }
 
@@ -136,6 +135,8 @@ export async function uploadVideo(
 
 export function getVideoStatusLabel(status: VideoSessionStatus): string {
   switch (status) {
+    case 'queued':
+      return 'QUEUED';
     case 'uploading':
       return 'UPLOADING';
     case 'uploaded':
@@ -155,6 +156,8 @@ export function getVideoStatusLabel(status: VideoSessionStatus): string {
 
 export function getVideoStatusColor(status: VideoSessionStatus): string {
   switch (status) {
+    case 'queued':
+      return '#FFD700';
     case 'uploading':
       return '#7a7a8e';
     case 'uploaded':
@@ -170,15 +173,4 @@ export function getVideoStatusColor(status: VideoSessionStatus): string {
     case 'failed':
       return '#f43f5e';
   }
-}
-
-export async function deleteVideoSession(sessionId: string, storagePath?: string): Promise<void> {
-  if (storagePath) {
-    try {
-      await deleteObject(ref(storage, storagePath));
-    } catch {
-      // File may already be deleted
-    }
-  }
-  await deleteDoc(doc(db, 'video_sessions', sessionId));
 }

@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { initSentry } from '../src/config/sentry';
-import { Stack, useRouter, useSegments } from 'expo-router';
+import { Stack, useRouter, useSegments, type Href } from 'expo-router';
 import * as Linking from 'expo-linking';
 
 initSentry();
@@ -125,7 +125,7 @@ function RootNavigator() {
       const result = parseDeepLink(event.url);
       if (result) {
         logger.info('Deep link navigating to', { path: result.path });
-        router.push(result.path as any);
+        router.push(result.path as Href);
       }
     }
 
@@ -202,6 +202,37 @@ function RootNavigator() {
           }}
         />
         <Stack.Screen
+          name="notifications"
+          options={{
+            headerShown: true,
+            title: 'INBOX',
+            headerStyle: { backgroundColor: colors.bgElevated },
+            headerTintColor: colors.accent,
+            headerTitleStyle: { fontFamily: fontFamily.heading, fontSize: 22, color: colors.text },
+          }}
+        />
+        <Stack.Screen
+          name="notification-rules"
+          options={{
+            headerShown: true,
+            title: 'RULES',
+            headerStyle: { backgroundColor: colors.bgElevated },
+            headerTintColor: colors.accent,
+            headerTitleStyle: { fontFamily: fontFamily.heading, fontSize: 22, color: colors.text },
+          }}
+        />
+        <Stack.Screen
+          name="notification-rules/new"
+          options={{
+            headerShown: true,
+            title: 'NEW RULE',
+            headerStyle: { backgroundColor: colors.bgElevated },
+            headerTintColor: colors.accent,
+            headerTitleStyle: { fontFamily: fontFamily.heading, fontSize: 22, color: colors.text },
+            presentation: 'modal',
+          }}
+        />
+        <Stack.Screen
           name="swimmer/edit"
           options={{
             headerShown: true,
@@ -250,6 +281,16 @@ function RootNavigator() {
             headerTintColor: colors.accent,
             headerTitleStyle: { fontFamily: fontFamily.heading, fontSize: 22, color: colors.text },
             presentation: 'modal',
+          }}
+        />
+        <Stack.Screen
+          name="import/history"
+          options={{
+            headerShown: true,
+            title: 'IMPORT HISTORY',
+            headerStyle: { backgroundColor: colors.bgElevated },
+            headerTintColor: colors.accent,
+            headerTitleStyle: { fontFamily: fontFamily.heading, fontSize: 22, color: colors.text },
           }}
         />
         <Stack.Screen

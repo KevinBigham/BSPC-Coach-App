@@ -8,12 +8,24 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Stack } from 'expo-router';
-import { getAttendanceCorrelation, formatDropPercent, type AttendanceCorrelation } from '../../src/services/analytics';
+import {
+  getAttendanceCorrelation,
+  formatDropPercent,
+  type AttendanceCorrelation,
+} from '../../src/services/analytics';
 import BarChart from '../../src/components/charts/BarChart';
-import { colors, spacing, fontSize, borderRadius, fontFamily, groupColors } from '../../src/config/theme';
+import {
+  colors,
+  spacing,
+  fontSize,
+  borderRadius,
+  fontFamily,
+  groupColors,
+} from '../../src/config/theme';
 import { GROUPS, type Group } from '../../src/config/constants';
+import { withScreenErrorBoundary } from '../../src/components/ScreenErrorBoundary';
 
-export default function AttendanceCorrelationScreen() {
+function AttendanceCorrelationScreen() {
   const [data, setData] = useState<AttendanceCorrelation[]>([]);
   const [loading, setLoading] = useState(true);
   const [group, setGroup] = useState<Group | undefined>(undefined);
@@ -26,19 +38,23 @@ export default function AttendanceCorrelationScreen() {
     setLoading(false);
   }, [group, rangeDays]);
 
-  useEffect(() => { loadData(); }, [loadData]);
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   // Split into quartiles by attendance
   const sorted = [...data].sort((a, b) => b.attendancePercent - a.attendancePercent);
   const topQuarter = sorted.slice(0, Math.ceil(sorted.length / 4));
-  const bottomQuarter = sorted.slice(Math.floor(sorted.length * 3 / 4));
+  const bottomQuarter = sorted.slice(Math.floor((sorted.length * 3) / 4));
 
-  const topAvgDrop = topQuarter.length > 0
-    ? topQuarter.reduce((s, c) => s + c.timeDropPercent, 0) / topQuarter.length
-    : 0;
-  const bottomAvgDrop = bottomQuarter.length > 0
-    ? bottomQuarter.reduce((s, c) => s + c.timeDropPercent, 0) / bottomQuarter.length
-    : 0;
+  const topAvgDrop =
+    topQuarter.length > 0
+      ? topQuarter.reduce((s, c) => s + c.timeDropPercent, 0) / topQuarter.length
+      : 0;
+  const bottomAvgDrop =
+    bottomQuarter.length > 0
+      ? bottomQuarter.reduce((s, c) => s + c.timeDropPercent, 0) / bottomQuarter.length
+      : 0;
 
   const chartData = [
     { label: 'Top 25%\nAttendance', value: topAvgDrop, color: colors.gold },
@@ -87,21 +103,19 @@ export default function AttendanceCorrelationScreen() {
               <Text style={styles.pixelLabel}>INSIGHT</Text>
               <Text style={styles.insightText}>
                 Swimmers in the top 25% of attendance average{' '}
-                <Text style={{ color: colors.gold }}>{formatDropPercent(topAvgDrop)}</Text>
-                {' '}improvement vs{' '}
-                <Text style={{ color: colors.purpleLight }}>{formatDropPercent(bottomAvgDrop)}</Text>
-                {' '}for the bottom 25%.
+                <Text style={{ color: colors.gold }}>{formatDropPercent(topAvgDrop)}</Text>{' '}
+                improvement vs{' '}
+                <Text style={{ color: colors.purpleLight }}>
+                  {formatDropPercent(bottomAvgDrop)}
+                </Text>{' '}
+                for the bottom 25%.
               </Text>
             </View>
 
             {/* Chart */}
             <View style={styles.chartCard}>
               <Text style={styles.sectionTitle}>AVG IMPROVEMENT BY ATTENDANCE</Text>
-              <BarChart
-                data={chartData}
-                height={140}
-                formatValue={(v) => formatDropPercent(v)}
-              />
+              <BarChart data={chartData} height={140} formatValue={(v) => formatDropPercent(v)} />
             </View>
 
             {/* Swimmer List */}
@@ -131,9 +145,7 @@ export default function AttendanceCorrelationScreen() {
                   </Text>
                 </View>
               ))}
-              {data.length === 0 && (
-                <Text style={styles.emptyText}>No data available</Text>
-              )}
+              {data.length === 0 && <Text style={styles.emptyText}>No data available</Text>}
             </View>
           </>
         )}
@@ -260,3 +272,5 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xxl,
   },
 });
+
+export default withScreenErrorBoundary(AttendanceCorrelationScreen, 'AttendanceCorrelationScreen');

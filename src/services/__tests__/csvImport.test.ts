@@ -6,6 +6,7 @@ jest.mock('../../config/firebase', () => ({
 }));
 
 jest.mock('firebase/firestore', () => ({
+  addDoc: jest.fn().mockResolvedValue({ id: 'job-1' }),
   collection: jest.fn((...args: unknown[]) => ({ path: (args as string[]).slice(1).join('/') })),
   query: jest.fn((ref: unknown) => ref),
   where: jest.fn(),
@@ -15,6 +16,7 @@ jest.mock('firebase/firestore', () => ({
     id: (args as string[])[args.length - 1],
   })),
   serverTimestamp: jest.fn(() => new Date()),
+  updateDoc: jest.fn().mockResolvedValue(undefined),
   writeBatch: jest.fn(() => ({
     set: jest.fn(),
     update: jest.fn(),
@@ -24,8 +26,17 @@ jest.mock('firebase/firestore', () => ({
 }));
 
 import { parseCSV, validateRows, importSwimmers } from '../csvImport';
+import type { ParsedRow } from '../csvImport';
 
 const firestore = require('firebase/firestore');
+
+interface ExistingSwimmerDoc {
+  data: () => {
+    firstName: string;
+    lastName: string;
+    group: string;
+  };
+}
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -100,7 +111,7 @@ describe('validateRows', () => {
   it('accepts valid rows and normalizes group and gender', () => {
     const result = validateRows([
       { firstName: 'Jane', lastName: 'Doe', group: 'gold', gender: 'female' },
-    ] as any[]);
+    ] as ParsedRow[]);
     expect(result.valid).toHaveLength(1);
     expect(result.valid[0].group).toBe('Gold');
     expect(result.valid[0].gender).toBe('F');
@@ -110,7 +121,7 @@ describe('validateRows', () => {
   it('rejects rows missing first name', () => {
     const result = validateRows([
       { firstName: '', lastName: 'Doe', group: 'Gold', gender: 'F' },
-    ] as any[]);
+    ] as ParsedRow[]);
     expect(result.valid).toHaveLength(0);
     expect(result.errors).toHaveLength(1);
     expect(result.errors[0]).toContain('Missing first name');
@@ -119,7 +130,7 @@ describe('validateRows', () => {
   it('rejects rows missing last name', () => {
     const result = validateRows([
       { firstName: 'Jane', lastName: '', group: 'Gold', gender: 'F' },
-    ] as any[]);
+    ] as ParsedRow[]);
     expect(result.valid).toHaveLength(0);
     expect(result.errors[0]).toContain('Missing last name');
   });
@@ -127,7 +138,7 @@ describe('validateRows', () => {
   it('rejects invalid group names', () => {
     const result = validateRows([
       { firstName: 'Jane', lastName: 'Doe', group: 'Superstar', gender: 'F' },
-    ] as any[]);
+    ] as ParsedRow[]);
     expect(result.valid).toHaveLength(0);
     expect(result.errors[0]).toContain('Invalid group');
   });
@@ -135,7 +146,7 @@ describe('validateRows', () => {
   it('rejects invalid gender values', () => {
     const result = validateRows([
       { firstName: 'Jane', lastName: 'Doe', group: 'Gold', gender: 'X' },
-    ] as any[]);
+    ] as ParsedRow[]);
     expect(result.valid).toHaveLength(0);
     expect(result.errors[0]).toContain('Invalid gender');
   });
@@ -143,7 +154,7 @@ describe('validateRows', () => {
   it('defaults group to Bronze when not specified', () => {
     const result = validateRows([
       { firstName: 'Jane', lastName: 'Doe', group: '', gender: 'F' },
-    ] as any[]);
+    ] as ParsedRow[]);
     expect(result.valid[0].group).toBe('Bronze');
   });
 });
@@ -151,13 +162,13 @@ describe('validateRows', () => {
 describe('importSwimmers', () => {
   it('skips duplicates based on name+group', async () => {
     firestore.getDocs.mockResolvedValue({
-      forEach: (cb: (d: any) => void) => {
+      forEach: (cb: (d: ExistingSwimmerDoc) => void) => {
         cb({ data: () => ({ firstName: 'Jane', lastName: 'Doe', group: 'Gold' }) });
       },
     });
 
     const result = await importSwimmers(
-      [{ firstName: 'Jane', lastName: 'Doe', group: 'Gold', gender: 'F' }] as any[],
+      [{ firstName: 'Jane', lastName: 'Doe', group: 'Gold', gender: 'F' }] as ParsedRow[],
       'coach-1',
     );
     expect(result.skipped).toBe(1);
@@ -168,7 +179,7 @@ describe('importSwimmers', () => {
     firestore.getDocs.mockResolvedValue({ forEach: () => {} });
 
     const result = await importSwimmers(
-      [{ firstName: 'New', lastName: 'Swimmer', group: 'Gold', gender: 'M' }] as any[],
+      [{ firstName: 'New', lastName: 'Swimmer', group: 'Gold', gender: 'M' }] as ParsedRow[],
       'coach-1',
     );
     expect(result.created).toBe(1);

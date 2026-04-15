@@ -1,14 +1,10 @@
-import {
-  collection,
-  query,
-  where,
-  getDocs,
-  writeBatch,
-  doc,
-  serverTimestamp,
-} from 'firebase/firestore';
+import { collection, query, getDocs, writeBatch, doc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../config/firebase';
-import { GROUPS, type Group } from '../config/constants';
+import { GROUPS } from '../config/constants';
+import { createImportJob, updateImportJob } from './importJobs';
+
+const CSV_IMPORT_FILE_NAME = 'pasted-roster.csv';
+const CSV_IMPORT_STORAGE_PATH = 'manual/pasted-roster.csv';
 
 export interface ParsedRow {
   firstName: string;
@@ -134,71 +130,113 @@ export function validateRows(rows: ParsedRow[]): ValidationResult {
 
 /** Imports validated swimmers into Firestore, skipping duplicates */
 export async function importSwimmers(rows: ParsedRow[], coachUid: string): Promise<ImportResult> {
-  // Fetch existing swimmers for duplicate detection
-  const existing = await getDocs(query(collection(db, 'swimmers')));
-  const existingKeys = new Set<string>();
-  existing.forEach((d) => {
-    const data = d.data();
-    existingKeys.add(
-      `${data.firstName?.toLowerCase()}|${data.lastName?.toLowerCase()}|${data.group?.toLowerCase()}`,
-    );
+  const importJobId = await createImportJob({
+    type: 'csv_roster',
+    fileName: CSV_IMPORT_FILE_NAME,
+    storagePath: CSV_IMPORT_STORAGE_PATH,
+    status: 'processing',
+    summary: {
+      recordsProcessed: rows.length,
+      swimmersCreated: 0,
+      swimmersUpdated: 0,
+      timesImported: 0,
+      errors: [],
+    },
+    coachId: coachUid,
   });
 
-  let created = 0;
-  let skipped = 0;
-  const errors: string[] = [];
+  try {
+    // Fetch existing swimmers for duplicate detection
+    const existing = await getDocs(query(collection(db, 'swimmers')));
+    const existingKeys = new Set<string>();
+    existing.forEach((d) => {
+      const data = d.data();
+      existingKeys.add(
+        `${data.firstName?.toLowerCase()}|${data.lastName?.toLowerCase()}|${data.group?.toLowerCase()}`,
+      );
+    });
 
-  // Batch in chunks of 400 (Firestore limit is 500, leaving room)
-  for (let i = 0; i < rows.length; i += 400) {
-    const chunk = rows.slice(i, i + 400);
-    const batch = writeBatch(db);
+    let created = 0;
+    let skipped = 0;
+    const errors: string[] = [];
 
-    for (const row of chunk) {
-      const key = `${row.firstName.toLowerCase()}|${row.lastName.toLowerCase()}|${row.group.toLowerCase()}`;
-      if (existingKeys.has(key)) {
-        skipped++;
-        continue;
+    // Batch in chunks of 400 (Firestore limit is 500, leaving room)
+    for (let i = 0; i < rows.length; i += 400) {
+      const chunk = rows.slice(i, i + 400);
+      const batch = writeBatch(db);
+
+      for (const row of chunk) {
+        const key = `${row.firstName.toLowerCase()}|${row.lastName.toLowerCase()}|${row.group.toLowerCase()}`;
+        if (existingKeys.has(key)) {
+          skipped++;
+          continue;
+        }
+
+        const ref = doc(collection(db, 'swimmers'));
+        batch.set(ref, {
+          firstName: row.firstName,
+          lastName: row.lastName,
+          displayName: `${row.firstName} ${row.lastName}`,
+          group: row.group,
+          gender: row.gender || 'F',
+          dateOfBirth: row.dateOfBirth || null,
+          usaSwimmingId: row.usaSwimmingId || null,
+          active: true,
+          strengths: [],
+          weaknesses: [],
+          techniqueFocusAreas: [],
+          goals: [],
+          parentContacts: row.parentName
+            ? [
+                {
+                  name: row.parentName,
+                  phone: row.parentPhone || '',
+                  email: row.parentEmail || '',
+                  relationship: 'Parent',
+                },
+              ]
+            : [],
+          meetSchedule: [],
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+          createdBy: coachUid,
+        });
+        existingKeys.add(key);
+        created++;
       }
 
-      const ref = doc(collection(db, 'swimmers'));
-      batch.set(ref, {
-        firstName: row.firstName,
-        lastName: row.lastName,
-        displayName: `${row.firstName} ${row.lastName}`,
-        group: row.group,
-        gender: row.gender || 'F',
-        dateOfBirth: row.dateOfBirth || null,
-        usaSwimmingId: row.usaSwimmingId || null,
-        active: true,
-        strengths: [],
-        weaknesses: [],
-        techniqueFocusAreas: [],
-        goals: [],
-        parentContacts: row.parentName
-          ? [
-              {
-                name: row.parentName,
-                phone: row.parentPhone || '',
-                email: row.parentEmail || '',
-                relationship: 'Parent',
-              },
-            ]
-          : [],
-        meetSchedule: [],
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-        createdBy: coachUid,
-      });
-      existingKeys.add(key);
-      created++;
+      try {
+        await batch.commit();
+      } catch (err: unknown) {
+        errors.push(`Batch error: ${err instanceof Error ? err.message : String(err)}`);
+      }
     }
 
-    try {
-      await batch.commit();
-    } catch (err: unknown) {
-      errors.push(`Batch error: ${err instanceof Error ? err.message : String(err)}`);
-    }
+    await updateImportJob(importJobId, {
+      status: 'complete',
+      summary: {
+        recordsProcessed: rows.length,
+        swimmersCreated: created,
+        swimmersUpdated: 0,
+        timesImported: 0,
+        errors,
+      },
+    });
+
+    return { created, skipped, errors };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Import failed';
+    await updateImportJob(importJobId, {
+      status: 'failed',
+      errorMessage,
+      summary: {
+        recordsProcessed: rows.length,
+        swimmersCreated: 0,
+        swimmersUpdated: 0,
+        timesImported: 0,
+        errors: [errorMessage],
+      },
+    });
+    throw error;
   }
-
-  return { created, skipped, errors };
 }

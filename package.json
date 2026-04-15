@@ -9,6 +9,7 @@
     "web": "expo start --web",
     "prepare": "husky",
     "lint": "eslint . --ext .ts,.tsx",
+    "lint:errors": "eslint . --ext .ts,.tsx --quiet",
     "lint:fix": "eslint . --ext .ts,.tsx --fix",
     "format": "prettier --write 'src/**/*.{ts,tsx}' 'app/**/*.{ts,tsx}'",
     "typecheck": "tsc --noEmit",
@@ -17,7 +18,15 @@
     "build:prod": "eas build --profile production --platform all",
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage"
+    "test:coverage": "jest --coverage",
+    "quality": "npm run typecheck && npm run lint:errors && npm test -- --runInBand && npm --prefix functions test -- --runInBand && npm --prefix functions run build && npm --prefix parent-portal run typecheck && npm --prefix parent-portal run lint && npm --prefix parent-portal run build && npm run madge:circular && npm run quality:strict-types && npm run quality:randomness",
+    "quality:dead-code": "knip",
+    "quality:strict-types": "bash scripts/check-strict-types.sh",
+    "quality:randomness": "bash scripts/check-randomness.sh",
+    "knip": "knip",
+    "madge:circular": "madge --circular --extensions ts,tsx src app functions/src",
+    "ts-prune": "ts-prune",
+    "depcheck": "depcheck"
   },
   "lint-staged": {
     "*.{ts,tsx}": [
@@ -74,17 +83,23 @@
     "@typescript-eslint/parser": "^8.58.0",
     "babel-plugin-transform-remove-console": "^6.9.4",
     "babel-preset-expo": "^55.0.15",
+    "depcheck": "^1.4.7",
+    "dotenv": "^17.4.2",
     "eslint": "^8.57.1",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.0.1",
+    "eslint-plugin-unused-imports": "^4.4.1",
     "husky": "^9.1.7",
     "jest": "^29.7.0",
     "jest-expo": "^55.0.13",
+    "knip": "^6.4.1",
     "lint-staged": "^16.4.0",
+    "madge": "^8.0.0",
     "prettier": "^3.8.1",
     "react-native-worklets": "^0.8.1",
     "react-test-renderer": "^19.1.0",
+    "ts-prune": "^0.10.3",
     "typescript": "~5.9.2"
   },
   "private": true

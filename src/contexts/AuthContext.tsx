@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
+import * as Notifications from 'expo-notifications';
 import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
@@ -8,6 +9,8 @@ import {
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../config/firebase';
 import type { Coach, CoachRole } from '../types/firestore.types';
+import { unregisterPushToken, unsubscribeFromAllTopics } from '../services/notifications';
+import { logger } from '../utils/logger';
 
 interface AuthState {
   user: User | null;
@@ -111,6 +114,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
+    if (state.coach) {
+      try {
+        const coachSnap = await getDoc(doc(db, 'coaches', state.coach.uid));
+        const coachData = coachSnap.exists() ? (coachSnap.data() as Coach) : null;
+        const registeredTokens = coachData?.fcmTokens ?? [];
+
+        if (registeredTokens.length > 0) {
+          const tokenResult = await Notifications.getExpoPushTokenAsync();
+          const currentToken = tokenResult.data;
+
+          await unsubscribeFromAllTopics(currentToken, state.coach.groups);
+          await unregisterPushToken(state.coach.uid, currentToken);
+        }
+      } catch (error) {
+        logger.warn('Push cleanup failed during sign out', {
+          error: error instanceof Error ? error.message : String(error),
+          coachUid: state.coach.uid,
+        });
+      }
+    }
+
     await firebaseSignOut(auth);
   };
 

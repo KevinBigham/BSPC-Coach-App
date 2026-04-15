@@ -13,48 +13,40 @@
  * Returns the same SDIFRecord shape so both parsers share the import pipeline.
  */
 
-import type { SDIFRecord, SDIFParseResult } from './sdifImport';
+import type { SDIFParseResult } from './sdifImport';
+import { parseSwimTimeString } from '../utils/time';
 
 // Hy-Tek event code mapping
 // HY3 encodes events as numeric codes
 const HY3_EVENT_MAP: Record<string, string> = {
-  '1': '50 Free', '2': '100 Free', '3': '200 Free', '4': '500 Free',
-  '5': '1000 Free', '6': '1650 Free',
-  '7': '50 Back', '8': '100 Back', '9': '200 Back',
-  '10': '50 Breast', '11': '100 Breast', '12': '200 Breast',
-  '13': '50 Fly', '14': '100 Fly', '15': '200 Fly',
-  '16': '100 IM', '17': '200 IM', '18': '400 IM',
+  '1': '50 Free',
+  '2': '100 Free',
+  '3': '200 Free',
+  '4': '500 Free',
+  '5': '1000 Free',
+  '6': '1650 Free',
+  '7': '50 Back',
+  '8': '100 Back',
+  '9': '200 Back',
+  '10': '50 Breast',
+  '11': '100 Breast',
+  '12': '200 Breast',
+  '13': '50 Fly',
+  '14': '100 Fly',
+  '15': '200 Fly',
+  '16': '100 IM',
+  '17': '200 IM',
+  '18': '400 IM',
 };
 
 const HY3_COURSE_MAP: Record<string, 'SCY' | 'SCM' | 'LCM'> = {
-  Y: 'SCY', S: 'SCM', L: 'LCM',
-  '1': 'SCY', '2': 'SCM', '3': 'LCM',
+  Y: 'SCY',
+  S: 'SCM',
+  L: 'LCM',
+  '1': 'SCY',
+  '2': 'SCM',
+  '3': 'LCM',
 };
-
-function parseHY3Time(timeStr: string): { hundredths: number; display: string } | null {
-  const cleaned = timeStr.trim();
-  if (!cleaned || cleaned === 'NT' || cleaned === 'NS' || cleaned === 'DQ' || cleaned === 'SCR' || cleaned === '0.00') {
-    return null;
-  }
-
-  // HY3 times can be in formats: "MM:SS.hh", "SS.hh", "M:SS.hh"
-  const colonMatch = cleaned.match(/^(\d+):(\d{2})\.(\d{2})$/);
-  if (colonMatch) {
-    const min = parseInt(colonMatch[1]);
-    const sec = parseInt(colonMatch[2]);
-    const hund = parseInt(colonMatch[3]);
-    return { hundredths: min * 6000 + sec * 100 + hund, display: cleaned };
-  }
-
-  const secMatch = cleaned.match(/^(\d+)\.(\d{2})$/);
-  if (secMatch) {
-    const sec = parseInt(secMatch[1]);
-    const hund = parseInt(secMatch[2]);
-    return { hundredths: sec * 100 + hund, display: cleaned };
-  }
-
-  return null;
-}
 
 function titleCase(str: string): string {
   return str.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
@@ -129,7 +121,13 @@ export function parseHY3(content: string): SDIFParseResult {
           const distMatch = eventCodeStr.match(/^(\d+)\s*([A-E])/);
           if (distMatch) {
             const dist = parseInt(distMatch[1]);
-            const strokeMap: Record<string, string> = { A: 'Free', B: 'Back', C: 'Breast', D: 'Fly', E: 'IM' };
+            const strokeMap: Record<string, string> = {
+              A: 'Free',
+              B: 'Back',
+              C: 'Breast',
+              D: 'Fly',
+              E: 'IM',
+            };
             const stroke = strokeMap[distMatch[2]];
             if (stroke && dist) event = `${dist} ${stroke}`;
           }
@@ -140,7 +138,7 @@ export function parseHY3(content: string): SDIFParseResult {
           continue;
         }
 
-        const parsedTime = parseHY3Time(timeStr);
+        const parsedTime = parseSwimTimeString(timeStr, ['0.00']);
         if (!parsedTime) continue; // Skip NT/DQ/SCR silently
 
         const course = HY3_COURSE_MAP[courseCode] || result.course;

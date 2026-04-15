@@ -8,6 +8,7 @@ import { SeasonTimeline } from '../../src/components/SeasonTimeline';
 import { getCurrentPhase } from '../../src/services/seasonPlanning';
 import { SkeletonList } from '../../src/components/Skeleton';
 import { colors, spacing, fontSize, borderRadius, fontFamily } from '../../src/config/theme';
+import { withScreenErrorBoundary } from '../../src/components/ScreenErrorBoundary';
 
 const PHASE_LABELS: Record<string, string> = {
   base: 'Base Training',
@@ -19,7 +20,7 @@ const PHASE_LABELS: Record<string, string> = {
   recovery: 'Recovery',
 };
 
-export default function SeasonIndexScreen() {
+function SeasonIndexScreen() {
   const { user } = useAuth();
   const { plans, loading, subscribePlans, setActivePlan } = useSeasonStore();
   const today = new Date().toISOString().split('T')[0];
@@ -172,3 +173,5 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
   },
 });
+
+export default withScreenErrorBoundary(SeasonIndexScreen, 'SeasonIndexScreen');

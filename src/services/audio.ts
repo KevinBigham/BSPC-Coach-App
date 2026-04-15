@@ -6,13 +6,12 @@ import {
   onSnapshot,
   addDoc,
   updateDoc,
-  deleteDoc,
   doc,
   serverTimestamp,
   limit as firestoreLimit,
   type Unsubscribe,
 } from 'firebase/firestore';
-import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
+import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../config/firebase';
 import type { AudioSession } from '../types/firestore.types';
 
@@ -95,15 +94,4 @@ export async function uploadAudio(
       },
     );
   });
-}
-
-export async function deleteAudioSession(sessionId: string, storagePath?: string): Promise<void> {
-  if (storagePath) {
-    try {
-      await deleteObject(ref(storage, storagePath));
-    } catch {
-      // File may already be deleted
-    }
-  }
-  await deleteDoc(doc(db, 'audio_sessions', sessionId));
 }

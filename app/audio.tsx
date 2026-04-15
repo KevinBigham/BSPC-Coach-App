@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   StyleSheet,
   Alert,
-  ActivityIndicator,
   Platform,
 } from 'react-native';
 import { Stack } from 'expo-router';
@@ -19,7 +18,7 @@ import {
   uploadAudio,
 } from '../src/services/audio';
 import { getTodayString } from '../src/utils/time';
-import { formatRelativeTime } from '../src/utils/date';
+import { formatRelativeTime, toDateSafe, type FirestoreTimestampLike } from '../src/utils/date';
 import { GROUPS, type Group } from '../src/config/constants';
 import {
   colors,
@@ -31,8 +30,14 @@ import {
 } from '../src/config/theme';
 import type { AudioSession } from '../src/types/firestore.types';
 import { enqueueUpload } from '../src/utils/offlineQueue';
+import { tapMedium, notifySuccess } from '../src/utils/haptics';
+import { withScreenErrorBoundary } from '../src/components/ScreenErrorBoundary';
 
 type RecordingState = 'idle' | 'recording' | 'stopped';
+type NativeRecording = {
+  stopAndUnloadAsync: () => Promise<unknown>;
+  getURI: () => string | null;
+};
 
 const STATUS_BADGE: Record<string, { label: string; color: string }> = {
   uploading: { label: 'UPLOADING', color: colors.accent },
@@ -45,7 +50,7 @@ const STATUS_BADGE: Record<string, { label: string; color: string }> = {
   queued: { label: 'QUEUED', color: colors.warning },
 };
 
-export default function AudioScreen() {
+function AudioScreen() {
   const { coach } = useAuth();
   const [recordingState, setRecordingState] = useState<RecordingState>('idle');
   const [duration, setDuration] = useState(0);
@@ -55,7 +60,7 @@ export default function AudioScreen() {
   const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
   const [sessions, setSessions] = useState<(AudioSession & { id: string })[]>([]);
 
-  const recordingRef = useRef<any>(null);
+  const recordingRef = useRef<NativeRecording | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
@@ -162,13 +167,29 @@ export default function AudioScreen() {
   };
 
   // ── Platform-dispatched recording controls ──
-  const startRecording = Platform.OS === 'web' ? startRecordingWeb : startRecordingNative;
-  const stopRecording = Platform.OS === 'web' ? stopRecordingWeb : stopRecordingNative;
+  const startRecording = async () => {
+    tapMedium();
+    if (Platform.OS === 'web') {
+      await startRecordingWeb();
+      return;
+    }
+
+    await startRecordingNative();
+  };
+
+  const stopRecording = async () => {
+    tapMedium();
+    if (Platform.OS === 'web') {
+      stopRecordingWeb();
+      return;
+    }
+
+    await stopRecordingNative();
+  };
 
   const handleUpload = async () => {
     const isWeb = Platform.OS === 'web';
 
-    // On web, build a blob URI from collected chunks
     if (isWeb && audioChunksRef.current.length === 0) return;
     if (!isWeb && !recordingRef.current) return;
     if (!coach) return;
@@ -191,12 +212,13 @@ export default function AudioScreen() {
         today,
         selectedGroup || undefined,
       );
-      await updateAudioSession(sessionId, { status: 'queued' as any });
+      await updateAudioSession(sessionId, { status: 'queued' });
       await enqueueUpload({
         type: 'audio',
         uri,
         metadata: { sessionId, coachId: coach.uid, date: today },
       });
+      notifySuccess();
       Alert.alert('Queued', 'Recording saved. It will upload when you reconnect.');
       setRecordingState('idle');
       setDuration(0);
@@ -208,7 +230,6 @@ export default function AudioScreen() {
     const today = getTodayString();
 
     try {
-      // Create session doc first
       const sessionId = await createAudioSession(
         coach.uid,
         coach.displayName || 'Unknown',
@@ -217,7 +238,6 @@ export default function AudioScreen() {
         selectedGroup || undefined,
       );
 
-      // Upload audio file
       const { storagePath, downloadUrl } = await uploadAudio(
         uri,
         coach.uid,
@@ -225,13 +245,11 @@ export default function AudioScreen() {
         setUploadProgress,
       );
 
-      // Update session with upload info
       await updateAudioSession(sessionId, {
         storagePath,
         status: 'uploaded',
-      } as any);
+      });
 
-      // Reset recording state
       recordingRef.current = null;
       audioChunksRef.current = [];
       mediaRecorderRef.current = null;
@@ -384,9 +402,7 @@ export default function AudioScreen() {
             sessions.map((session) => {
               const badge = STATUS_BADGE[session.status] || STATUS_BADGE.uploaded;
               const createdAt =
-                session.createdAt instanceof Date
-                  ? session.createdAt
-                  : (session.createdAt as any)?.toDate?.() || new Date();
+                toDateSafe(session.createdAt as FirestoreTimestampLike) ?? new Date();
 
               return (
                 <View key={session.id} style={styles.sessionCard}>
@@ -605,3 +621,5 @@ const styles = StyleSheet.create({
   statusBadgeText: { fontFamily: fontFamily.pixel, fontSize: fontSize.pixel },
   sessionCoach: { fontFamily: fontFamily.body, fontSize: fontSize.xs, color: colors.textSecondary },
 });
+
+export default withScreenErrorBoundary(AudioScreen, 'AudioScreen');

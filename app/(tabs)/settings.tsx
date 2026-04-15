@@ -7,10 +7,12 @@ import { db } from '../../src/config/firebase';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { getNotificationPermissionStatus } from '../../src/services/notifications';
 import { colors, spacing, fontSize, borderRadius, fontFamily } from '../../src/config/theme';
+import { tapHeavy, selectionChanged } from '../../src/utils/haptics';
+import { withScreenErrorBoundary } from '../../src/components/ScreenErrorBoundary';
 
 type NotifPref = 'dailyDigest' | 'newNotes' | 'attendanceAlerts' | 'aiDraftsReady';
 
-export default function SettingsScreen() {
+function SettingsScreen() {
   const { coach, user, signOut, isAdmin } = useAuth();
   const [saving, setSaving] = useState(false);
   const [pushStatus, setPushStatus] = useState<string>('unknown');
@@ -24,12 +26,20 @@ export default function SettingsScreen() {
   const handleSignOut = () => {
     Alert.alert('Sign Out', 'Are you sure?', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Sign Out', style: 'destructive', onPress: signOut },
+      {
+        text: 'Sign Out',
+        style: 'destructive',
+        onPress: () => {
+          tapHeavy();
+          void signOut();
+        },
+      },
     ]);
   };
 
   const toggleNotification = async (key: NotifPref) => {
     if (!user || !coach) return;
+    selectionChanged();
     const currentValue = coach.notificationPrefs[key];
     setSaving(true);
     try {
@@ -39,8 +49,8 @@ export default function SettingsScreen() {
       });
       // AuthContext will refresh from Firestore on next auth state change
       // For immediate feedback, we trust the toggle state
-    } catch (err: any) {
-      Alert.alert('Error', err.message);
+    } catch (err: unknown) {
+      Alert.alert('Error', err instanceof Error ? err.message : String(err));
     }
     setSaving(false);
   };
@@ -116,6 +126,12 @@ export default function SettingsScreen() {
             onPress={() => router.push('/meet-import')}
           >
             <Text style={styles.adminBtnText}>IMPORT MEET RESULTS</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.adminBtn, { marginTop: spacing.sm }]}
+            onPress={() => router.push('/import/history')}
+          >
+            <Text style={styles.adminBtnText}>IMPORT HISTORY</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -259,3 +275,5 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
 });
+
+export default withScreenErrorBoundary(SettingsScreen, 'SettingsScreen');

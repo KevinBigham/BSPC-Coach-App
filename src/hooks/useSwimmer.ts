@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import type { Swimmer } from '../types/firestore.types';
+import { toDateSafe, type FirestoreTimestampLike } from '../utils/date';
 
 type SwimmerWithId = Swimmer & { id: string };
 
@@ -24,9 +25,7 @@ export function useSwimmer(swimmerId: string | undefined): {
         const data = snap.data() as Swimmer;
         // Convert Timestamp to Date for dateOfBirth if needed
         const dateOfBirth =
-          data.dateOfBirth && typeof (data.dateOfBirth as any).toDate === 'function'
-            ? (data.dateOfBirth as any).toDate()
-            : data.dateOfBirth;
+          toDateSafe(data.dateOfBirth as FirestoreTimestampLike) ?? data.dateOfBirth;
         setSwimmer({ ...data, dateOfBirth, id: snap.id });
       } else {
         setSwimmer(null);

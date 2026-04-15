@@ -1,0 +1,8 @@
+appId: com.bspowercats.coach
+---
+- launchApp
+- tapOn: "MORE"
+- tapOn: "VIDEO"
+- assertVisible: "VIDEO ANALYSIS"
+- assertVisible:
+    text: "hidden"

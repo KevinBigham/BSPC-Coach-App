@@ -84,12 +84,10 @@ export function generatePracticePlanDoc(plan: PracticePlan): string {
     lines.push(`Description: ${plan.description}`);
   }
 
-  // Calculate total yardage
   const totalYardage = plan.sets.reduce((sum, set) => sum + formatSetYardage(set), 0);
   lines.push(`Total Yardage: ${totalYardage}`);
   lines.push('');
 
-  // Sort sets by order
   const sortedSets = [...plan.sets].sort((a, b) => a.order - b.order);
 
   for (const set of sortedSets) {
@@ -128,7 +126,6 @@ export function generateSwimmerReport(
   lines.push(header(`Swimmer Report: ${swimmer.displayName}`));
   lines.push('');
 
-  // Bio section
   lines.push(subHeader('Profile'));
   lines.push(`Name: ${swimmer.firstName} ${swimmer.lastName}`);
   lines.push(`Group: ${swimmer.group}`);
@@ -139,7 +136,6 @@ export function generateSwimmerReport(
   }
   lines.push('');
 
-  // Strengths / Weaknesses
   if (swimmer.strengths.length > 0) {
     lines.push('Strengths:');
     for (const s of swimmer.strengths) {
@@ -166,12 +162,10 @@ export function generateSwimmerReport(
   }
   lines.push('');
 
-  // Times section
   lines.push(subHeader('Best Times'));
   if (times.length === 0) {
     lines.push('  No times recorded.');
   } else {
-    // Group PRs by event, show only PRs or best per event
     const prsByEvent = new Map<string, SwimTime>();
     for (const t of times) {
       const key = `${t.event} (${t.course})`;
@@ -189,7 +183,6 @@ export function generateSwimmerReport(
   }
   lines.push('');
 
-  // All recorded times (chronological)
   lines.push(subHeader('Time History'));
   if (times.length === 0) {
     lines.push('  No times recorded.');
@@ -205,7 +198,6 @@ export function generateSwimmerReport(
   }
   lines.push('');
 
-  // Attendance section
   lines.push(subHeader('Attendance'));
   if (attendance.length === 0) {
     lines.push('  No attendance records.');
@@ -222,7 +214,6 @@ export function generateSwimmerReport(
     if (sickCount > 0) lines.push(`  Sick: ${sickCount}`);
     if (injuredCount > 0) lines.push(`  Injured: ${injuredCount}`);
 
-    // Last 5 dates
     const recentDates = [...attendance]
       .sort((a, b) => b.practiceDate.localeCompare(a.practiceDate))
       .slice(0, 5);
@@ -235,7 +226,6 @@ export function generateSwimmerReport(
   }
   lines.push('');
 
-  // Parent contacts
   if (swimmer.parentContacts.length > 0) {
     lines.push(subHeader('Parent Contacts'));
     for (const pc of swimmer.parentContacts) {
@@ -273,7 +263,6 @@ export function generateGroupReport(
   lines.push(header(`Group Report: ${group}`));
   lines.push('');
 
-  // Summary
   lines.push(subHeader('Summary'));
   lines.push(`Group: ${group}`);
   lines.push(`Total Swimmers: ${swimmers.length}`);
@@ -281,14 +270,12 @@ export function generateGroupReport(
   lines.push(`Inactive Swimmers: ${swimmers.filter((s) => !s.active).length}`);
   lines.push('');
 
-  // Attendance stats
   lines.push(subHeader('Attendance'));
   lines.push(`Total Practices: ${stats.totalPractices}`);
   lines.push(`Average Attendance: ${stats.averageAttendance.toFixed(1)}`);
   lines.push(`Attendance Rate: ${stats.attendancePercent.toFixed(1)}%`);
   lines.push('');
 
-  // Roster
   lines.push(subHeader('Roster'));
   if (swimmers.length === 0) {
     lines.push('  No swimmers in this group.');
@@ -301,7 +288,6 @@ export function generateGroupReport(
   }
   lines.push('');
 
-  // Gender breakdown
   const males = swimmers.filter((s) => s.gender === 'M').length;
   const females = swimmers.filter((s) => s.gender === 'F').length;
   lines.push(subHeader('Demographics'));

@@ -12,15 +12,11 @@ import {
   serverTimestamp,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
-import type { SeasonPlan, WeekPlan, FirebaseTimestamp } from '../types/firestore.types';
-import type { Group } from '../config/constants';
+import type { SeasonPlan, WeekPlan } from '../types/firestore.types';
 
 type SeasonPlanWithId = SeasonPlan & { id: string };
 type WeekPlanWithId = WeekPlan & { id: string };
 
-/**
- * Subscribe to season plans for a coach
- */
 export function subscribeSeasonPlans(
   coachId: string,
   callback: (plans: SeasonPlanWithId[]) => void,
@@ -35,28 +31,6 @@ export function subscribeSeasonPlans(
   });
 }
 
-/**
- * Subscribe to season plans for a specific group
- */
-export function subscribeSeasonPlansByGroup(
-  coachId: string,
-  group: Group,
-  callback: (plans: SeasonPlanWithId[]) => void,
-) {
-  const q = query(
-    collection(db, 'season_plans'),
-    where('coachId', '==', coachId),
-    where('group', '==', group),
-    orderBy('startDate', 'desc'),
-  );
-  return onSnapshot(q, (snapshot) => {
-    callback(snapshot.docs.map((d) => ({ id: d.id, ...d.data() }) as SeasonPlanWithId));
-  });
-}
-
-/**
- * Create a new season plan
- */
 export async function createSeasonPlan(
   plan: Omit<SeasonPlan, 'createdAt' | 'updatedAt'>,
 ): Promise<string> {
@@ -68,9 +42,6 @@ export async function createSeasonPlan(
   return docRef.id;
 }
 
-/**
- * Update a season plan
- */
 export async function updateSeasonPlan(
   planId: string,
   updates: Partial<Omit<SeasonPlan, 'createdAt'>>,
@@ -81,11 +52,7 @@ export async function updateSeasonPlan(
   });
 }
 
-/**
- * Delete a season plan and its weeks
- */
 export async function deleteSeasonPlan(planId: string): Promise<void> {
-  // Delete all weeks first
   const weeksSnap = await getDocs(collection(db, 'season_plans', planId, 'weeks'));
   const deletePromises = weeksSnap.docs.map((d) =>
     deleteDoc(doc(db, 'season_plans', planId, 'weeks', d.id)),
@@ -94,9 +61,6 @@ export async function deleteSeasonPlan(planId: string): Promise<void> {
   await deleteDoc(doc(db, 'season_plans', planId));
 }
 
-/**
- * Subscribe to week plans for a season
- */
 export function subscribeWeekPlans(planId: string, callback: (weeks: WeekPlanWithId[]) => void) {
   const q = query(collection(db, 'season_plans', planId, 'weeks'), orderBy('weekNumber', 'asc'));
   return onSnapshot(q, (snapshot) => {
@@ -104,9 +68,6 @@ export function subscribeWeekPlans(planId: string, callback: (weeks: WeekPlanWit
   });
 }
 
-/**
- * Create or update a week plan
- */
 export async function upsertWeekPlan(planId: string, week: WeekPlan): Promise<string> {
   if (week.id) {
     const { id: weekId, ...data } = week;
@@ -117,9 +78,6 @@ export async function upsertWeekPlan(planId: string, week: WeekPlan): Promise<st
   return docRef.id;
 }
 
-/**
- * Calculate total yardage for a season plan from its phases
- */
 export function calculateSeasonYardage(phases: SeasonPlan['phases']): number {
   return phases.reduce((total, phase) => {
     const startMs = new Date(phase.startDate).getTime();
@@ -129,18 +87,13 @@ export function calculateSeasonYardage(phases: SeasonPlan['phases']): number {
   }, 0);
 }
 
-/**
- * Calculate taper progress (percentage of peak yardage reduction)
- */
+/** Returns 0-100 % reduction from peak yardage. */
 export function calculateTaperProgress(peakYardage: number, currentYardage: number): number {
   if (peakYardage <= 0) return 0;
   const reduction = ((peakYardage - currentYardage) / peakYardage) * 100;
   return Math.round(Math.max(0, Math.min(100, reduction)));
 }
 
-/**
- * Get the current phase for a given date
- */
 export function getCurrentPhase(
   phases: SeasonPlan['phases'],
   date: string = new Date().toISOString().split('T')[0],
@@ -148,9 +101,6 @@ export function getCurrentPhase(
   return phases.find((p) => date >= p.startDate && date <= p.endDate) ?? null;
 }
 
-/**
- * Generate week plans from season phases
- */
 export function generateWeekPlans(phases: SeasonPlan['phases']): Omit<WeekPlan, 'id'>[] {
   const weeks: Omit<WeekPlan, 'id'>[] = [];
   let weekNumber = 1;

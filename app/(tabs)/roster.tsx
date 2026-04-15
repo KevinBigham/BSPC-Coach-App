@@ -31,6 +31,7 @@ import type {
   AttendanceAggregation,
   SwimmerAggregation,
 } from '../../src/types/firestore.types';
+import { withScreenErrorBoundary } from '../../src/components/ScreenErrorBoundary';
 
 type SortOption = 'az' | 'za' | 'group' | 'newest';
 const SORT_LABELS: Record<SortOption, string> = {
@@ -40,7 +41,7 @@ const SORT_LABELS: Record<SortOption, string> = {
   newest: 'Newest',
 };
 
-export default function RosterScreen() {
+function RosterScreen() {
   const params = useLocalSearchParams<{ group?: string }>();
   const { isAdmin } = useAuth();
   const activeSwimmers = useSwimmersStore((s) => s.swimmers);
@@ -115,15 +116,14 @@ export default function RosterScreen() {
       );
     }
 
-    // Sort
     switch (sort) {
       case 'za':
         result = [...result].sort((a, b) => b.lastName.localeCompare(a.lastName));
         break;
       case 'group':
         result = [...result].sort((a, b) => {
-          const gi = GROUPS.indexOf(a.group as any);
-          const gj = GROUPS.indexOf(b.group as any);
+          const gi = GROUPS.indexOf(a.group);
+          const gj = GROUPS.indexOf(b.group);
           return gi - gj || a.lastName.localeCompare(b.lastName);
         });
         break;
@@ -155,7 +155,7 @@ export default function RosterScreen() {
         {
           text: 'Activate',
           onPress: async () => {
-            await updateSwimmer(swimmer.id, { active: true } as any);
+            await updateSwimmer(swimmer.id, { active: true });
           },
         },
       ],
@@ -233,8 +233,8 @@ export default function RosterScreen() {
             try {
               const csv = exportRosterCSV(swimmers);
               await shareCSV('bspc_roster.csv', csv);
-            } catch (err: any) {
-              Alert.alert('Export Error', err.message);
+            } catch (err: unknown) {
+              Alert.alert('Export Error', err instanceof Error ? err.message : String(err));
             }
           }}
         >
@@ -554,3 +554,5 @@ const styles = StyleSheet.create({
   },
   fabText: { color: colors.bgDeep, fontSize: 28, fontWeight: '400', marginTop: -2 },
 });
+
+export default withScreenErrorBoundary(RosterScreen, 'RosterScreen');
