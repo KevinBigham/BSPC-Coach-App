@@ -11,7 +11,14 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { useAuth } from '../../src/contexts/AuthContext';
-import { colors, spacing, fontSize, borderRadius, fontFamily, groupColors } from '../../src/config/theme';
+import {
+  colors,
+  spacing,
+  fontSize,
+  borderRadius,
+  fontFamily,
+  groupColors,
+} from '../../src/config/theme';
 import { GROUPS, NOTE_TAGS, type Group, type NoteTag } from '../../src/config/constants';
 import { getTodayString } from '../../src/utils/time';
 import { formatRelativeTime } from '../../src/utils/date';
@@ -28,11 +35,13 @@ import {
   calculateTotalYardage,
 } from '../../src/services/practicePlans';
 import { usePracticeStore } from '../../src/stores/practiceStore';
+import { tapLight, notifySuccess } from '../../src/utils/haptics';
 import type { PracticePlan } from '../../src/types/firestore.types';
+import { withScreenErrorBoundary } from '../../src/components/ScreenErrorBoundary';
 
 type PlanWithId = PracticePlan & { id: string };
 
-export default function PracticeScreen() {
+function PracticeScreen() {
   const { coach } = useAuth();
   const [plans, setPlans] = useState<PlanWithId[]>([]);
   const [loading, setLoading] = useState(true);
@@ -47,10 +56,13 @@ export default function PracticeScreen() {
   const [gnSaving, setGnSaving] = useState(false);
 
   useEffect(() => {
-    return subscribePracticePlans((data) => {
-      setPlans(data);
-      setLoading(false);
-    }, { max: 50 });
+    return subscribePracticePlans(
+      (data) => {
+        setPlans(data);
+        setLoading(false);
+      },
+      { max: 50 },
+    );
   }, []);
 
   useEffect(() => {
@@ -61,7 +73,15 @@ export default function PracticeScreen() {
     if (!gnText.trim() || !coach) return;
     setGnSaving(true);
     try {
-      await addGroupNote(gnText.trim(), gnTags, gnGroup, coach.uid, coach.displayName || 'Unknown', getTodayString());
+      await addGroupNote(
+        gnText.trim(),
+        gnTags,
+        gnGroup,
+        coach.uid,
+        coach.displayName || 'Unknown',
+        getTodayString(),
+      );
+      notifySuccess();
       setGnText('');
       setGnTags([]);
     } catch (err: any) {
@@ -73,7 +93,14 @@ export default function PracticeScreen() {
   const handleDeleteGroupNote = (noteId: string) => {
     Alert.alert('Delete Note', 'Delete this group note?', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => deleteGroupNote(noteId) },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: () => {
+          tapLight();
+          void deleteGroupNote(noteId);
+        },
+      },
     ]);
   };
 
@@ -131,13 +158,28 @@ export default function PracticeScreen() {
             <Text style={styles.backText}>← BACK</Text>
           </TouchableOpacity>
           <View style={styles.detailActions}>
-            <TouchableOpacity onPress={() => { setSelectedPlan(null); handleEdit(selectedPlan); }} style={styles.actionBtn}>
+            <TouchableOpacity
+              onPress={() => {
+                setSelectedPlan(null);
+                handleEdit(selectedPlan);
+              }}
+              style={styles.actionBtn}
+            >
               <Text style={styles.actionBtnText}>EDIT</Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => handleDuplicate(selectedPlan)} style={styles.actionBtn}>
+            <TouchableOpacity
+              onPress={() => handleDuplicate(selectedPlan)}
+              style={styles.actionBtn}
+            >
               <Text style={styles.actionBtnText}>COPY</Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => { handleDelete(selectedPlan); setSelectedPlan(null); }} style={[styles.actionBtn, { borderColor: colors.error }]}>
+            <TouchableOpacity
+              onPress={() => {
+                handleDelete(selectedPlan);
+                setSelectedPlan(null);
+              }}
+              style={[styles.actionBtn, { borderColor: colors.error }]}
+            >
               <Text style={[styles.actionBtnText, { color: colors.error }]}>DELETE</Text>
             </TouchableOpacity>
           </View>
@@ -145,7 +187,9 @@ export default function PracticeScreen() {
 
         <ScrollView style={styles.scrollArea} contentContainerStyle={styles.scrollContent}>
           <Text style={styles.detailTitle}>{selectedPlan.title.toUpperCase()}</Text>
-          {selectedPlan.description ? <Text style={styles.detailDesc}>{selectedPlan.description}</Text> : null}
+          {selectedPlan.description ? (
+            <Text style={styles.detailDesc}>{selectedPlan.description}</Text>
+          ) : null}
 
           <View style={styles.detailStatsRow}>
             <View style={styles.detailStatBox}>
@@ -158,7 +202,15 @@ export default function PracticeScreen() {
             </View>
             {selectedPlan.group && (
               <View style={styles.detailStatBox}>
-                <Text style={[styles.detailStatNum, { color: groupColors[selectedPlan.group] || colors.accent, fontSize: fontSize.lg }]}>
+                <Text
+                  style={[
+                    styles.detailStatNum,
+                    {
+                      color: groupColors[selectedPlan.group] || colors.accent,
+                      fontSize: fontSize.lg,
+                    },
+                  ]}
+                >
                   {selectedPlan.group}
                 </Text>
                 <Text style={styles.detailStatLabel}>GROUP</Text>
@@ -181,8 +233,12 @@ export default function PracticeScreen() {
                       <Text style={styles.setItemMain}>
                         {item.reps} × {item.distance} {item.stroke}
                       </Text>
-                      {item.interval && <Text style={styles.setItemInterval}>@ {item.interval}</Text>}
-                      {item.description && <Text style={styles.setItemDesc}>{item.description}</Text>}
+                      {item.interval && (
+                        <Text style={styles.setItemInterval}>@ {item.interval}</Text>
+                      )}
+                      {item.description && (
+                        <Text style={styles.setItemDesc}>{item.description}</Text>
+                      )}
                     </View>
                     <Text style={styles.setItemYardage}>{yardage}</Text>
                     {item.focusPoints && item.focusPoints.length > 0 && (
@@ -222,15 +278,24 @@ export default function PracticeScreen() {
           <TouchableOpacity style={styles.primaryBtn} onPress={handleCreate}>
             <Text style={styles.primaryBtnText}>+ NEW PRACTICE</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.secondaryBtn} onPress={() => router.push('/practice/templates')}>
+          <TouchableOpacity
+            style={styles.secondaryBtn}
+            onPress={() => router.push('/practice/templates')}
+          >
             <Text style={styles.secondaryBtnText}>TEMPLATES</Text>
           </TouchableOpacity>
         </View>
         <View style={styles.actionRow}>
-          <TouchableOpacity style={styles.libraryBtn} onPress={() => router.push('/practice/library')}>
+          <TouchableOpacity
+            style={styles.libraryBtn}
+            onPress={() => router.push('/practice/library')}
+          >
             <Text style={styles.libraryBtnText}>LIBRARY</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.aiBtn} onPress={() => router.push('/practice/ai-generate')}>
+          <TouchableOpacity
+            style={styles.aiBtn}
+            onPress={() => router.push('/practice/ai-generate')}
+          >
             <Text style={styles.aiBtnText}>AI GENERATE</Text>
           </TouchableOpacity>
         </View>
@@ -256,11 +321,7 @@ export default function PracticeScreen() {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>TEMPLATES</Text>
             {templates.map((plan) => (
-              <PlanCard
-                key={plan.id}
-                plan={plan}
-                onPress={() => setSelectedPlan(plan)}
-              />
+              <PlanCard key={plan.id} plan={plan} onPress={() => setSelectedPlan(plan)} />
             ))}
           </View>
         )}
@@ -270,11 +331,7 @@ export default function PracticeScreen() {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>SCHEDULED</Text>
             {scheduled.map((plan) => (
-              <PlanCard
-                key={plan.id}
-                plan={plan}
-                onPress={() => setSelectedPlan(plan)}
-              />
+              <PlanCard key={plan.id} plan={plan} onPress={() => setSelectedPlan(plan)} />
             ))}
           </View>
         )}
@@ -294,15 +351,29 @@ export default function PracticeScreen() {
 
           {/* Add Group Note Form */}
           <View style={styles.gnForm}>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: spacing.sm }}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={{ marginBottom: spacing.sm }}
+            >
               <View style={styles.gnGroupRow}>
                 {GROUPS.map((g) => (
                   <TouchableOpacity
                     key={g}
-                    style={[styles.gnGroupChip, gnGroup === g && { backgroundColor: colors.purple, borderColor: groupColors[g] }]}
+                    style={[
+                      styles.gnGroupChip,
+                      gnGroup === g && {
+                        backgroundColor: colors.purple,
+                        borderColor: groupColors[g],
+                      },
+                    ]}
                     onPress={() => setGnGroup(g)}
                   >
-                    <Text style={[styles.gnGroupChipText, gnGroup === g && { color: groupColors[g] }]}>{g}</Text>
+                    <Text
+                      style={[styles.gnGroupChipText, gnGroup === g && { color: groupColors[g] }]}
+                    >
+                      {g}
+                    </Text>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -315,15 +386,27 @@ export default function PracticeScreen() {
               placeholderTextColor={colors.textSecondary}
               multiline
             />
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: spacing.sm }}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={{ marginTop: spacing.sm }}
+            >
               <View style={styles.gnTagRow}>
                 {NOTE_TAGS.slice(0, 10).map((tag) => (
                   <TouchableOpacity
                     key={tag}
                     style={[styles.gnTag, gnTags.includes(tag) && styles.gnTagActive]}
-                    onPress={() => setGnTags((prev) => prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag])}
+                    onPress={() =>
+                      setGnTags((prev) =>
+                        prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag],
+                      )
+                    }
                   >
-                    <Text style={[styles.gnTagText, gnTags.includes(tag) && styles.gnTagTextActive]}>{tag}</Text>
+                    <Text
+                      style={[styles.gnTagText, gnTags.includes(tag) && styles.gnTagTextActive]}
+                    >
+                      {tag}
+                    </Text>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -339,9 +422,10 @@ export default function PracticeScreen() {
 
           {/* Group Notes List */}
           {groupNotes.slice(0, 15).map((note) => {
-            const createdAt = note.createdAt instanceof Date
-              ? note.createdAt
-              : (note.createdAt as any)?.toDate?.() || new Date();
+            const createdAt =
+              note.createdAt instanceof Date
+                ? note.createdAt
+                : (note.createdAt as any)?.toDate?.() || new Date();
             return (
               <TouchableOpacity
                 key={note.id}
@@ -351,8 +435,20 @@ export default function PracticeScreen() {
                 }}
               >
                 <View style={styles.gnCardHeader}>
-                  <View style={[styles.gnCardGroupBadge, { borderColor: groupColors[note.group] || colors.purple }]}>
-                    <Text style={[styles.gnCardGroupText, { color: groupColors[note.group] || colors.accent }]}>{note.group}</Text>
+                  <View
+                    style={[
+                      styles.gnCardGroupBadge,
+                      { borderColor: groupColors[note.group] || colors.purple },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.gnCardGroupText,
+                        { color: groupColors[note.group] || colors.accent },
+                      ]}
+                    >
+                      {note.group}
+                    </Text>
                   </View>
                   <Text style={styles.gnCardCoach}>{note.coachName}</Text>
                   <Text style={styles.gnCardTime}>{formatRelativeTime(createdAt)}</Text>
@@ -371,9 +467,7 @@ export default function PracticeScreen() {
             );
           })}
 
-          {groupNotes.length === 0 && (
-            <Text style={styles.emptyText}>No group notes yet</Text>
-          )}
+          {groupNotes.length === 0 && <Text style={styles.emptyText}>No group notes yet</Text>}
         </View>
       </ScrollView>
 
@@ -398,12 +492,21 @@ function PlanCard({ plan, onPress }: { plan: PlanWithId; onPress: () => void }) 
         <View style={{ flex: 1 }}>
           <Text style={styles.planTitle}>{plan.title.toUpperCase()}</Text>
           {plan.description ? (
-            <Text style={styles.planDesc} numberOfLines={1}>{plan.description}</Text>
+            <Text style={styles.planDesc} numberOfLines={1}>
+              {plan.description}
+            </Text>
           ) : null}
         </View>
         {plan.group && (
-          <View style={[styles.planGroupBadge, { borderColor: groupColors[plan.group] || colors.purple }]}>
-            <Text style={[styles.planGroupText, { color: groupColors[plan.group] || colors.accent }]}>
+          <View
+            style={[
+              styles.planGroupBadge,
+              { borderColor: groupColors[plan.group] || colors.purple },
+            ]}
+          >
+            <Text
+              style={[styles.planGroupText, { color: groupColors[plan.group] || colors.accent }]}
+            >
               {plan.group}
             </Text>
           </View>
@@ -435,7 +538,12 @@ function PlanCard({ plan, onPress }: { plan: PlanWithId; onPress: () => void }) 
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bgBase },
-  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.bgBase },
+  centered: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.bgBase,
+  },
   scrollArea: { flex: 1 },
   scrollContent: { padding: spacing.lg, paddingBottom: spacing.xxxl + 60 },
 
@@ -447,103 +555,446 @@ const styles = StyleSheet.create({
     borderBottomWidth: 2,
     borderBottomColor: colors.purple,
   },
-  pixelLabel: { fontFamily: fontFamily.pixel, fontSize: fontSize.pixel, color: colors.gold, letterSpacing: 1, marginBottom: spacing.xs },
-  screenTitle: { fontFamily: fontFamily.heading, fontSize: fontSize.xxxl, color: colors.text, letterSpacing: 2 },
+  pixelLabel: {
+    fontFamily: fontFamily.pixel,
+    fontSize: fontSize.pixel,
+    color: colors.gold,
+    letterSpacing: 1,
+    marginBottom: spacing.xs,
+  },
+  screenTitle: {
+    fontFamily: fontFamily.heading,
+    fontSize: fontSize.xxxl,
+    color: colors.text,
+    letterSpacing: 2,
+  },
 
   // Action Buttons
   actionRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg },
-  primaryBtn: { flex: 1, backgroundColor: colors.purple, padding: spacing.md, borderRadius: borderRadius.md, alignItems: 'center' },
-  primaryBtnText: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.md, color: colors.text, letterSpacing: 1 },
-  secondaryBtn: { flex: 1, padding: spacing.md, borderRadius: borderRadius.md, borderWidth: 2, borderColor: colors.purple, alignItems: 'center' },
-  secondaryBtnText: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.md, color: colors.accent, letterSpacing: 1 },
-  libraryBtn: { flex: 1, padding: spacing.md, borderRadius: borderRadius.md, borderWidth: 1, borderColor: colors.border, alignItems: 'center', backgroundColor: colors.bgDeep },
-  libraryBtnText: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.sm, color: colors.text, letterSpacing: 1 },
-  aiBtn: { flex: 1, padding: spacing.md, borderRadius: borderRadius.md, borderWidth: 1, borderColor: colors.gold, alignItems: 'center', backgroundColor: 'rgba(255,215,0,0.06)' },
-  aiBtnText: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.sm, color: colors.gold, letterSpacing: 1 },
+  primaryBtn: {
+    flex: 1,
+    backgroundColor: colors.purple,
+    padding: spacing.md,
+    borderRadius: borderRadius.md,
+    alignItems: 'center',
+  },
+  primaryBtnText: {
+    fontFamily: fontFamily.bodySemi,
+    fontSize: fontSize.md,
+    color: colors.text,
+    letterSpacing: 1,
+  },
+  secondaryBtn: {
+    flex: 1,
+    padding: spacing.md,
+    borderRadius: borderRadius.md,
+    borderWidth: 2,
+    borderColor: colors.purple,
+    alignItems: 'center',
+  },
+  secondaryBtnText: {
+    fontFamily: fontFamily.bodySemi,
+    fontSize: fontSize.md,
+    color: colors.accent,
+    letterSpacing: 1,
+  },
+  libraryBtn: {
+    flex: 1,
+    padding: spacing.md,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    backgroundColor: colors.bgDeep,
+  },
+  libraryBtnText: {
+    fontFamily: fontFamily.bodySemi,
+    fontSize: fontSize.sm,
+    color: colors.text,
+    letterSpacing: 1,
+  },
+  aiBtn: {
+    flex: 1,
+    padding: spacing.md,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.gold,
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,215,0,0.06)',
+  },
+  aiBtnText: {
+    fontFamily: fontFamily.bodySemi,
+    fontSize: fontSize.sm,
+    color: colors.gold,
+    letterSpacing: 1,
+  },
 
   // Stats
   statsRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg },
-  statBox: { flex: 1, backgroundColor: colors.bgDeep, borderRadius: borderRadius.lg, padding: spacing.md, alignItems: 'center', borderWidth: 1, borderColor: colors.border },
+  statBox: {
+    flex: 1,
+    backgroundColor: colors.bgDeep,
+    borderRadius: borderRadius.lg,
+    padding: spacing.md,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
   statNum: { fontFamily: fontFamily.stat, fontSize: fontSize.xxl, color: colors.accent },
-  statLabel: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.xs, color: colors.textSecondary, letterSpacing: 1, marginTop: 2 },
+  statLabel: {
+    fontFamily: fontFamily.bodySemi,
+    fontSize: fontSize.xs,
+    color: colors.textSecondary,
+    letterSpacing: 1,
+    marginTop: 2,
+  },
 
   // Section
   section: { marginBottom: spacing.xl },
-  sectionTitle: { fontFamily: fontFamily.heading, fontSize: fontSize.xl, color: colors.text, letterSpacing: 1, marginBottom: spacing.sm },
+  sectionTitle: {
+    fontFamily: fontFamily.heading,
+    fontSize: fontSize.xl,
+    color: colors.text,
+    letterSpacing: 1,
+    marginBottom: spacing.sm,
+  },
 
   // Plan Card
-  planCard: { backgroundColor: colors.bgDeep, borderRadius: borderRadius.lg, padding: spacing.lg, marginBottom: spacing.sm, borderWidth: 1, borderColor: colors.border },
-  planCardHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
-  planTitle: { fontFamily: fontFamily.heading, fontSize: fontSize.xl, color: colors.text, letterSpacing: 1 },
-  planDesc: { fontFamily: fontFamily.body, fontSize: fontSize.sm, color: colors.textSecondary, marginTop: 2 },
-  planGroupBadge: { paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: borderRadius.xs, borderWidth: 1, backgroundColor: 'rgba(0,0,0,0.3)' },
+  planCard: {
+    backgroundColor: colors.bgDeep,
+    borderRadius: borderRadius.lg,
+    padding: spacing.lg,
+    marginBottom: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  planCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+  },
+  planTitle: {
+    fontFamily: fontFamily.heading,
+    fontSize: fontSize.xl,
+    color: colors.text,
+    letterSpacing: 1,
+  },
+  planDesc: {
+    fontFamily: fontFamily.body,
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  planGroupBadge: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: borderRadius.xs,
+    borderWidth: 1,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+  },
   planGroupText: { fontFamily: fontFamily.pixel, fontSize: fontSize.pixel },
-  planCardMeta: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.sm, gap: spacing.xs },
-  planMetaText: { fontFamily: fontFamily.statMono, fontSize: fontSize.xs, color: colors.textSecondary },
+  planCardMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: spacing.sm,
+    gap: spacing.xs,
+  },
+  planMetaText: {
+    fontFamily: fontFamily.statMono,
+    fontSize: fontSize.xs,
+    color: colors.textSecondary,
+  },
   planMetaDot: { color: colors.textSecondary, fontSize: fontSize.xs },
-  templateBadge: { backgroundColor: 'rgba(255,215,0,0.1)', paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: borderRadius.xs, borderWidth: 1, borderColor: colors.gold, marginLeft: spacing.sm },
+  templateBadge: {
+    backgroundColor: 'rgba(255,215,0,0.1)',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: borderRadius.xs,
+    borderWidth: 1,
+    borderColor: colors.gold,
+    marginLeft: spacing.sm,
+  },
   templateBadgeText: { fontFamily: fontFamily.pixel, fontSize: fontSize.pixel, color: colors.gold },
 
   // Empty State
   emptyState: { paddingVertical: spacing.xxxl, alignItems: 'center' },
-  emptyPixel: { fontFamily: fontFamily.pixel, fontSize: fontSize.pixel, color: colors.gold, marginBottom: spacing.md },
-  emptyText: { fontFamily: fontFamily.body, fontSize: fontSize.sm, color: colors.textSecondary, textAlign: 'center', lineHeight: 20, maxWidth: 260 },
+  emptyPixel: {
+    fontFamily: fontFamily.pixel,
+    fontSize: fontSize.pixel,
+    color: colors.gold,
+    marginBottom: spacing.md,
+  },
+  emptyText: {
+    fontFamily: fontFamily.body,
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 20,
+    maxWidth: 260,
+  },
 
   // FAB
-  fab: { position: 'absolute', bottom: 24, right: 24, width: 56, height: 56, borderRadius: 28, backgroundColor: colors.purple, alignItems: 'center', justifyContent: 'center', elevation: 8, shadowColor: colors.purpleGlow, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 8 },
+  fab: {
+    position: 'absolute',
+    bottom: 24,
+    right: 24,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: colors.purple,
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 8,
+    shadowColor: colors.purpleGlow,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+  },
   fabText: { fontFamily: fontFamily.heading, fontSize: 32, color: colors.text, marginTop: -2 },
 
   // Detail
-  detailHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: spacing.lg, backgroundColor: colors.bgElevated, borderBottomWidth: 1, borderBottomColor: colors.border },
+  detailHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: spacing.lg,
+    backgroundColor: colors.bgElevated,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
   detailActions: { flexDirection: 'row', gap: spacing.sm },
-  actionBtn: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: borderRadius.sm, borderWidth: 1, borderColor: colors.border },
+  actionBtn: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
   actionBtnText: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.xs, color: colors.text },
   backButton: { paddingVertical: spacing.xs },
   backText: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.sm, color: colors.accent },
-  detailTitle: { fontFamily: fontFamily.heading, fontSize: fontSize.xxxl, color: colors.text, letterSpacing: 2 },
-  detailDesc: { fontFamily: fontFamily.body, fontSize: fontSize.md, color: colors.textSecondary, marginTop: spacing.xs },
-  detailStatsRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.lg, marginBottom: spacing.lg },
-  detailStatBox: { flex: 1, backgroundColor: colors.bgDeep, borderRadius: borderRadius.lg, padding: spacing.md, alignItems: 'center', borderWidth: 1, borderColor: colors.border },
+  detailTitle: {
+    fontFamily: fontFamily.heading,
+    fontSize: fontSize.xxxl,
+    color: colors.text,
+    letterSpacing: 2,
+  },
+  detailDesc: {
+    fontFamily: fontFamily.body,
+    fontSize: fontSize.md,
+    color: colors.textSecondary,
+    marginTop: spacing.xs,
+  },
+  detailStatsRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.lg,
+    marginBottom: spacing.lg,
+  },
+  detailStatBox: {
+    flex: 1,
+    backgroundColor: colors.bgDeep,
+    borderRadius: borderRadius.lg,
+    padding: spacing.md,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
   detailStatNum: { fontFamily: fontFamily.stat, fontSize: fontSize.xxl, color: colors.accent },
-  detailStatLabel: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.xs, color: colors.textSecondary, letterSpacing: 1, marginTop: 2 },
+  detailStatLabel: {
+    fontFamily: fontFamily.bodySemi,
+    fontSize: fontSize.xs,
+    color: colors.textSecondary,
+    letterSpacing: 1,
+    marginTop: 2,
+  },
 
   // Set Card (detail view)
-  setCard: { backgroundColor: colors.bgDeep, borderRadius: borderRadius.lg, padding: spacing.lg, marginBottom: spacing.md, borderWidth: 1, borderColor: colors.border },
-  setHeader: { marginBottom: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.borderLight, paddingBottom: spacing.sm },
-  setName: { fontFamily: fontFamily.heading, fontSize: fontSize.xl, color: colors.gold, letterSpacing: 1 },
-  setCategoryLabel: { fontFamily: fontFamily.pixel, fontSize: fontSize.pixel, color: colors.textSecondary, letterSpacing: 1, marginTop: 2 },
-  setDesc: { fontFamily: fontFamily.body, fontSize: fontSize.sm, color: colors.textSecondary, marginTop: 2 },
-  setItem: { paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.borderLight, flexDirection: 'row', alignItems: 'flex-start', flexWrap: 'wrap' },
+  setCard: {
+    backgroundColor: colors.bgDeep,
+    borderRadius: borderRadius.lg,
+    padding: spacing.lg,
+    marginBottom: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  setHeader: {
+    marginBottom: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderLight,
+    paddingBottom: spacing.sm,
+  },
+  setName: {
+    fontFamily: fontFamily.heading,
+    fontSize: fontSize.xl,
+    color: colors.gold,
+    letterSpacing: 1,
+  },
+  setCategoryLabel: {
+    fontFamily: fontFamily.pixel,
+    fontSize: fontSize.pixel,
+    color: colors.textSecondary,
+    letterSpacing: 1,
+    marginTop: 2,
+  },
+  setDesc: {
+    fontFamily: fontFamily.body,
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  setItem: {
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderLight,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    flexWrap: 'wrap',
+  },
   setItemLeft: { flex: 1 },
   setItemMain: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.md, color: colors.text },
-  setItemInterval: { fontFamily: fontFamily.statMono, fontSize: fontSize.sm, color: colors.accent, marginTop: 2 },
-  setItemDesc: { fontFamily: fontFamily.body, fontSize: fontSize.sm, color: colors.textSecondary, marginTop: 2 },
-  setItemYardage: { fontFamily: fontFamily.stat, fontSize: fontSize.lg, color: colors.textSecondary, marginLeft: spacing.sm },
-  focusRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.xs, width: '100%' },
-  focusBadge: { backgroundColor: 'rgba(74,14,120,0.3)', paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: borderRadius.xs, borderWidth: 1, borderColor: colors.purple },
+  setItemInterval: {
+    fontFamily: fontFamily.statMono,
+    fontSize: fontSize.sm,
+    color: colors.accent,
+    marginTop: 2,
+  },
+  setItemDesc: {
+    fontFamily: fontFamily.body,
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  setItemYardage: {
+    fontFamily: fontFamily.stat,
+    fontSize: fontSize.lg,
+    color: colors.textSecondary,
+    marginLeft: spacing.sm,
+  },
+  focusRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+    marginTop: spacing.xs,
+    width: '100%',
+  },
+  focusBadge: {
+    backgroundColor: 'rgba(74,14,120,0.3)',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: borderRadius.xs,
+    borderWidth: 1,
+    borderColor: colors.purple,
+  },
   focusText: { fontFamily: fontFamily.pixel, fontSize: fontSize.pixel, color: colors.purpleLight },
 
   // Group Notes
-  gnForm: { backgroundColor: colors.bgDeep, borderRadius: borderRadius.lg, padding: spacing.lg, borderWidth: 1, borderColor: colors.border, marginBottom: spacing.md },
+  gnForm: {
+    backgroundColor: colors.bgDeep,
+    borderRadius: borderRadius.lg,
+    padding: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginBottom: spacing.md,
+  },
   gnGroupRow: { flexDirection: 'row', gap: spacing.xs },
-  gnGroupChip: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: borderRadius.sm, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bgBase },
-  gnGroupChipText: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.xs, color: colors.textSecondary },
-  gnInput: { borderWidth: 1, borderColor: colors.border, borderRadius: borderRadius.sm, padding: spacing.md, fontFamily: fontFamily.body, fontSize: fontSize.md, color: colors.text, backgroundColor: colors.bgBase, minHeight: 60, textAlignVertical: 'top' },
+  gnGroupChip: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.bgBase,
+  },
+  gnGroupChipText: {
+    fontFamily: fontFamily.bodySemi,
+    fontSize: fontSize.xs,
+    color: colors.textSecondary,
+  },
+  gnInput: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: borderRadius.sm,
+    padding: spacing.md,
+    fontFamily: fontFamily.body,
+    fontSize: fontSize.md,
+    color: colors.text,
+    backgroundColor: colors.bgBase,
+    minHeight: 60,
+    textAlignVertical: 'top',
+  },
   gnTagRow: { flexDirection: 'row', gap: spacing.xs },
-  gnTag: { paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, borderRadius: borderRadius.sm, backgroundColor: colors.bgBase, borderWidth: 1, borderColor: colors.border },
+  gnTag: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.sm,
+    backgroundColor: colors.bgBase,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
   gnTagActive: { backgroundColor: colors.purple, borderColor: colors.purpleLight },
-  gnTagText: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.xs, color: colors.textSecondary },
+  gnTagText: {
+    fontFamily: fontFamily.bodySemi,
+    fontSize: fontSize.xs,
+    color: colors.textSecondary,
+  },
   gnTagTextActive: { color: colors.text },
-  gnSaveBtn: { backgroundColor: colors.purple, padding: spacing.md, borderRadius: borderRadius.sm, alignItems: 'center', marginTop: spacing.md },
+  gnSaveBtn: {
+    backgroundColor: colors.purple,
+    padding: spacing.md,
+    borderRadius: borderRadius.sm,
+    alignItems: 'center',
+    marginTop: spacing.md,
+  },
   gnSaveBtnText: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.md, color: colors.text },
-  gnCard: { backgroundColor: colors.bgDeep, borderRadius: borderRadius.md, padding: spacing.lg, marginBottom: spacing.sm, borderWidth: 1, borderColor: colors.border },
-  gnCardHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm },
-  gnCardGroupBadge: { paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: borderRadius.xs, borderWidth: 1, backgroundColor: 'rgba(0,0,0,0.3)' },
+  gnCard: {
+    backgroundColor: colors.bgDeep,
+    borderRadius: borderRadius.md,
+    padding: spacing.lg,
+    marginBottom: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  gnCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  gnCardGroupBadge: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: borderRadius.xs,
+    borderWidth: 1,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+  },
   gnCardGroupText: { fontFamily: fontFamily.pixel, fontSize: fontSize.pixel },
   gnCardCoach: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.xs, color: colors.accent },
-  gnCardTime: { fontFamily: fontFamily.statMono, fontSize: fontSize.xs, color: colors.textSecondary },
-  gnCardContent: { fontFamily: fontFamily.body, fontSize: fontSize.md, color: colors.text, lineHeight: 22 },
+  gnCardTime: {
+    fontFamily: fontFamily.statMono,
+    fontSize: fontSize.xs,
+    color: colors.textSecondary,
+  },
+  gnCardContent: {
+    fontFamily: fontFamily.body,
+    fontSize: fontSize.md,
+    color: colors.text,
+    lineHeight: 22,
+  },
   gnCardTags: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.sm },
-  gnCardTag: { backgroundColor: 'rgba(74, 14, 120, 0.3)', paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: borderRadius.xs, borderWidth: 1, borderColor: colors.purple },
-  gnCardTagText: { fontFamily: fontFamily.pixel, fontSize: fontSize.pixel, color: colors.purpleLight },
+  gnCardTag: {
+    backgroundColor: 'rgba(74, 14, 120, 0.3)',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: borderRadius.xs,
+    borderWidth: 1,
+    borderColor: colors.purple,
+  },
+  gnCardTagText: {
+    fontFamily: fontFamily.pixel,
+    fontSize: fontSize.pixel,
+    color: colors.purpleLight,
+  },
 });
+
+export default withScreenErrorBoundary(PracticeScreen, 'PracticeScreen');

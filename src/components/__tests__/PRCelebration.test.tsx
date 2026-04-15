@@ -10,9 +10,14 @@ jest.mock('../../utils/meetTiming', () => ({
   },
 }));
 
+jest.mock('../../utils/haptics', () => ({
+  notifyHeavy: jest.fn(),
+}));
+
 import React from 'react';
 import { render, fireEvent } from '@testing-library/react-native';
 import PRCelebration from '../PRCelebration';
+import { notifyHeavy } from '../../utils/haptics';
 
 const defaultProps = () => ({
   swimmerName: 'Jane Doe',
@@ -25,6 +30,11 @@ describe('PRCelebration', () => {
   it('renders PERSONAL RECORD label', () => {
     const { getByText } = render(<PRCelebration {...defaultProps()} />);
     expect(getByText('PERSONAL RECORD')).toBeTruthy();
+  });
+
+  it('fires heavy haptics when mounted', () => {
+    render(<PRCelebration {...defaultProps()} />);
+    expect(notifyHeavy).toHaveBeenCalled();
   });
 
   it('renders swimmer name uppercased', () => {

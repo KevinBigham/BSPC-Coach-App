@@ -27,8 +27,10 @@ import * as ImagePicker from 'expo-image-picker';
 import type { Swimmer, ParentContact } from '../../src/types/firestore.types';
 import { uploadProfilePhoto, deleteProfilePhoto } from '../../src/services/profilePhoto';
 import { grantConsent, revokeConsent } from '../../src/utils/mediaConsent';
+import { notifySuccess, selectionChanged } from '../../src/utils/haptics';
+import { withScreenErrorBoundary } from '../../src/components/ScreenErrorBoundary';
 
-export default function EditSwimmerScreen() {
+function EditSwimmerScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { coach } = useAuth();
   const [loading, setLoading] = useState(true);
@@ -129,6 +131,7 @@ export default function EditSwimmerScreen() {
         updatedAt: serverTimestamp(),
       });
 
+      notifySuccess();
       router.back();
     } catch (err: any) {
       Alert.alert('Error', err.message);
@@ -350,13 +353,19 @@ export default function EditSwimmerScreen() {
           <View style={styles.toggleRow}>
             <TouchableOpacity
               style={[styles.toggleButton, consentGranted && styles.toggleActiveGold]}
-              onPress={() => setConsentGranted(true)}
+              onPress={() => {
+                selectionChanged();
+                setConsentGranted(true);
+              }}
             >
               <Text style={styles.toggleText}>Granted</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.toggleButton, !consentGranted && styles.toggleActiveError]}
-              onPress={() => setConsentGranted(false)}
+              onPress={() => {
+                selectionChanged();
+                setConsentGranted(false);
+              }}
             >
               <Text style={styles.toggleText}>Not Granted</Text>
             </TouchableOpacity>
@@ -613,3 +622,5 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
 });
+
+export default withScreenErrorBoundary(EditSwimmerScreen, 'EditSwimmerScreen');

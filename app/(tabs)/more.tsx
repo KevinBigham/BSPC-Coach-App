@@ -1,13 +1,8 @@
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  ScrollView,
-} from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { router } from 'expo-router';
 import {
   Users,
+  Bell,
   CalendarDays,
   BarChart3,
   Search,
@@ -16,6 +11,7 @@ import {
   Video,
 } from 'lucide-react-native';
 import { colors, spacing, fontSize, borderRadius, fontFamily } from '../../src/config/theme';
+import { withScreenErrorBoundary } from '../../src/components/ScreenErrorBoundary';
 
 interface MoreItem {
   label: string;
@@ -55,6 +51,13 @@ const ITEMS: MoreItem[] = [
     iconColor: colors.gold,
   },
   {
+    label: 'NOTIFICATION RULES',
+    sublabel: 'Alerts & streaks',
+    icon: Bell,
+    route: '/notification-rules',
+    iconColor: colors.gold,
+  },
+  {
     label: 'SEARCH',
     sublabel: 'Find anything',
     icon: Search,
@@ -77,7 +80,7 @@ const ITEMS: MoreItem[] = [
   },
 ];
 
-export default function MoreScreen() {
+function MoreScreen() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.header}>
@@ -153,3 +156,5 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 });
+
+export default withScreenErrorBoundary(MoreScreen, 'MoreScreen');

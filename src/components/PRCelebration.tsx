@@ -1,14 +1,8 @@
 import React, { useEffect, useRef } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  Animated,
-  Dimensions,
-  TouchableOpacity,
-} from 'react-native';
+import { View, Text, StyleSheet, Animated, Dimensions, TouchableOpacity } from 'react-native';
 import { colors, fontFamily, fontSize, spacing } from '../config/theme';
 import { formatSplitDisplay } from '../utils/meetTiming';
+import { notifyHeavy } from '../utils/haptics';
 
 interface PRCelebrationProps {
   swimmerName: string;
@@ -102,6 +96,7 @@ export default function PRCelebration({
   const opacityAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
+    notifyHeavy();
     Animated.parallel([
       Animated.spring(scaleAnim, {
         toValue: 1,
@@ -120,11 +115,7 @@ export default function PRCelebration({
   const drop = oldTime ? oldTime - newTime : 0;
 
   return (
-    <TouchableOpacity
-      style={styles.overlay}
-      activeOpacity={1}
-      onPress={onDismiss}
-    >
+    <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={onDismiss}>
       {/* Confetti */}
       {Array.from({ length: CONFETTI_COUNT }).map((_, i) => (
         <ConfettiPiece key={i} index={i} />

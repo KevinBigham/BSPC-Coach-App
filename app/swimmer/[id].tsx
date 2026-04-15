@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -48,6 +48,7 @@ import GoalCard from '../../src/components/GoalCard';
 import SwimmerTimeline from '../../src/components/SwimmerTimeline';
 import SwimmerVideoClips from '../../src/components/SwimmerVideoClips';
 import VideoComparison from '../../src/components/VideoComparison';
+import SparkLine from '../../src/components/charts/SparkLine';
 import type {
   Swimmer,
   SwimmerNote,
@@ -56,6 +57,7 @@ import type {
   AttendanceStatus,
   SwimmerGoal,
 } from '../../src/types/firestore.types';
+import { withScreenErrorBoundary } from '../../src/components/ScreenErrorBoundary';
 
 type Tab = 'overview' | 'notes' | 'times' | 'attendance' | 'timeline';
 
@@ -67,7 +69,7 @@ const STATUS_COLORS: Record<string, string> = {
   left_early: colors.textSecondary,
 };
 
-export default function SwimmerProfileScreen() {
+function SwimmerProfileScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { coach, isAdmin } = useAuth();
   const [swimmer, setSwimmer] = useState<Swimmer | null>(null);
@@ -799,6 +801,24 @@ function TimesTab({
   swimmer: Swimmer;
 }) {
   const [showAddTime, setShowAddTime] = useState(false);
+  const trendByEvent = useMemo(() => {
+    const grouped = new Map<string, number[]>();
+
+    [...times]
+      .sort((left, right) => {
+        const leftDate = getTimestampValue(left.createdAt);
+        const rightDate = getTimestampValue(right.createdAt);
+        return leftDate.getTime() - rightDate.getTime();
+      })
+      .forEach((time) => {
+        const key = `${time.event}|${time.course}`;
+        const values = grouped.get(key) ?? [];
+        values.push(time.time);
+        grouped.set(key, values);
+      });
+
+    return grouped;
+  }, [times]);
 
   // Compute age group for standard badges
   const dob =
@@ -845,7 +865,16 @@ function TimesTab({
             onLongPress={() => onDeleteTime(time.id)}
           >
             <View>
-              <Text style={styles.timeEvent}>{time.event}</Text>
+              <View style={styles.timeEventRow}>
+                <Text style={styles.timeEvent}>{time.event}</Text>
+                <SparkLine
+                  data={trendByEvent.get(`${time.event}|${time.course}`) ?? [time.time]}
+                  invertTrend
+                  width={80}
+                  height={24}
+                  color={colors.gold}
+                />
+              </View>
               <Text style={styles.timeMeet}>
                 {time.meetName || 'Practice'} {time.course}
               </Text>
@@ -885,6 +914,15 @@ function TimesTab({
       )}
     </View>
   );
+}
+
+function getTimestampValue(timestamp: SwimTime['createdAt']): Date {
+  if (timestamp instanceof Date) {
+    return timestamp;
+  }
+
+  const maybeTimestamp = timestamp as SwimTime['createdAt'] & { toDate?: () => Date };
+  return typeof maybeTimestamp.toDate === 'function' ? maybeTimestamp.toDate() : new Date();
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -1493,6 +1531,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
+  timeEventRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
   timeEvent: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.md, color: colors.text },
   timeMeet: {
     fontFamily: fontFamily.body,
@@ -1638,3 +1681,5 @@ const styles = StyleSheet.create({
   },
   modalSaveText: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.md, color: colors.text },
 });
+
+export default withScreenErrorBoundary(SwimmerProfileScreen, 'SwimmerProfileScreen');

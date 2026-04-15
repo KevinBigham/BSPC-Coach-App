@@ -122,4 +122,26 @@ describe('offlineQueue', () => {
     const queue = await getQueue();
     expect(queue[0].idempotencyKey).not.toBe(queue[1].idempotencyKey);
   });
+
+  it('retains queued video uploads across a failed run and processes them when online again', async () => {
+    await enqueueUpload({
+      type: 'video',
+      uri: 'file:///offline-video.mp4',
+      metadata: { sessionId: 'session-1', date: '2026-04-10' },
+    });
+
+    const onAudio = jest.fn().mockResolvedValue(undefined);
+    const onVideo = jest
+      .fn()
+      .mockRejectedValueOnce(new Error('offline'))
+      .mockResolvedValueOnce(undefined);
+
+    const firstPass = await processQueue(onAudio, onVideo);
+    expect(firstPass).toEqual({ processed: 0, failed: 1 });
+    expect(await getQueue()).toHaveLength(1);
+
+    const secondPass = await processQueue(onAudio, onVideo);
+    expect(secondPass).toEqual({ processed: 1, failed: 0 });
+    expect(await getQueue()).toHaveLength(0);
+  });
 });

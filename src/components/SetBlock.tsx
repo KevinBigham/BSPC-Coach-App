@@ -3,12 +3,13 @@ import { View, Text, TouchableOpacity, TextInput, StyleSheet } from 'react-nativ
 import { colors, spacing, fontSize, borderRadius, fontFamily } from '../config/theme';
 import type { PracticePlanSet, PracticePlanItem } from '../types/firestore.types';
 import SetItemRow from './SetItemRow';
+import { tapLight } from '../utils/haptics';
 
 const CATEGORY_COLORS: Record<string, string> = {
-  'Warmup': colors.info,
+  Warmup: colors.info,
   'Pre-Set': colors.accent,
   'Main Set': colors.gold,
-  'Cooldown': colors.purpleLight,
+  Cooldown: colors.purpleLight,
 };
 
 interface SetBlockProps {
@@ -47,7 +48,11 @@ export default function SetBlock({
   return (
     <View style={styles.container}>
       {/* Header */}
-      <TouchableOpacity style={styles.header} onPress={() => setCollapsed(!collapsed)} onLongPress={onDelete}>
+      <TouchableOpacity
+        style={styles.header}
+        onPress={() => setCollapsed(!collapsed)}
+        onLongPress={onDelete}
+      >
         <View style={[styles.categoryDot, { backgroundColor: categoryColor }]} />
         <View style={styles.headerInfo}>
           <TextInput
@@ -84,10 +89,19 @@ export default function SetBlock({
               item={item}
               index={i}
               onUpdate={(data) => onUpdateItem(i, data)}
-              onDelete={() => onRemoveItem(i)}
+              onDelete={() => {
+                tapLight();
+                onRemoveItem(i);
+              }}
             />
           ))}
-          <TouchableOpacity style={styles.addItemBtn} onPress={onAddItem}>
+          <TouchableOpacity
+            style={styles.addItemBtn}
+            onPress={() => {
+              tapLight();
+              onAddItem();
+            }}
+          >
             <Text style={styles.addItemText}>+ ADD ITEM</Text>
           </TouchableOpacity>
         </View>
@@ -97,14 +111,42 @@ export default function SetBlock({
 }
 
 const styles = StyleSheet.create({
-  container: { backgroundColor: colors.bgDeep, borderRadius: borderRadius.md, borderWidth: 1, borderColor: colors.border, marginBottom: spacing.md, overflow: 'hidden' },
+  container: {
+    backgroundColor: colors.bgDeep,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginBottom: spacing.md,
+    overflow: 'hidden',
+  },
   // Header
-  header: { flexDirection: 'row', alignItems: 'center', padding: spacing.md, backgroundColor: colors.bgSurface },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.md,
+    backgroundColor: colors.bgSurface,
+  },
   categoryDot: { width: 8, height: 8, borderRadius: 4, marginRight: spacing.sm },
   headerInfo: { flex: 1 },
-  setName: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.md, color: colors.text, padding: 0 },
-  categoryLabel: { fontFamily: fontFamily.pixel, fontSize: fontSize.pixel, color: colors.textSecondary, letterSpacing: 1, marginTop: 2 },
-  yardage: { fontFamily: fontFamily.stat, fontSize: fontSize.lg, color: colors.accent, marginHorizontal: spacing.sm },
+  setName: {
+    fontFamily: fontFamily.bodySemi,
+    fontSize: fontSize.md,
+    color: colors.text,
+    padding: 0,
+  },
+  categoryLabel: {
+    fontFamily: fontFamily.pixel,
+    fontSize: fontSize.pixel,
+    color: colors.textSecondary,
+    letterSpacing: 1,
+    marginTop: 2,
+  },
+  yardage: {
+    fontFamily: fontFamily.stat,
+    fontSize: fontSize.lg,
+    color: colors.accent,
+    marginHorizontal: spacing.sm,
+  },
   moveButtons: { gap: 2 },
   moveBtn: { padding: 2 },
   moveBtnText: { fontSize: 10, color: colors.textSecondary },
@@ -112,5 +154,10 @@ const styles = StyleSheet.create({
   // Items
   itemsContainer: { borderTopWidth: 1, borderTopColor: colors.border },
   addItemBtn: { padding: spacing.md, alignItems: 'center' },
-  addItemText: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.sm, color: colors.accent, letterSpacing: 1 },
+  addItemText: {
+    fontFamily: fontFamily.bodySemi,
+    fontSize: fontSize.sm,
+    color: colors.accent,
+    letterSpacing: 1,
+  },
 });

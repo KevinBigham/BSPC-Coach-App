@@ -177,6 +177,7 @@ export interface DashboardGlobal {
 }
 
 export type AudioSessionStatus =
+  | 'queued'
   | 'uploading'
   | 'uploaded'
   | 'transcribing'
@@ -215,6 +216,7 @@ export interface AIDraft {
 }
 
 export type VideoSessionStatus =
+  | 'queued'
   | 'uploading'
   | 'uploaded'
   | 'extracting_frames'
@@ -475,10 +477,11 @@ export interface NotificationRule {
 
 export interface ImportJob {
   id?: string;
-  type: 'csv_roster' | 'sdif' | 'cl2';
+  type: 'csv_roster' | 'sdif' | 'hy3' | 'cl2';
   fileName: string;
   storagePath: string;
   status: 'processing' | 'complete' | 'failed';
+  errorMessage?: string;
   summary: {
     recordsProcessed: number;
     swimmersCreated: number;
@@ -488,4 +491,5 @@ export interface ImportJob {
   };
   coachId: string;
   createdAt: FirebaseTimestamp;
+  updatedAt?: FirebaseTimestamp;
 }
