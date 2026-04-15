@@ -1,0 +1,8 @@
+appId: com.bspowercats.coach
+---
+- launchApp
+- tapOn: "ATTENDANCE"
+- assertVisible: "ATTENDANCE"
+- tapOn: "${BSPC_E2E_SWIMMER}"
+- assertVisible:
+    text: "CHECK"

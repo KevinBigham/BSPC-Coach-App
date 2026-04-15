@@ -60,6 +60,19 @@ describe('createParentInvite', () => {
     expect(forbidden.test(codeChars)).toBe(false);
   });
 
+  it('does not use Math.random when creating invite codes', async () => {
+    const randomSpy = jest.spyOn(Math, 'random').mockImplementation(() => {
+      throw new Error('Math.random must not be used for invite codes');
+    });
+
+    await expect(createParentInvite('sw-1', 'Jane Doe', 'coach-1', 'Coach Kevin')).resolves.toMatch(
+      /^[A-HJ-NP-Z2-9]{4}-[A-HJ-NP-Z2-9]{4}$/,
+    );
+    expect(randomSpy).not.toHaveBeenCalled();
+
+    randomSpy.mockRestore();
+  });
+
   it('sets a 7-day expiry', async () => {
     await createParentInvite('sw-1', 'Jane Doe', 'coach-1', 'Coach Kevin');
     expect(firestore.Timestamp.fromDate).toHaveBeenCalled();

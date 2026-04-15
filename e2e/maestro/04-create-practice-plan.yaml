@@ -1,0 +1,9 @@
+appId: com.bspowercats.coach
+---
+- launchApp
+- tapOn: "PRACTICE"
+- tapOn: "NEW"
+- tapOn: "TITLE"
+- inputText: "E2E Smoke Practice"
+- tapOn: "SAVE"
+- assertVisible: "E2E Smoke Practice"

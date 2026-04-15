@@ -1,28 +1,75 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  "entry": [
-    "index.ts",
-    "app/**/*.{ts,tsx}",
-    "jest.setup.ts",
-    "src/**/*.test.{ts,tsx}",
-    "src/**/__tests__/**/*.{ts,tsx}",
-    "functions/src/index.ts",
-    "functions/src/**/*.test.ts",
-    "functions/src/**/__tests__/**/*.ts"
-  ],
-  "project": [
-    "src/**/*.{ts,tsx}",
-    "app/**/*.{ts,tsx}",
-    "functions/src/**/*.ts"
-  ],
-  "ignore": [
-    "parent-portal/**",
-    "scripts/**",
-    "functions/lib/**",
-    "**/*.d.ts"
-  ],
-  "ignoreDependencies": [
-    "babel-plugin-transform-remove-console"
-  ],
-  "ignoreBinaries": []
+  "workspaces": {
+    ".": {
+      "entry": [
+        "app/**/*.{ts,tsx}",
+        "babel.config.js",
+        "src/**/*.test.{ts,tsx}",
+        "src/**/__tests__/**/*.{ts,tsx}",
+        "scripts/*.ts"
+      ],
+      "project": [
+        "src/**/*.{ts,tsx}",
+        "app/**/*.{ts,tsx}",
+        "scripts/**/*.ts",
+        "*.{js,ts}"
+      ],
+      "ignore": [
+        "functions/**",
+        "parent-portal/**"
+      ],
+      "ignoreBinaries": [
+        "eas"
+      ],
+      "ignoreDependencies": [
+        "babel-plugin-transform-remove-console",
+        "babel-preset-expo",
+        "expo-updates"
+      ]
+    },
+    "functions": {
+      "entry": [
+        "src/**/*.test.ts",
+        "src/**/__tests__/**/*.ts"
+      ],
+      "project": [
+        "src/**/*.ts"
+      ]
+    },
+    "parent-portal": {
+      "entry": [
+        "src/app/**/*.{ts,tsx}",
+        "src/lib/**/*.{ts,tsx}"
+      ],
+      "project": [
+        "src/**/*.{ts,tsx}"
+      ]
+    }
+  },
+  "ignoreIssues": {
+    "functions/src/ai/swimKnowledge.ts": [
+      "exports",
+      "types"
+    ],
+    "src/config/constants.ts": [
+      "exports",
+      "types"
+    ],
+    "src/services/aiPractice.ts": [
+      "types"
+    ],
+    "src/services/csvImport.ts": [
+      "types"
+    ],
+    "src/services/sdifImport.ts": [
+      "types"
+    ],
+    "src/utils/deepLinking.ts": [
+      "types"
+    ],
+    "src/utils/offlineQueue.ts": [
+      "types"
+    ]
+  }
 }

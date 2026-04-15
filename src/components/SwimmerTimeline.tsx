@@ -7,18 +7,22 @@ import {
   StyleSheet,
   ActivityIndicator,
 } from 'react-native';
-import {
-  collection,
-  query,
-  orderBy,
-  limit,
-  onSnapshot,
-  where,
-  collectionGroup,
-} from 'firebase/firestore';
+import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { colors, spacing, fontSize, borderRadius, fontFamily } from '../config/theme';
-import { formatTimeDisplay } from '../utils/time';
+import type { SwimmerNote, SwimTime } from '../types/firestore.types';
+import { toDateSafe, type FirestoreTimestampLike } from '../utils/date';
+
+type TimelineNote = Pick<SwimmerNote, 'id' | 'content' | 'source' | 'coachName' | 'tags'> & {
+  practiceDate?: FirestoreTimestampLike;
+};
+
+type TimelineTime = Pick<
+  SwimTime,
+  'id' | 'event' | 'course' | 'timeDisplay' | 'isPR' | 'meetName' | 'meetDate'
+> & {
+  createdAt?: FirestoreTimestampLike;
+};
 
 interface TimelineItem {
   id: string;
@@ -44,25 +48,42 @@ interface Props {
   swimmerId: string;
 }
 
+function formatTimelineDate(value: FirestoreTimestampLike): string {
+  if (typeof value === 'string') return value;
+  const date = toDateSafe(value);
+  return date ? date.toISOString().split('T')[0] : '';
+}
+
 export default function SwimmerTimeline({ swimmerId }: Props) {
-  const [notes, setNotes] = useState<any[]>([]);
-  const [times, setTimes] = useState<any[]>([]);
+  const [notes, setNotes] = useState<TimelineNote[]>([]);
+  const [times, setTimes] = useState<TimelineTime[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<FilterType>('all');
 
   useEffect(() => {
     const unsubNotes = onSnapshot(
-      query(collection(db, 'swimmers', swimmerId, 'notes'), orderBy('createdAt', 'desc'), limit(100)),
-      (snap) => setNotes(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
+      query(
+        collection(db, 'swimmers', swimmerId, 'notes'),
+        orderBy('createdAt', 'desc'),
+        limit(100),
+      ),
+      (snap) => setNotes(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as TimelineNote)),
     );
     const unsubTimes = onSnapshot(
-      query(collection(db, 'swimmers', swimmerId, 'times'), orderBy('createdAt', 'desc'), limit(100)),
+      query(
+        collection(db, 'swimmers', swimmerId, 'times'),
+        orderBy('createdAt', 'desc'),
+        limit(100),
+      ),
       (snap) => {
-        setTimes(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+        setTimes(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as TimelineTime));
         setLoading(false);
-      }
+      },
     );
-    return () => { unsubNotes(); unsubTimes(); };
+    return () => {
+      unsubNotes();
+      unsubTimes();
+    };
   }, [swimmerId]);
 
   const items = useMemo(() => {
@@ -74,7 +95,7 @@ export default function SwimmerTimeline({ swimmerId }: Props) {
       all.push({
         id: `note-${note.id}`,
         type: isVideo ? 'video' : 'note',
-        date: note.practiceDate || '',
+        date: formatTimelineDate(note.practiceDate),
         title: note.content?.substring(0, 120) || '',
         subtitle: isVideo ? 'AI Video Analysis' : isAudio ? 'AI Audio Note' : note.coachName,
         detail: note.tags?.join(', '),
@@ -87,7 +108,7 @@ export default function SwimmerTimeline({ swimmerId }: Props) {
       all.push({
         id: `time-${time.id}`,
         type: time.isPR ? 'pr' : 'time',
-        date: time.meetDate || (time.createdAt?.toDate?.()?.toISOString?.()?.split('T')[0]) || '',
+        date: formatTimelineDate(time.meetDate || time.createdAt),
         title: `${time.event} — ${time.timeDisplay}`,
         subtitle: time.meetName || 'Practice',
         detail: time.course,
@@ -139,9 +160,7 @@ export default function SwimmerTimeline({ swimmerId }: Props) {
 
           return (
             <View key={item.id}>
-              {showDate && item.date && (
-                <Text style={styles.dateHeader}>{item.date}</Text>
-              )}
+              {showDate && item.date && <Text style={styles.dateHeader}>{item.date}</Text>}
               <View style={styles.timelineItem}>
                 <View style={[styles.dot, { backgroundColor: badge.color }]} />
                 <View style={styles.line} />
@@ -150,16 +169,15 @@ export default function SwimmerTimeline({ swimmerId }: Props) {
                     <View style={[styles.typeBadge, { borderColor: badge.color }]}>
                       <Text style={[styles.typeText, { color: badge.color }]}>{badge.label}</Text>
                     </View>
-                    {item.subtitle && (
-                      <Text style={styles.itemSubtitle}>{item.subtitle}</Text>
-                    )}
+                    {item.subtitle && <Text style={styles.itemSubtitle}>{item.subtitle}</Text>}
                   </View>
-                  <Text style={[styles.itemTitle, item.type === 'pr' && styles.prTitle]} numberOfLines={3}>
+                  <Text
+                    style={[styles.itemTitle, item.type === 'pr' && styles.prTitle]}
+                    numberOfLines={3}
+                  >
                     {item.title}
                   </Text>
-                  {item.detail && (
-                    <Text style={styles.itemDetail}>{item.detail}</Text>
-                  )}
+                  {item.detail && <Text style={styles.itemDetail}>{item.detail}</Text>}
                 </View>
               </View>
             </View>
@@ -186,7 +204,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bgBase,
   },
   filterChipActive: { backgroundColor: colors.purple, borderColor: colors.purpleLight },
-  filterText: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.xs, color: colors.textSecondary },
+  filterText: {
+    fontFamily: fontFamily.bodySemi,
+    fontSize: fontSize.xs,
+    color: colors.textSecondary,
+  },
   filterTextActive: { color: colors.text },
 
   // Date Header
@@ -245,9 +267,25 @@ const styles = StyleSheet.create({
   },
   typeText: { fontFamily: fontFamily.pixel, fontSize: fontSize.pixel, letterSpacing: 1 },
   itemSubtitle: { fontFamily: fontFamily.body, fontSize: fontSize.xs, color: colors.textSecondary },
-  itemTitle: { fontFamily: fontFamily.body, fontSize: fontSize.sm, color: colors.text, lineHeight: 20 },
+  itemTitle: {
+    fontFamily: fontFamily.body,
+    fontSize: fontSize.sm,
+    color: colors.text,
+    lineHeight: 20,
+  },
   prTitle: { color: colors.gold, fontFamily: fontFamily.stat },
-  itemDetail: { fontFamily: fontFamily.statMono, fontSize: fontSize.xs, color: colors.textSecondary, marginTop: spacing.xs },
+  itemDetail: {
+    fontFamily: fontFamily.statMono,
+    fontSize: fontSize.xs,
+    color: colors.textSecondary,
+    marginTop: spacing.xs,
+  },
 
-  emptyText: { fontFamily: fontFamily.body, fontSize: fontSize.sm, color: colors.textSecondary, textAlign: 'center', paddingVertical: spacing.xxl },
+  emptyText: {
+    fontFamily: fontFamily.body,
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    paddingVertical: spacing.xxl,
+  },
 });

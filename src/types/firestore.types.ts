@@ -42,6 +42,8 @@ export interface MediaConsent {
   granted: boolean;
   /** Date consent was granted or revoked */
   date: FirebaseTimestamp;
+  /** Optional expiration date for time-limited media releases */
+  expiresAt?: FirebaseTimestamp;
   /** Name of parent/guardian who provided consent */
   grantedBy?: string;
   /** Optional notes (e.g., "revoked 2026-03-01 via email") */
@@ -67,6 +69,8 @@ export interface Swimmer {
   meetSchedule: string[];
   /** COPPA/SafeSport media consent — controls video/photo tagging eligibility */
   mediaConsent?: MediaConsent;
+  /** Hard block for photography/video even if a general media release exists */
+  doNotPhotograph?: boolean;
   createdAt: FirebaseTimestamp;
   updatedAt: FirebaseTimestamp;
   createdBy: string;

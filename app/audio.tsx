@@ -34,6 +34,10 @@ import { tapMedium, notifySuccess } from '../src/utils/haptics';
 import { withScreenErrorBoundary } from '../src/components/ScreenErrorBoundary';
 
 type RecordingState = 'idle' | 'recording' | 'stopped';
+type NativeRecording = {
+  stopAndUnloadAsync: () => Promise<unknown>;
+  getURI: () => string | null;
+};
 
 const STATUS_BADGE: Record<string, { label: string; color: string }> = {
   uploading: { label: 'UPLOADING', color: colors.accent },
@@ -56,7 +60,7 @@ function AudioScreen() {
   const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
   const [sessions, setSessions] = useState<(AudioSession & { id: string })[]>([]);
 
-  const recordingRef = useRef<any>(null);
+  const recordingRef = useRef<NativeRecording | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {

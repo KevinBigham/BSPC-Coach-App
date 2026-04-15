@@ -20,7 +20,7 @@ import type {
   Swimmer,
 } from '../types/firestore.types';
 import type { Group } from '../config/constants';
-import { hasMediaConsent } from '../utils/mediaConsent';
+import { canTagOrUploadMedia } from '../utils/mediaConsent';
 
 type VideoSessionWithId = VideoSession & { id: string };
 
@@ -65,7 +65,7 @@ export function validateMediaConsent(
 ): string[] {
   return taggedSwimmerIds
     .map((id) => swimmers.find((s) => s.id === id))
-    .filter((s): s is Swimmer & { id: string } => !!s && !hasMediaConsent(s))
+    .filter((s): s is Swimmer & { id: string } => !!s && !canTagOrUploadMedia(s).allowed)
     .map((s) => s.displayName);
 }
 

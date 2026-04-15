@@ -155,10 +155,27 @@ describe('validateMediaConsent', () => {
   const { validateMediaConsent } = require('../video');
 
   const swimmers = [
-    { id: 's1', displayName: 'Alice A', mediaConsent: { granted: true, date: new Date() } },
+    {
+      id: 's1',
+      displayName: 'Alice A',
+      active: true,
+      mediaConsent: { granted: true, date: new Date() },
+    },
     { id: 's2', displayName: 'Bob B', mediaConsent: { granted: false, date: new Date() } },
     { id: 's3', displayName: 'Charlie C' },
-    { id: 's4', displayName: 'Dana D', mediaConsent: { granted: true, date: new Date() } },
+    {
+      id: 's4',
+      displayName: 'Dana D',
+      active: true,
+      mediaConsent: { granted: true, date: new Date() },
+    },
+    {
+      id: 's5',
+      displayName: 'Eli E',
+      active: true,
+      doNotPhotograph: true,
+      mediaConsent: { granted: true, date: new Date() },
+    },
   ] as any[];
 
   it('returns empty array when all tagged swimmers have consent', () => {
@@ -166,7 +183,11 @@ describe('validateMediaConsent', () => {
   });
 
   it('returns names of swimmers without consent', () => {
-    expect(validateMediaConsent(['s1', 's2', 's3'], swimmers)).toEqual(['Bob B', 'Charlie C']);
+    expect(validateMediaConsent(['s1', 's2', 's3', 's5'], swimmers)).toEqual([
+      'Bob B',
+      'Charlie C',
+      'Eli E',
+    ]);
   });
 
   it('returns empty array for empty tag list', () => {

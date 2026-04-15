@@ -1,0 +1,9 @@
+appId: com.bspowercats.coach
+---
+- launchApp
+- tapOn: "EMAIL"
+- inputText: "${BSPC_E2E_EMAIL}"
+- tapOn: "PASSWORD"
+- inputText: "${BSPC_E2E_PASSWORD}"
+- tapOn: "SIGN IN"
+- assertVisible: "DASHBOARD"

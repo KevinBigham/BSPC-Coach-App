@@ -1,92 +1,59 @@
 'use client';
 
-import { useState, useEffect, use } from 'react';
+import { useEffect, use, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { doc, onSnapshot, collection, query, orderBy, limit } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
 import { onAuthChange } from '@/lib/auth';
+import { getErrorMessage } from '@/lib/errors';
+import {
+  loadParentSwimmerPortalData,
+  type ParentAttendanceSummary,
+  type ParentSwimmerDetail,
+  type ParentSwimTime,
+} from '@/lib/parentPortal';
 
-interface Swimmer {
-  firstName: string;
-  lastName: string;
-  group: string;
-  gender: string;
-  active: boolean;
-  strengths: string[];
-  goals: string[];
-}
-
-interface SwimTime {
-  id: string;
-  event: string;
-  course: string;
-  time: number;
-  timeDisplay: string;
-  isPR: boolean;
-  meetName?: string;
-}
-
-interface AttendanceRecord {
-  id: string;
-  practiceDate: string;
-  status?: string;
-}
+type Tab = 'overview' | 'times' | 'attendance';
 
 function formatTime(hundredths: number): string {
   const mins = Math.floor(hundredths / 6000);
   const secs = Math.floor((hundredths % 6000) / 100);
   const hs = hundredths % 100;
-  if (mins > 0) return `${mins}:${secs.toString().padStart(2, '0')}.${hs.toString().padStart(2, '0')}`;
+  if (mins > 0)
+    return `${mins}:${secs.toString().padStart(2, '0')}.${hs.toString().padStart(2, '0')}`;
   return `${secs}.${hs.toString().padStart(2, '0')}`;
 }
 
 export default function SwimmerPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
-  const [swimmer, setSwimmer] = useState<Swimmer | null>(null);
-  const [times, setTimes] = useState<SwimTime[]>([]);
-  const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
-  const [tab, setTab] = useState<'overview' | 'times' | 'attendance'>('overview');
+  const [swimmer, setSwimmer] = useState<ParentSwimmerDetail | null>(null);
+  const [times, setTimes] = useState<ParentSwimTime[]>([]);
+  const [attendance, setAttendance] = useState<ParentAttendanceSummary[]>([]);
+  const [tab, setTab] = useState<Tab>('overview');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     return onAuthChange((user) => {
-      if (!user) router.push('/');
-    });
-  }, []);
+      if (!user) {
+        router.push('/');
+        return;
+      }
 
-  useEffect(() => {
-    return onSnapshot(doc(db, 'swimmers', id), (snap) => {
-      if (snap.exists()) setSwimmer(snap.data() as Swimmer);
+      loadParentSwimmerPortalData(id)
+        .then((data) => {
+          setSwimmer(data.swimmer);
+          setTimes(data.times);
+          setAttendance(data.attendance);
+        })
+        .catch((err: unknown) => {
+          setError(getErrorMessage(err, 'Unable to load swimmer data'));
+        })
+        .finally(() => setLoading(false));
     });
-  }, [id]);
+  }, [id, router]);
 
-  useEffect(() => {
-    const q = query(
-      collection(db, 'swimmers', id, 'times'),
-      orderBy('createdAt', 'desc'),
-      limit(50),
-    );
-    return onSnapshot(q, (snap) => {
-      setTimes(snap.docs.map((d) => ({ id: d.id, ...d.data() } as SwimTime)));
-    });
-  }, [id]);
-
-  useEffect(() => {
-    const q = query(
-      collection(db, 'attendance'),
-      orderBy('practiceDate', 'desc'),
-      limit(30),
-    );
-    return onSnapshot(q, (snap) => {
-      setAttendance(
-        snap.docs
-          .map((d) => ({ id: d.id, ...d.data() } as any))
-          .filter((a: any) => a.swimmerId === id),
-      );
-    });
-  }, [id]);
-
-  if (!swimmer) {
+  if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <p className="text-[var(--text-secondary)]">Loading...</p>
@@ -94,12 +61,30 @@ export default function SwimmerPage({ params }: { params: Promise<{ id: string }
     );
   }
 
-  // Build PRs map
-  const prs: Record<string, SwimTime> = {};
-  for (const t of times) {
-    const key = `${t.event}_${t.course}`;
-    if (!prs[key] || t.time < prs[key].time) {
-      prs[key] = t;
+  if (error || !swimmer) {
+    return (
+      <div>
+        <Link
+          href="/dashboard"
+          className="text-[var(--accent)] text-sm hover:underline mb-4 inline-block"
+        >
+          ← Back to Dashboard
+        </Link>
+        <div className="card">
+          <span className="pixel-label">ACCESS UNAVAILABLE</span>
+          <p className="text-[var(--text-secondary)] mt-3">
+            {error || 'This swimmer is not linked to your account.'}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const prs: Record<string, ParentSwimTime> = {};
+  for (const time of times) {
+    const key = `${time.event}_${time.course}`;
+    if (!prs[key] || time.time < prs[key].time) {
+      prs[key] = time;
     }
   }
   const prList = Object.values(prs).sort((a, b) => a.event.localeCompare(b.event));
@@ -112,12 +97,13 @@ export default function SwimmerPage({ params }: { params: Promise<{ id: string }
 
   return (
     <div>
-      {/* Back */}
-      <a href="/dashboard" className="text-[var(--accent)] text-sm hover:underline mb-4 inline-block">
+      <Link
+        href="/dashboard"
+        className="text-[var(--accent)] text-sm hover:underline mb-4 inline-block"
+      >
         ← Back to Dashboard
-      </a>
+      </Link>
 
-      {/* Header */}
       <div className="mb-6">
         <span className="pixel-label">{swimmer.group}</span>
         <h2 className="heading text-4xl mt-1">
@@ -128,27 +114,24 @@ export default function SwimmerPage({ params }: { params: Promise<{ id: string }
         </p>
       </div>
 
-      {/* Tabs */}
       <div className="flex gap-1 mb-6 border-b border-[var(--border)]">
-        {tabs.map((t) => (
+        {tabs.map((item) => (
           <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
+            key={item.key}
+            onClick={() => setTab(item.key)}
             className={`px-4 py-2 text-sm font-semibold border-b-2 transition-colors ${
-              tab === t.key
+              tab === item.key
                 ? 'border-[var(--accent)] text-[var(--accent)]'
                 : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text)]'
             }`}
           >
-            {t.label}
+            {item.label}
           </button>
         ))}
       </div>
 
-      {/* Overview Tab */}
       {tab === 'overview' && (
         <div className="space-y-6">
-          {/* Stats */}
           <div className="grid grid-cols-3 gap-4">
             <div className="card text-center">
               <span className="stat-number text-3xl">{prList.length}</span>
@@ -164,32 +147,39 @@ export default function SwimmerPage({ params }: { params: Promise<{ id: string }
             </div>
           </div>
 
-          {/* PRs */}
           {prList.length > 0 && (
             <div>
               <h3 className="heading text-xl mb-3">PERSONAL RECORDS</h3>
               <div className="grid gap-3 md:grid-cols-2">
                 {prList.map((pr) => (
-                  <div key={`${pr.event}_${pr.course}`} className="card flex items-center justify-between">
+                  <div
+                    key={`${pr.event}_${pr.course}`}
+                    className="card flex items-center justify-between"
+                  >
                     <div>
                       <p className="font-semibold">{pr.event}</p>
                       <span className="pixel-label">{pr.course}</span>
                     </div>
-                    <span className="stat-number text-xl">{pr.timeDisplay || formatTime(pr.time)}</span>
+                    <span className="stat-number text-xl">
+                      {pr.timeDisplay || formatTime(pr.time)}
+                    </span>
                   </div>
                 ))}
               </div>
             </div>
           )}
 
-          {/* Strengths & Goals */}
           {swimmer.strengths.length > 0 && (
             <div>
               <h3 className="heading text-xl mb-3">STRENGTHS</h3>
               <div className="flex flex-wrap gap-2">
-                {swimmer.strengths.map((s, i) => (
-                  <span key={i} className="px-3 py-1 rounded text-sm border border-[var(--purple)] text-[var(--accent)]" style={{ background: 'rgba(74,14,120,0.3)' }}>
-                    {s}
+                {swimmer.strengths.map((strength) => (
+                  <span
+                    key={strength}
+                    className="px-3 py-1 rounded text-sm border border-[var(--purple)] text-[var(--accent)]"
+                    style={{ background: 'rgba(74,14,120,0.3)' }}
+                  >
+                    {strength}
                   </span>
                 ))}
               </div>
@@ -200,9 +190,13 @@ export default function SwimmerPage({ params }: { params: Promise<{ id: string }
             <div>
               <h3 className="heading text-xl mb-3">GOALS</h3>
               <div className="flex flex-wrap gap-2">
-                {swimmer.goals.map((g, i) => (
-                  <span key={i} className="px-3 py-1 rounded text-sm border border-[var(--gold)]" style={{ color: 'var(--gold)', background: 'rgba(255,215,0,0.1)' }}>
-                    {g}
+                {swimmer.goals.map((goal) => (
+                  <span
+                    key={goal}
+                    className="px-3 py-1 rounded text-sm border border-[var(--gold)]"
+                    style={{ color: 'var(--gold)', background: 'rgba(255,215,0,0.1)' }}
+                  >
+                    {goal}
                   </span>
                 ))}
               </div>
@@ -211,7 +205,6 @@ export default function SwimmerPage({ params }: { params: Promise<{ id: string }
         </div>
       )}
 
-      {/* Times Tab */}
       {tab === 'times' && (
         <div className="card">
           <table className="w-full">
@@ -224,15 +217,19 @@ export default function SwimmerPage({ params }: { params: Promise<{ id: string }
               </tr>
             </thead>
             <tbody>
-              {times.map((t) => (
-                <tr key={t.id} className="border-b border-[var(--border-light)]">
+              {times.map((time) => (
+                <tr key={time.id} className="border-b border-[var(--border-light)]">
                   <td className="py-2 font-semibold text-sm">
-                    {t.event}
-                    {t.isPR && <span className="ml-2 text-[var(--gold)] text-xs">PR</span>}
+                    {time.event}
+                    {time.isPR && <span className="ml-2 text-[var(--gold)] text-xs">PR</span>}
                   </td>
-                  <td className="py-2 text-center pixel-label">{t.course}</td>
-                  <td className="py-2 text-right stat-number">{t.timeDisplay || formatTime(t.time)}</td>
-                  <td className="py-2 text-right text-[var(--text-secondary)] text-xs">{t.meetName || '—'}</td>
+                  <td className="py-2 text-center pixel-label">{time.course}</td>
+                  <td className="py-2 text-right stat-number">
+                    {time.timeDisplay || formatTime(time.time)}
+                  </td>
+                  <td className="py-2 text-right text-[var(--text-secondary)] text-xs">
+                    {time.meetName || '—'}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -243,21 +240,23 @@ export default function SwimmerPage({ params }: { params: Promise<{ id: string }
         </div>
       )}
 
-      {/* Attendance Tab */}
       {tab === 'attendance' && (
         <div className="card">
           <div className="grid grid-cols-7 gap-2">
-            {attendance.slice(0, 28).map((a) => (
+            {attendance.slice(0, 28).map((record) => (
               <div
-                key={a.id}
+                key={record.id}
                 className="text-center p-2 rounded text-xs"
                 style={{
-                  backgroundColor: a.status === 'excused' ? 'rgba(255,215,0,0.1)' : 'rgba(74,14,120,0.3)',
-                  border: `1px solid ${a.status === 'excused' ? 'var(--gold)' : 'var(--purple)'}`,
+                  backgroundColor:
+                    record.status === 'excused' ? 'rgba(255,215,0,0.1)' : 'rgba(74,14,120,0.3)',
+                  border: `1px solid ${
+                    record.status === 'excused' ? 'var(--gold)' : 'var(--purple)'
+                  }`,
                 }}
               >
                 <p className="font-mono text-[var(--text-secondary)]">
-                  {a.practiceDate.split('-').slice(1).join('/')}
+                  {record.practiceDate.split('-').slice(1).join('/')}
                 </p>
               </div>
             ))}

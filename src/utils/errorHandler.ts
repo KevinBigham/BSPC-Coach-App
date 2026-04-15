@@ -6,7 +6,7 @@ import type { ToastType } from '../components/Toast';
  */
 let globalShowToast: ((message: string, type?: ToastType) => void) | null = null;
 
-export function setGlobalToast(fn: (message: string, type?: ToastType) => void) {
+export function setGlobalToast(fn: ((message: string, type?: ToastType) => void) | null) {
   globalShowToast = fn;
 }
 
@@ -19,19 +19,6 @@ export function handleError(error: unknown, context?: string): void {
   if (globalShowToast) {
     const userMessage = context ? `${context}: ${message}` : message;
     globalShowToast(userMessage, 'error');
-  }
-}
-
-/** Returns null on failure (after showing toast). */
-export async function withErrorHandling<T>(
-  fn: () => Promise<T>,
-  context: string,
-): Promise<T | null> {
-  try {
-    return await fn();
-  } catch (error) {
-    handleError(error, context);
-    return null;
   }
 }
 

@@ -237,8 +237,8 @@ function VideoScreen() {
             </Text>
             {nonConsentedCount > 0 && (
               <Text style={styles.consentWarning}>
-                {nonConsentedCount} swimmer{nonConsentedCount !== 1 ? 's' : ''} hidden — no media
-                consent on file
+                {nonConsentedCount} swimmer{nonConsentedCount !== 1 ? 's' : ''} hidden — media
+                consent, Do Not Photograph, or active status blocks tagging
               </Text>
             )}
             <View style={styles.swimmerGrid}>
