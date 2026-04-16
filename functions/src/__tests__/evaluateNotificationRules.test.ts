@@ -183,6 +183,59 @@ describe('evaluateRulesForAttendance', () => {
     );
   });
 
+  it('does not fire missed-practice on a swimmer with no prior attendance', async () => {
+    const notificationSet = jest.fn().mockResolvedValue(undefined);
+    const notificationDoc = jest.fn().mockReturnValue({ set: notificationSet });
+    const ruleDocs = [
+      createMockDoc('rule-missed', {
+        name: 'Missed Practice Alert',
+        trigger: 'missed_practice',
+        enabled: true,
+        coachId: 'coach-1',
+        config: { threshold: 3 },
+      }),
+    ];
+    // Only the current attendance record exists — no prior history, so
+    // the rule must not treat it as a missed-practice gap.
+    const attendanceDocs = [createMockDoc('a-current', { practiceDate: '2026-04-10' })];
+
+    db.collection.mockImplementation((path: string) => {
+      if (path === 'notification_rules') {
+        return buildRulesQuery(ruleDocs);
+      }
+
+      if (path === 'attendance') {
+        return {
+          where: jest.fn().mockReturnValue({
+            orderBy: jest.fn().mockReturnValue({
+              limit: jest.fn().mockReturnValue({
+                get: jest.fn().mockResolvedValue(createMockQuerySnapshot(attendanceDocs)),
+              }),
+            }),
+          }),
+        };
+      }
+
+      if (path === 'notifications') {
+        return {
+          doc: notificationDoc,
+        };
+      }
+
+      throw new Error(`Unexpected collection path: ${path}`);
+    });
+
+    await evaluateRulesForAttendance({
+      swimmerId: 'new-swimmer',
+      swimmerName: 'First Day',
+      group: 'Bronze',
+      practiceDate: '2026-04-10',
+      markedBy: 'coach-1',
+    });
+
+    expect(notificationSet).not.toHaveBeenCalled();
+  });
+
   it('skips rules that do not match the attendance group', async () => {
     const notificationSet = jest.fn().mockResolvedValue(undefined);
     const notificationDoc = jest.fn().mockReturnValue({ set: notificationSet });
