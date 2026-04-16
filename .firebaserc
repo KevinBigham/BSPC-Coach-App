@@ -1,5 +1,7 @@
 {
-  "projects": {},
+  "projects": {
+    "default": "bspc-coach"
+  },
   "targets": {
     "bspc-coach": {
       "storage": {
