@@ -1,6 +1,10 @@
 import * as admin from 'firebase-admin';
 import { getPrompt } from './prompts';
 
+if (!admin.apps.length) {
+  admin.initializeApp();
+}
+
 const db = admin.firestore();
 
 interface ExtractedObservation {
