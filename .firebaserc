@@ -1,0 +1,13 @@
+{
+  "projects": {},
+  "targets": {
+    "bspc-coach": {
+      "storage": {
+        "rules": [
+          "bspc-coach.firebasestorage.app"
+        ]
+      }
+    }
+  },
+  "etags": {}
+}
