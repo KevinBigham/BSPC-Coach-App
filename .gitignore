@@ -53,3 +53,7 @@ functions/lib/
 # Next.js parent-portal build output
 parent-portal/.next/
 parent-portal/next-env.d.ts
+
+# Apple Developer credentials
+.apple-creds/
+*.p8
