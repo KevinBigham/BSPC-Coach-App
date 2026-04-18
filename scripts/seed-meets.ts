@@ -11,30 +11,19 @@
  * Usage: npx tsx scripts/seed-meets.ts
  */
 
-import { initializeApp } from 'firebase/app';
-import {
-  getFirestore,
-  collection,
-  getDocs,
-  writeBatch,
-  doc,
-  serverTimestamp,
-} from 'firebase/firestore';
-import { config } from 'dotenv';
+import { readFileSync } from 'fs';
+import { join } from 'path';
+import { cert, initializeApp, getApps } from 'firebase-admin/app';
+import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 
-config();
+const serviceAccountPath = join(__dirname, '..', 'google-service-account.json');
+const serviceAccount = JSON.parse(readFileSync(serviceAccountPath, 'utf-8'));
 
-const firebaseConfig = {
-  apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID,
-};
+if (getApps().length === 0) {
+  initializeApp({ credential: cert(serviceAccount) });
+}
 
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
+const db = getFirestore();
 
 const COACH_ID = 'seed-script';
 const COACH_NAME = 'BSPC Schedule';
@@ -349,8 +338,8 @@ function meetKey(name: string, startDate: string): string {
 }
 
 async function seedMeets() {
-  const meetsCol = collection(db, 'meets');
-  const existing = await getDocs(meetsCol);
+  const meetsCol = db.collection('meets');
+  const existing = await meetsCol.get();
   const existingByKey = new Map<string, string>(); // key → docId
   existing.forEach((d) => {
     const data = d.data();
@@ -360,14 +349,14 @@ async function seedMeets() {
   });
   console.log(`Found ${existingByKey.size} existing meets`);
 
-  const batch = writeBatch(db);
+  const batch = db.batch();
   let created = 0;
   let updated = 0;
 
   for (const meet of MEETS) {
     const key = meetKey(meet.name, meet.startDate);
     const existingId = existingByKey.get(key);
-    const ref = existingId ? doc(meetsCol, existingId) : doc(meetsCol);
+    const ref = existingId ? meetsCol.doc(existingId) : meetsCol.doc();
 
     batch.set(
       ref,
@@ -375,8 +364,8 @@ async function seedMeets() {
         ...meet,
         coachId: COACH_ID,
         coachName: COACH_NAME,
-        updatedAt: serverTimestamp(),
-        ...(existingId ? {} : { createdAt: serverTimestamp() }),
+        updatedAt: FieldValue.serverTimestamp(),
+        ...(existingId ? {} : { createdAt: FieldValue.serverTimestamp() }),
       },
       { merge: true },
     );

@@ -8,25 +8,17 @@
  * are left untouched (their coach-edited fields like goals, strengths,
  * parent contacts, etc. are preserved).
  *
+ * Auth: uses Firebase Admin SDK via google-service-account.json at the
+ * project root. Bypasses Firestore rules — run only from a trusted
+ * environment.
+ *
  * Usage: npx tsx scripts/seed-roster.ts
  */
 
 import { readFileSync } from 'fs';
 import { join } from 'path';
-import { initializeApp } from 'firebase/app';
-import {
-  getFirestore,
-  collection,
-  getDocs,
-  writeBatch,
-  doc,
-  serverTimestamp,
-  query,
-  limit,
-} from 'firebase/firestore';
-import { config } from 'dotenv';
-
-config();
+import { cert, initializeApp, getApps } from 'firebase-admin/app';
+import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 
 const GROUPS = ['Bronze', 'Silver', 'Gold', 'Advanced', 'Platinum', 'Diamond'] as const;
 type Group = (typeof GROUPS)[number];
@@ -41,24 +33,21 @@ interface RosterEntry {
   usaSwimmingExpDate: string | null;
 }
 
-const firebaseConfig = {
-  apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID,
-};
+const serviceAccountPath = join(__dirname, '..', 'google-service-account.json');
+const serviceAccount = JSON.parse(readFileSync(serviceAccountPath, 'utf-8'));
 
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
+if (getApps().length === 0) {
+  initializeApp({ credential: cert(serviceAccount) });
+}
+
+const db = getFirestore();
 
 function dedupKey(firstName: string, lastName: string, dob: string | null): string {
   return `${firstName.toLowerCase()}|${lastName.toLowerCase()}|${dob ?? ''}`;
 }
 
 async function getCoachUid(): Promise<string> {
-  const snap = await getDocs(query(collection(db, 'coaches'), limit(10)));
+  const snap = await db.collection('coaches').limit(10).get();
   for (const d of snap.docs) {
     if (d.data().role === 'admin') return d.id;
   }
@@ -67,7 +56,7 @@ async function getCoachUid(): Promise<string> {
 }
 
 async function getExistingKeys(): Promise<Set<string>> {
-  const snap = await getDocs(collection(db, 'swimmers'));
+  const snap = await db.collection('swimmers').get();
   const keys = new Set<string>();
   snap.forEach((d) => {
     const data = d.data();
@@ -94,7 +83,7 @@ async function main() {
 
   for (let i = 0; i < entries.length; i += 400) {
     const chunk = entries.slice(i, i + 400);
-    const batch = writeBatch(db);
+    const batch = db.batch();
 
     for (const s of chunk) {
       const key = dedupKey(s.firstName, s.lastName, s.dateOfBirth);
@@ -102,7 +91,7 @@ async function main() {
         skipped++;
         continue;
       }
-      const ref = doc(collection(db, 'swimmers'));
+      const ref = db.collection('swimmers').doc();
       batch.set(ref, {
         firstName: s.firstName,
         lastName: s.lastName,
@@ -117,8 +106,8 @@ async function main() {
         goals: [],
         parentContacts: [],
         meetSchedule: [],
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
+        createdAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
         createdBy: coachUid,
       });
       existingKeys.add(key);
