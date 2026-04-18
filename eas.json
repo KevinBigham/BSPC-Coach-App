@@ -1,26 +1,46 @@
 {
   "cli": {
     "version": ">= 16.0.0",
-    "appVersionSource": "remote"
+    "appVersionSource": "remote",
+    "promptToConfigurePushNotifications": false
   },
   "build": {
     "development": {
       "developmentClient": true,
       "distribution": "internal",
       "env": {
-        "APP_VARIANT": "development"
+        "APP_VARIANT": "development",
+        "EXPO_PUBLIC_FIREBASE_API_KEY": "AIzaSyCR_X-LQST_7xDpqWoUcVCzwmEc9Rctvs8",
+        "EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN": "bspc-coach.firebaseapp.com",
+        "EXPO_PUBLIC_FIREBASE_PROJECT_ID": "bspc-coach",
+        "EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET": "bspc-coach.firebasestorage.app",
+        "EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID": "885257250029",
+        "EXPO_PUBLIC_FIREBASE_APP_ID": "1:885257250029:web:905f91c7f323c1486258e4"
       }
     },
     "preview": {
       "distribution": "internal",
+      "credentialsSource": "local",
       "env": {
-        "APP_VARIANT": "preview"
+        "APP_VARIANT": "preview",
+        "EXPO_PUBLIC_FIREBASE_API_KEY": "AIzaSyCR_X-LQST_7xDpqWoUcVCzwmEc9Rctvs8",
+        "EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN": "bspc-coach.firebaseapp.com",
+        "EXPO_PUBLIC_FIREBASE_PROJECT_ID": "bspc-coach",
+        "EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET": "bspc-coach.firebasestorage.app",
+        "EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID": "885257250029",
+        "EXPO_PUBLIC_FIREBASE_APP_ID": "1:885257250029:web:905f91c7f323c1486258e4"
       }
     },
     "production": {
       "autoIncrement": true,
       "env": {
-        "APP_VARIANT": "production"
+        "APP_VARIANT": "production",
+        "EXPO_PUBLIC_FIREBASE_API_KEY": "AIzaSyCR_X-LQST_7xDpqWoUcVCzwmEc9Rctvs8",
+        "EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN": "bspc-coach.firebaseapp.com",
+        "EXPO_PUBLIC_FIREBASE_PROJECT_ID": "bspc-coach",
+        "EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET": "bspc-coach.firebasestorage.app",
+        "EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID": "885257250029",
+        "EXPO_PUBLIC_FIREBASE_APP_ID": "1:885257250029:web:905f91c7f323c1486258e4"
       }
     }
   },

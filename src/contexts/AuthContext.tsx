@@ -54,11 +54,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               error: null,
             });
           } else {
-            // First login — create coach profile with default role
+            // First login — create coach profile with admin role for pilot.
+            // TODO: switch back to 'coach' once a proper invite/role flow ships.
             const newCoach: Omit<Coach, 'uid'> = {
               email: user.email || '',
               displayName: user.displayName || user.email?.split('@')[0] || 'Coach',
-              role: 'coach' as CoachRole,
+              role: 'admin' as CoachRole,
               groups: [],
               notificationPrefs: {
                 dailyDigest: true,
