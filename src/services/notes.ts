@@ -18,7 +18,7 @@ import type { ExtendedSwimmerNoteSource } from '../types/voiceNote';
 type NoteWithId = SwimmerNote & { id: string };
 type NoteAuthor = { uid: string; displayName: string };
 
-export interface AddNoteOptions {
+interface AddNoteOptions {
   source?: ExtendedSwimmerNoteSource;
   sourceRefId?: string;
   practiceDate?: string;
