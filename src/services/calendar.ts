@@ -104,6 +104,21 @@ export async function submitRSVP(
   return ref.id;
 }
 
+/**
+ * Sort events chronologically by startDate, then by startTime within the same day.
+ * Missing startTime sorts first (treated as 00:00). Single-digit hours are
+ * normalized so '8:00' and '10:00' compare numerically, not lexically.
+ */
+export function sortEventsChronologically<T extends { startDate: string; startTime?: string }>(
+  events: readonly T[],
+): T[] {
+  const norm = (t?: string): string => (t ?? '00:00').padStart(5, '0');
+  return [...events].sort((a, b) => {
+    if (a.startDate !== b.startDate) return a.startDate.localeCompare(b.startDate);
+    return norm(a.startTime).localeCompare(norm(b.startTime));
+  });
+}
+
 export function getEventTypeColor(type: CalendarEvent['type']): string {
   switch (type) {
     case 'practice':

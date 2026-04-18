@@ -57,3 +57,11 @@ parent-portal/next-env.d.ts
 # Apple Developer credentials
 .apple-creds/
 *.p8
+
+# EAS local credentials — never commit (contains cert password)
+credentials.json
+credentials/
+
+# Raw roster/meet source spreadsheets — contain athlete PII, never commit
+*.xlsx
+*.xls

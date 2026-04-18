@@ -78,6 +78,9 @@ function EventDetailScreen() {
   return (
     <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.scroll}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+          <Text style={styles.backBtnText}>◀ BACK</Text>
+        </TouchableOpacity>
         {/* Type Badge */}
         <View style={[styles.typeBadge, { borderColor: typeColor }]}>
           <Text style={[styles.typeText, { color: typeColor }]}>
@@ -203,6 +206,13 @@ function EventDetailScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bgBase },
   scroll: { padding: spacing.lg, paddingBottom: 100 },
+  backBtn: { paddingVertical: spacing.sm, marginBottom: spacing.md },
+  backBtnText: {
+    fontFamily: fontFamily.pixel,
+    fontSize: fontSize.pixel,
+    color: colors.gold,
+    letterSpacing: 1,
+  },
   typeBadge: {
     alignSelf: 'flex-start',
     paddingHorizontal: spacing.md,

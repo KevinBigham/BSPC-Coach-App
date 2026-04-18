@@ -4,7 +4,7 @@ import { router } from 'expo-router';
 import { useAuth } from '../src/contexts/AuthContext';
 import { colors, spacing, fontSize, borderRadius, fontFamily } from '../src/config/theme';
 import { useCalendarStore } from '../src/stores/calendarStore';
-import { subscribeEvents, getEventTypeColor, getEventTypeLabel } from '../src/services/calendar';
+import { subscribeEvents, sortEventsChronologically } from '../src/services/calendar';
 import CalendarMonth from '../src/components/CalendarMonth';
 import EventCard from '../src/components/EventCard';
 import { withScreenErrorBoundary } from '../src/components/ScreenErrorBoundary';
@@ -37,15 +37,19 @@ function CalendarScreen() {
   const year = parseInt(yearStr);
   const month = parseInt(monthStr) - 1;
 
-  // Events for selected date
-  const dateEvents = selectedDate ? events.filter((e) => e.startDate === selectedDate) : [];
+  // Events for selected date (sorted by start time within the day)
+  const dateEvents = selectedDate
+    ? sortEventsChronologically(events.filter((e) => e.startDate === selectedDate))
+    : [];
 
   return (
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <View>
-          <Text style={styles.pixelLabel}>TEAM</Text>
+        <View style={styles.headerLeft}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backLink}>
+            <Text style={styles.backLinkText}>◀ DASHBOARD</Text>
+          </TouchableOpacity>
           <Text style={styles.screenTitle}>CALENDAR</Text>
         </View>
         <TouchableOpacity style={styles.addBtn} onPress={() => router.push('/calendar/event/new')}>
@@ -119,8 +123,9 @@ function CalendarScreen() {
         {/* Upcoming Events Summary */}
         <View style={styles.upcomingSection}>
           <Text style={styles.sectionTitle}>UPCOMING</Text>
-          {events
-            .filter((e) => e.startDate >= (selectedDate || viewMonth + '-01'))
+          {sortEventsChronologically(
+            events.filter((e) => e.startDate >= (selectedDate || viewMonth + '-01')),
+          )
             .slice(0, 5)
             .map((event) => (
               <EventCard
@@ -149,12 +154,13 @@ const styles = StyleSheet.create({
     borderBottomWidth: 2,
     borderBottomColor: colors.purple,
   },
-  pixelLabel: {
+  headerLeft: { flexShrink: 1 },
+  backLink: { marginBottom: spacing.xs, paddingVertical: spacing.xs },
+  backLinkText: {
     fontFamily: fontFamily.pixel,
     fontSize: fontSize.pixel,
     color: colors.gold,
     letterSpacing: 1,
-    marginBottom: spacing.xs,
   },
   screenTitle: {
     fontFamily: fontFamily.heading,
