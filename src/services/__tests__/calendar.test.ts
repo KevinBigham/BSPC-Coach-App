@@ -43,6 +43,7 @@ import {
   submitRSVP,
   getEventTypeColor,
   getEventTypeLabel,
+  sortEventsChronologically,
 } from '../calendar';
 
 const firestore = require('firebase/firestore');
@@ -203,5 +204,45 @@ describe('getEventTypeLabel', () => {
 
   it('returns raw type for unknown', () => {
     expect(getEventTypeLabel('custom_type' as any)).toBe('custom_type');
+  });
+});
+
+describe('sortEventsChronologically', () => {
+  it('sorts by startDate ascending', () => {
+    const events = [
+      { startDate: '2026-04-20' },
+      { startDate: '2026-04-18' },
+      { startDate: '2026-04-19' },
+    ];
+    expect(sortEventsChronologically(events).map((e) => e.startDate)).toEqual([
+      '2026-04-18',
+      '2026-04-19',
+      '2026-04-20',
+    ]);
+  });
+
+  it('sorts by startTime within the same day (numeric, not lexical)', () => {
+    const events = [
+      { startDate: '2026-04-18', startTime: '10:00' },
+      { startDate: '2026-04-18', startTime: '8:00' },
+      { startDate: '2026-04-18', startTime: '14:30' },
+    ];
+    expect(sortEventsChronologically(events).map((e) => e.startTime)).toEqual([
+      '8:00',
+      '10:00',
+      '14:30',
+    ]);
+  });
+
+  it('treats missing startTime as 00:00 (sorts first within a day)', () => {
+    const events = [{ startDate: '2026-04-18', startTime: '08:00' }, { startDate: '2026-04-18' }];
+    expect(sortEventsChronologically(events)[0].startTime).toBeUndefined();
+  });
+
+  it('does not mutate the input array', () => {
+    const events = [{ startDate: '2026-04-20' }, { startDate: '2026-04-18' }];
+    const original = events.map((e) => e.startDate);
+    sortEventsChronologically(events);
+    expect(events.map((e) => e.startDate)).toEqual(original);
   });
 });

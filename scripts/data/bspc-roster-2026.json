@@ -1,0 +1,2018 @@
+[
+  {
+    "firstName": "Connelly",
+    "lastName": "Bennett",
+    "gender": "F",
+    "group": "Diamond",
+    "dateOfBirth": "2008-12-12",
+    "usaSwimmingRegType": "Individual Season Athlete",
+    "usaSwimmingExpDate": "2026-09-01"
+  },
+  {
+    "firstName": "Kailyn",
+    "lastName": "Cabaniss (Forcinito)",
+    "gender": "F",
+    "group": "Diamond",
+    "dateOfBirth": "2011-06-20",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Kate",
+    "lastName": "Finucane",
+    "gender": "F",
+    "group": "Diamond",
+    "dateOfBirth": "2010-09-14",
+    "usaSwimmingRegType": "Individual Season Athlete",
+    "usaSwimmingExpDate": "2026-09-01"
+  },
+  {
+    "firstName": "Aurora",
+    "lastName": "Fordyce",
+    "gender": "F",
+    "group": "Diamond",
+    "dateOfBirth": "2009-12-21",
+    "usaSwimmingRegType": "Individual Season Athlete",
+    "usaSwimmingExpDate": "2026-09-01"
+  },
+  {
+    "firstName": "Ellie",
+    "lastName": "Hunt",
+    "gender": "F",
+    "group": "Diamond",
+    "dateOfBirth": "2009-03-31",
+    "usaSwimmingRegType": "Individual Season Athlete",
+    "usaSwimmingExpDate": "2026-09-01"
+  },
+  {
+    "firstName": "Lily",
+    "lastName": "Jackson",
+    "gender": "M",
+    "group": "Diamond",
+    "dateOfBirth": "2010-07-16",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Dia",
+    "lastName": "James",
+    "gender": "F",
+    "group": "Diamond",
+    "dateOfBirth": "2009-09-21",
+    "usaSwimmingRegType": "Individual Season Athlete",
+    "usaSwimmingExpDate": "2026-09-01"
+  },
+  {
+    "firstName": "Hailey",
+    "lastName": "Johnson",
+    "gender": "F",
+    "group": "Diamond",
+    "dateOfBirth": "2010-07-08",
+    "usaSwimmingRegType": "Individual Season Athlete",
+    "usaSwimmingExpDate": "2026-09-01"
+  },
+  {
+    "firstName": "Claire",
+    "lastName": "Keeton",
+    "gender": "F",
+    "group": "Diamond",
+    "dateOfBirth": "2011-04-24",
+    "usaSwimmingRegType": "Individual Season Athlete",
+    "usaSwimmingExpDate": "2026-09-01"
+  },
+  {
+    "firstName": "Callista",
+    "lastName": "Lake",
+    "gender": "F",
+    "group": "Diamond",
+    "dateOfBirth": "2009-01-20",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2025-12-31"
+  },
+  {
+    "firstName": "Avery",
+    "lastName": "Morehead",
+    "gender": "F",
+    "group": "Diamond",
+    "dateOfBirth": "2011-06-01",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Chloe",
+    "lastName": "Radford",
+    "gender": "M",
+    "group": "Diamond",
+    "dateOfBirth": "2010-07-09",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Olivia",
+    "lastName": "Swanson",
+    "gender": "F",
+    "group": "Diamond",
+    "dateOfBirth": "2008-08-21",
+    "usaSwimmingRegType": "Individual Season Athlete",
+    "usaSwimmingExpDate": "2026-09-01"
+  },
+  {
+    "firstName": "Ellie",
+    "lastName": "Vaughan",
+    "gender": "F",
+    "group": "Diamond",
+    "dateOfBirth": "2009-04-13",
+    "usaSwimmingRegType": "Individual Season Athlete",
+    "usaSwimmingExpDate": "2026-09-01"
+  },
+  {
+    "firstName": "Mason",
+    "lastName": "Baylard",
+    "gender": "M",
+    "group": "Diamond",
+    "dateOfBirth": "2010-08-12",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Landon",
+    "lastName": "Bird",
+    "gender": "M",
+    "group": "Diamond",
+    "dateOfBirth": "2008-09-12",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Wade",
+    "lastName": "Blackburn",
+    "gender": "M",
+    "group": "Diamond",
+    "dateOfBirth": "2011-03-31",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Braxton",
+    "lastName": "Campbell",
+    "gender": "M",
+    "group": "Diamond",
+    "dateOfBirth": "2010-04-01",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Henry",
+    "lastName": "Clisso",
+    "gender": "M",
+    "group": "Diamond",
+    "dateOfBirth": "2010-04-23",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Chase",
+    "lastName": "Ellis",
+    "gender": "M",
+    "group": "Diamond",
+    "dateOfBirth": "2009-08-18",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Caleb",
+    "lastName": "Gipson",
+    "gender": "M",
+    "group": "Diamond",
+    "dateOfBirth": "2010-04-18",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "John",
+    "lastName": "Hollingshead",
+    "gender": "M",
+    "group": "Diamond",
+    "dateOfBirth": "2010-11-18",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Evan",
+    "lastName": "Johnson",
+    "gender": "M",
+    "group": "Diamond",
+    "dateOfBirth": "2008-08-17",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Roark",
+    "lastName": "Johnson",
+    "gender": "M",
+    "group": "Diamond",
+    "dateOfBirth": "2011-07-27",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Chandler",
+    "lastName": "Jorgensen",
+    "gender": "M",
+    "group": "Diamond",
+    "dateOfBirth": "2010-12-25",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Lucas",
+    "lastName": "Manade",
+    "gender": "M",
+    "group": "Diamond",
+    "dateOfBirth": "2009-01-27",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Troy",
+    "lastName": "Mitchell",
+    "gender": "M",
+    "group": "Diamond",
+    "dateOfBirth": "2011-07-13",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Gabe",
+    "lastName": "New",
+    "gender": "M",
+    "group": "Diamond",
+    "dateOfBirth": "2011-01-10",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Aidan",
+    "lastName": "O'Toole",
+    "gender": "M",
+    "group": "Diamond",
+    "dateOfBirth": "2010-04-13",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Brecken",
+    "lastName": "Ramler",
+    "gender": "M",
+    "group": "Diamond",
+    "dateOfBirth": "2010-12-26",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Carter",
+    "lastName": "Reece",
+    "gender": "M",
+    "group": "Diamond",
+    "dateOfBirth": "2009-11-18",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Archer",
+    "lastName": "Sanderson",
+    "gender": "M",
+    "group": "Diamond",
+    "dateOfBirth": "2009-08-27",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Bentley",
+    "lastName": "Stasiak",
+    "gender": "M",
+    "group": "Diamond",
+    "dateOfBirth": "2007-12-20",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-29"
+  },
+  {
+    "firstName": "Finn",
+    "lastName": "Hoffman",
+    "gender": "M",
+    "group": "Diamond",
+    "dateOfBirth": "2008-07-16",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Sadie",
+    "lastName": "Lee",
+    "gender": "M",
+    "group": "Diamond",
+    "dateOfBirth": "2009-04-27",
+    "usaSwimmingRegType": "Individual Season Athlete",
+    "usaSwimmingExpDate": "2026-06-30"
+  },
+  {
+    "firstName": "Emma",
+    "lastName": "Austin",
+    "gender": "F",
+    "group": "Platinum",
+    "dateOfBirth": "2012-04-13",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Elijah",
+    "lastName": "Beck",
+    "gender": "M",
+    "group": "Platinum",
+    "dateOfBirth": "2011-01-31",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "McKenna",
+    "lastName": "Brown",
+    "gender": "F",
+    "group": "Platinum",
+    "dateOfBirth": "2012-11-30",
+    "usaSwimmingRegType": "Individual Season Athlete",
+    "usaSwimmingExpDate": "2026-06-04"
+  },
+  {
+    "firstName": "Quinton",
+    "lastName": "Campbell",
+    "gender": "M",
+    "group": "Platinum",
+    "dateOfBirth": "2012-06-16",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Gael",
+    "lastName": "Cos Villa Alva",
+    "gender": "M",
+    "group": "Platinum",
+    "dateOfBirth": "2011-12-18",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Delanie",
+    "lastName": "Davenport",
+    "gender": "F",
+    "group": "Platinum",
+    "dateOfBirth": "2012-03-12",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Clare",
+    "lastName": "Finucane",
+    "gender": "F",
+    "group": "Platinum",
+    "dateOfBirth": "2013-01-24",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Jordan",
+    "lastName": "Floyd",
+    "gender": "F",
+    "group": "Platinum",
+    "dateOfBirth": "2012-07-29",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Aidan",
+    "lastName": "Foley",
+    "gender": "M",
+    "group": "Platinum",
+    "dateOfBirth": "2012-05-25",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Kayden",
+    "lastName": "Johnson",
+    "gender": "M",
+    "group": "Platinum",
+    "dateOfBirth": "2012-04-11",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Elle",
+    "lastName": "Pealer",
+    "gender": "F",
+    "group": "Platinum",
+    "dateOfBirth": "2013-02-10",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Price",
+    "lastName": "Ramler",
+    "gender": "M",
+    "group": "Platinum",
+    "dateOfBirth": "2012-07-24",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Cassidy",
+    "lastName": "Spellerberg",
+    "gender": "F",
+    "group": "Platinum",
+    "dateOfBirth": "2012-01-19",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Audrey",
+    "lastName": "Straits",
+    "gender": "F",
+    "group": "Platinum",
+    "dateOfBirth": "2012-11-17",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Rosalie",
+    "lastName": "Swanson",
+    "gender": "F",
+    "group": "Platinum",
+    "dateOfBirth": "2013-05-19",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Nora",
+    "lastName": "Adams",
+    "gender": "F",
+    "group": "Platinum",
+    "dateOfBirth": "2011-08-23",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Liliana",
+    "lastName": "Gonzalez Herrera",
+    "gender": "F",
+    "group": "Platinum",
+    "dateOfBirth": "2011-10-19",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Natalie",
+    "lastName": "Punzo",
+    "gender": "F",
+    "group": "Platinum",
+    "dateOfBirth": "2011-11-29",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "James",
+    "lastName": "States",
+    "gender": "M",
+    "group": "Platinum",
+    "dateOfBirth": "2012-06-21",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Hadley",
+    "lastName": "Bubalo",
+    "gender": "F",
+    "group": "Advanced",
+    "dateOfBirth": "2014-09-10",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Adrien",
+    "lastName": "Cretin",
+    "gender": "M",
+    "group": "Advanced",
+    "dateOfBirth": "2011-12-26",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Jack",
+    "lastName": "Dolence",
+    "gender": "M",
+    "group": "Advanced",
+    "dateOfBirth": "2013-02-08",
+    "usaSwimmingRegType": "Flex Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Lily",
+    "lastName": "Falkenstein",
+    "gender": "F",
+    "group": "Advanced",
+    "dateOfBirth": "2012-09-22",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Lauren",
+    "lastName": "Galvez",
+    "gender": "F",
+    "group": "Advanced",
+    "dateOfBirth": "2014-07-26",
+    "usaSwimmingRegType": "Flex Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Owen",
+    "lastName": "Johnson",
+    "gender": "M",
+    "group": "Advanced",
+    "dateOfBirth": "2015-11-06",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Kacey",
+    "lastName": "Kline",
+    "gender": "F",
+    "group": "Advanced",
+    "dateOfBirth": "2014-06-09",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Hudson",
+    "lastName": "Kramer",
+    "gender": "M",
+    "group": "Advanced",
+    "dateOfBirth": "2013-09-17",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Danielle",
+    "lastName": "Leven",
+    "gender": "F",
+    "group": "Advanced",
+    "dateOfBirth": "2014-09-05",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Emma",
+    "lastName": "Lloyd",
+    "gender": "F",
+    "group": "Advanced",
+    "dateOfBirth": "2014-12-17",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Carson",
+    "lastName": "Lundgren",
+    "gender": "M",
+    "group": "Advanced",
+    "dateOfBirth": "2013-12-11",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Avery",
+    "lastName": "Mason",
+    "gender": "F",
+    "group": "Advanced",
+    "dateOfBirth": "2012-12-27",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Violet",
+    "lastName": "Radford",
+    "gender": "F",
+    "group": "Advanced",
+    "dateOfBirth": "2012-06-21",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Cason",
+    "lastName": "Ramler",
+    "gender": "M",
+    "group": "Advanced",
+    "dateOfBirth": "2014-03-25",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Wells",
+    "lastName": "Ramler",
+    "gender": "M",
+    "group": "Advanced",
+    "dateOfBirth": "2015-08-05",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Augustino",
+    "lastName": "Segalo",
+    "gender": "M",
+    "group": "Advanced",
+    "dateOfBirth": "2013-08-14",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Parker",
+    "lastName": "Sullins",
+    "gender": "M",
+    "group": "Advanced",
+    "dateOfBirth": "2014-05-22",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Olivia",
+    "lastName": "Vodolazskyi",
+    "gender": "F",
+    "group": "Advanced",
+    "dateOfBirth": "2012-09-17",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Kate",
+    "lastName": "Alfano",
+    "gender": "F",
+    "group": "Advanced",
+    "dateOfBirth": "2011-12-08",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Lillian",
+    "lastName": "Freeland",
+    "gender": "F",
+    "group": "Advanced",
+    "dateOfBirth": "2013-06-05",
+    "usaSwimmingRegType": "Individual Season Athlete",
+    "usaSwimmingExpDate": "2026-06-04"
+  },
+  {
+    "firstName": "Andrew",
+    "lastName": "Owings",
+    "gender": "M",
+    "group": "Advanced",
+    "dateOfBirth": "2014-03-28",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "John",
+    "lastName": "Van Noy",
+    "gender": "M",
+    "group": "Advanced",
+    "dateOfBirth": "2013-02-01",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Grayson",
+    "lastName": "Wolters",
+    "gender": "M",
+    "group": "Advanced",
+    "dateOfBirth": "2013-05-21",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Griffin",
+    "lastName": "Alexander",
+    "gender": "M",
+    "group": "Gold",
+    "dateOfBirth": "2013-01-01",
+    "usaSwimmingRegType": "Flex Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Ariana",
+    "lastName": "Black",
+    "gender": "F",
+    "group": "Gold",
+    "dateOfBirth": "2014-06-06",
+    "usaSwimmingRegType": "Flex Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Malakai",
+    "lastName": "Castaneda",
+    "gender": "M",
+    "group": "Gold",
+    "dateOfBirth": "2015-11-20",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "George",
+    "lastName": "Damstedt",
+    "gender": "M",
+    "group": "Gold",
+    "dateOfBirth": "2015-07-28",
+    "usaSwimmingRegType": "Flex Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Sven",
+    "lastName": "Damstedt",
+    "gender": "M",
+    "group": "Gold",
+    "dateOfBirth": "2013-12-21",
+    "usaSwimmingRegType": "Flex Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Austin",
+    "lastName": "Dyer",
+    "gender": "M",
+    "group": "Gold",
+    "dateOfBirth": "2013-04-04",
+    "usaSwimmingRegType": "Flex Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Cruz",
+    "lastName": "Floersch",
+    "gender": "M",
+    "group": "Gold",
+    "dateOfBirth": "2011-09-20",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Ava",
+    "lastName": "Foley",
+    "gender": "F",
+    "group": "Gold",
+    "dateOfBirth": "2015-01-26",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Jacob",
+    "lastName": "Gipson",
+    "gender": "M",
+    "group": "Gold",
+    "dateOfBirth": "2016-07-11",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Madison",
+    "lastName": "Gray",
+    "gender": "F",
+    "group": "Gold",
+    "dateOfBirth": "2017-03-29",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Ray",
+    "lastName": "Holden",
+    "gender": "M",
+    "group": "Gold",
+    "dateOfBirth": "2016-09-07",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Delaney",
+    "lastName": "Jorgensen",
+    "gender": "F",
+    "group": "Gold",
+    "dateOfBirth": "2013-10-25",
+    "usaSwimmingRegType": "Flex Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Liam",
+    "lastName": "Kelly",
+    "gender": "M",
+    "group": "Gold",
+    "dateOfBirth": "2011-08-05",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Reid",
+    "lastName": "Mason",
+    "gender": "M",
+    "group": "Gold",
+    "dateOfBirth": "2015-10-29",
+    "usaSwimmingRegType": "Flex Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Kira",
+    "lastName": "Milam (Taylor)",
+    "gender": "F",
+    "group": "Gold",
+    "dateOfBirth": "2015-08-17",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Sloan",
+    "lastName": "Milligan",
+    "gender": "F",
+    "group": "Gold",
+    "dateOfBirth": "2013-12-10",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Kennedy",
+    "lastName": "Patterson",
+    "gender": "F",
+    "group": "Gold",
+    "dateOfBirth": "2012-10-11",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Jacob",
+    "lastName": "Stephenson",
+    "gender": "M",
+    "group": "Gold",
+    "dateOfBirth": "2015-03-28",
+    "usaSwimmingRegType": "Flex Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Meredith",
+    "lastName": "Sullins",
+    "gender": "F",
+    "group": "Gold",
+    "dateOfBirth": "2017-05-03",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Penelope",
+    "lastName": "Swanson",
+    "gender": "F",
+    "group": "Gold",
+    "dateOfBirth": "2016-08-16",
+    "usaSwimmingRegType": "Individual Season Athlete",
+    "usaSwimmingExpDate": "2026-06-04"
+  },
+  {
+    "firstName": "Anna",
+    "lastName": "White",
+    "gender": "F",
+    "group": "Gold",
+    "dateOfBirth": "2017-06-23",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Avery",
+    "lastName": "White",
+    "gender": "F",
+    "group": "Gold",
+    "dateOfBirth": "2015-08-03",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Jackson",
+    "lastName": "Boone",
+    "gender": "M",
+    "group": "Gold",
+    "dateOfBirth": "2015-03-13",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Christopher",
+    "lastName": "Groom",
+    "gender": "M",
+    "group": "Gold",
+    "dateOfBirth": "2016-06-03",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Quinn",
+    "lastName": "Kirk",
+    "gender": "F",
+    "group": "Gold",
+    "dateOfBirth": "2016-06-10",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Charlotte",
+    "lastName": "Nichols",
+    "gender": "F",
+    "group": "Gold",
+    "dateOfBirth": "2015-10-08",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Harper",
+    "lastName": "Alexander",
+    "gender": "F",
+    "group": "Silver",
+    "dateOfBirth": "2015-10-29",
+    "usaSwimmingRegType": "Flex Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Ezra",
+    "lastName": "Castaneda",
+    "gender": "M",
+    "group": "Silver",
+    "dateOfBirth": "2018-09-05",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Atarah",
+    "lastName": "Cox",
+    "gender": "F",
+    "group": "Silver",
+    "dateOfBirth": "2015-12-13",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Sophia",
+    "lastName": "Davis",
+    "gender": "F",
+    "group": "Silver",
+    "dateOfBirth": "2016-07-26",
+    "usaSwimmingRegType": null,
+    "usaSwimmingExpDate": null
+  },
+  {
+    "firstName": "Maddie",
+    "lastName": "Eaton",
+    "gender": "F",
+    "group": "Silver",
+    "dateOfBirth": "2018-05-28",
+    "usaSwimmingRegType": "Flex Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Bryce",
+    "lastName": "Garbs",
+    "gender": "M",
+    "group": "Silver",
+    "dateOfBirth": "2016-04-18",
+    "usaSwimmingRegType": "Flex Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Reign",
+    "lastName": "Harris",
+    "gender": "M",
+    "group": "Silver",
+    "dateOfBirth": "2016-08-15",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Preston",
+    "lastName": "Harris",
+    "gender": "M",
+    "group": "Silver",
+    "dateOfBirth": "2018-06-13",
+    "usaSwimmingRegType": "Flex Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Vivian",
+    "lastName": "Harris",
+    "gender": "F",
+    "group": "Silver",
+    "dateOfBirth": "2016-10-12",
+    "usaSwimmingRegType": "Flex Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Scarlett",
+    "lastName": "James",
+    "gender": "F",
+    "group": "Silver",
+    "dateOfBirth": "2015-02-10",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Miles",
+    "lastName": "Johnson",
+    "gender": "M",
+    "group": "Silver",
+    "dateOfBirth": "2015-12-29",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Leo",
+    "lastName": "Kapur",
+    "gender": "M",
+    "group": "Silver",
+    "dateOfBirth": "2017-11-12",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Lucy",
+    "lastName": "Kidd",
+    "gender": "F",
+    "group": "Silver",
+    "dateOfBirth": "2015-08-05",
+    "usaSwimmingRegType": "Flex Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Liam",
+    "lastName": "Loy",
+    "gender": "M",
+    "group": "Silver",
+    "dateOfBirth": "2014-07-16",
+    "usaSwimmingRegType": "Flex Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Solomon",
+    "lastName": "Mitchell",
+    "gender": "M",
+    "group": "Silver",
+    "dateOfBirth": "2013-10-31",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Savannah",
+    "lastName": "Patterson",
+    "gender": "F",
+    "group": "Silver",
+    "dateOfBirth": "2014-06-12",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Phoebe",
+    "lastName": "Pugh (Ray)",
+    "gender": "F",
+    "group": "Silver",
+    "dateOfBirth": "2016-08-14",
+    "usaSwimmingRegType": "Flex Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Mage",
+    "lastName": "Reed (Zhang)",
+    "gender": "M",
+    "group": "Silver",
+    "dateOfBirth": "2015-05-06",
+    "usaSwimmingRegType": "Flex Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Scarlet",
+    "lastName": "Shaw",
+    "gender": "F",
+    "group": "Silver",
+    "dateOfBirth": "2015-03-09",
+    "usaSwimmingRegType": "Flex Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Talia",
+    "lastName": "Sneed",
+    "gender": "F",
+    "group": "Silver",
+    "dateOfBirth": "2015-12-13",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Tyler",
+    "lastName": "Stephenson",
+    "gender": "M",
+    "group": "Silver",
+    "dateOfBirth": "2015-03-28",
+    "usaSwimmingRegType": "Flex Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Colten",
+    "lastName": "Sutphin",
+    "gender": "M",
+    "group": "Silver",
+    "dateOfBirth": "2018-01-24",
+    "usaSwimmingRegType": "Flex Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Taber",
+    "lastName": "Ulleberg",
+    "gender": "M",
+    "group": "Silver",
+    "dateOfBirth": "2016-08-14",
+    "usaSwimmingRegType": "Flex Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Aaron",
+    "lastName": "Vodolazskyi",
+    "gender": "M",
+    "group": "Silver",
+    "dateOfBirth": "2015-02-09",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Jacob",
+    "lastName": "Vodolazskyi",
+    "gender": "M",
+    "group": "Silver",
+    "dateOfBirth": "2017-08-25",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Georgia",
+    "lastName": "Kirk",
+    "gender": "F",
+    "group": "Silver",
+    "dateOfBirth": "2018-12-11",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Josh",
+    "lastName": "Lindley",
+    "gender": "M",
+    "group": "Silver",
+    "dateOfBirth": "2014-09-15",
+    "usaSwimmingRegType": "Flex Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Lola",
+    "lastName": "Powell",
+    "gender": "F",
+    "group": "Silver",
+    "dateOfBirth": "2015-07-28",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "George",
+    "lastName": "States",
+    "gender": "M",
+    "group": "Silver",
+    "dateOfBirth": "2017-04-26",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Willow",
+    "lastName": "Bachani",
+    "gender": "F",
+    "group": "Bronze",
+    "dateOfBirth": "2016-12-13",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Henry",
+    "lastName": "Bryant",
+    "gender": "M",
+    "group": "Bronze",
+    "dateOfBirth": "2014-08-22",
+    "usaSwimmingRegType": "Flex Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Cade",
+    "lastName": "Calvert",
+    "gender": "M",
+    "group": "Bronze",
+    "dateOfBirth": "2017-05-14",
+    "usaSwimmingRegType": "Flex Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Colbie",
+    "lastName": "Calvert",
+    "gender": "F",
+    "group": "Bronze",
+    "dateOfBirth": "2019-03-26",
+    "usaSwimmingRegType": "Flex Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Charlie",
+    "lastName": "Caringer (Walters)",
+    "gender": "M",
+    "group": "Bronze",
+    "dateOfBirth": "2017-10-02",
+    "usaSwimmingRegType": "Flex Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "LilyAnn",
+    "lastName": "Carter",
+    "gender": "F",
+    "group": "Bronze",
+    "dateOfBirth": "2016-05-02",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Erin",
+    "lastName": "Cos Villa Alva",
+    "gender": "F",
+    "group": "Bronze",
+    "dateOfBirth": "2017-04-08",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Oliver",
+    "lastName": "Damstedt",
+    "gender": "M",
+    "group": "Bronze",
+    "dateOfBirth": "2018-01-03",
+    "usaSwimmingRegType": "Flex Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "JJ",
+    "lastName": "Elkins",
+    "gender": "M",
+    "group": "Bronze",
+    "dateOfBirth": "2019-12-12",
+    "usaSwimmingRegType": "Flex Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Zach",
+    "lastName": "Frego",
+    "gender": "M",
+    "group": "Bronze",
+    "dateOfBirth": "2016-05-16",
+    "usaSwimmingRegType": "Flex Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Elliott",
+    "lastName": "Greer",
+    "gender": "M",
+    "group": "Bronze",
+    "dateOfBirth": "2017-11-03",
+    "usaSwimmingRegType": "Flex Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Max",
+    "lastName": "Hamilton",
+    "gender": "M",
+    "group": "Bronze",
+    "dateOfBirth": "2015-10-05",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Ryker",
+    "lastName": "Ham",
+    "gender": "M",
+    "group": "Bronze",
+    "dateOfBirth": "2017-05-08",
+    "usaSwimmingRegType": "Flex Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Hadley",
+    "lastName": "Hernandez",
+    "gender": "F",
+    "group": "Bronze",
+    "dateOfBirth": "2014-07-27",
+    "usaSwimmingRegType": "Flex Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Lily",
+    "lastName": "Hogan",
+    "gender": "F",
+    "group": "Bronze",
+    "dateOfBirth": "2014-12-29",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Emmy",
+    "lastName": "Hogan",
+    "gender": "F",
+    "group": "Bronze",
+    "dateOfBirth": "2016-09-28",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Theodora",
+    "lastName": "Hunt",
+    "gender": "F",
+    "group": "Bronze",
+    "dateOfBirth": null,
+    "usaSwimmingRegType": null,
+    "usaSwimmingExpDate": null
+  },
+  {
+    "firstName": "Clayton",
+    "lastName": "Jacobson",
+    "gender": "M",
+    "group": "Bronze",
+    "dateOfBirth": "2016-06-05",
+    "usaSwimmingRegType": "Flex Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Audrey",
+    "lastName": "Jason",
+    "gender": "F",
+    "group": "Bronze",
+    "dateOfBirth": null,
+    "usaSwimmingRegType": null,
+    "usaSwimmingExpDate": null
+  },
+  {
+    "firstName": "Joshua",
+    "lastName": "Jason",
+    "gender": "M",
+    "group": "Bronze",
+    "dateOfBirth": null,
+    "usaSwimmingRegType": null,
+    "usaSwimmingExpDate": null
+  },
+  {
+    "firstName": "Ethan",
+    "lastName": "Johnson",
+    "gender": "M",
+    "group": "Bronze",
+    "dateOfBirth": "2017-05-26",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Isabelle",
+    "lastName": "Loy",
+    "gender": "F",
+    "group": "Bronze",
+    "dateOfBirth": "2016-10-21",
+    "usaSwimmingRegType": "Flex Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Sophie",
+    "lastName": "Loy",
+    "gender": "F",
+    "group": "Bronze",
+    "dateOfBirth": "2019-02-08",
+    "usaSwimmingRegType": "Flex Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Luke",
+    "lastName": "Maddock",
+    "gender": "M",
+    "group": "Bronze",
+    "dateOfBirth": "2018-05-15",
+    "usaSwimmingRegType": "Flex Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Mason",
+    "lastName": "Maddock",
+    "gender": "M",
+    "group": "Bronze",
+    "dateOfBirth": "2016-03-04",
+    "usaSwimmingRegType": "Flex Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Riley",
+    "lastName": "Mann",
+    "gender": "F",
+    "group": "Bronze",
+    "dateOfBirth": "2018-01-16",
+    "usaSwimmingRegType": "Flex Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Miriam",
+    "lastName": "McDaniel (Keller)",
+    "gender": "F",
+    "group": "Bronze",
+    "dateOfBirth": "2017-10-04",
+    "usaSwimmingRegType": "Flex Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Jameson",
+    "lastName": "Moran",
+    "gender": "M",
+    "group": "Bronze",
+    "dateOfBirth": "2016-01-03",
+    "usaSwimmingRegType": "Flex Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Rylann",
+    "lastName": "Pair",
+    "gender": "F",
+    "group": "Bronze",
+    "dateOfBirth": "2016-04-22",
+    "usaSwimmingRegType": "Flex Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Mack",
+    "lastName": "Pritchard (Mackay)",
+    "gender": "F",
+    "group": "Bronze",
+    "dateOfBirth": "2016-06-09",
+    "usaSwimmingRegType": "Flex Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Alexandra",
+    "lastName": "Radford",
+    "gender": "F",
+    "group": "Bronze",
+    "dateOfBirth": "2018-04-12",
+    "usaSwimmingRegType": "Flex Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Maxwell",
+    "lastName": "Simpson",
+    "gender": "M",
+    "group": "Bronze",
+    "dateOfBirth": "2018-06-06",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Tehya",
+    "lastName": "Stephenson",
+    "gender": "F",
+    "group": "Bronze",
+    "dateOfBirth": "2017-07-25",
+    "usaSwimmingRegType": "Flex Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Grant",
+    "lastName": "Tipton",
+    "gender": "M",
+    "group": "Bronze",
+    "dateOfBirth": "2018-04-12",
+    "usaSwimmingRegType": "Flex Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Austyn",
+    "lastName": "Zirhut",
+    "gender": "F",
+    "group": "Bronze",
+    "dateOfBirth": "2016-12-06",
+    "usaSwimmingRegType": "Individual Season Athlete",
+    "usaSwimmingExpDate": "2026-01-06"
+  },
+  {
+    "firstName": "Booker",
+    "lastName": "Johnson",
+    "gender": "M",
+    "group": "Bronze",
+    "dateOfBirth": "2017-09-20",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Kaylen",
+    "lastName": "Scopel",
+    "gender": "F",
+    "group": "Bronze",
+    "dateOfBirth": "2014-10-29",
+    "usaSwimmingRegType": "Flex Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Penelope",
+    "lastName": "Velasquez",
+    "gender": "F",
+    "group": "Bronze",
+    "dateOfBirth": "2019-04-01",
+    "usaSwimmingRegType": "Flex Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Aiden",
+    "lastName": "Jones",
+    "gender": "M",
+    "group": "Silver",
+    "dateOfBirth": "2015-07-23",
+    "usaSwimmingRegType": "Flex Athlete",
+    "usaSwimmingExpDate": "2025-12-31"
+  },
+  {
+    "firstName": "Ella",
+    "lastName": "Hixenbaugh",
+    "gender": "F",
+    "group": "Bronze",
+    "dateOfBirth": "2018-05-02",
+    "usaSwimmingRegType": null,
+    "usaSwimmingExpDate": null
+  },
+  {
+    "firstName": "Rylee",
+    "lastName": "Boehm",
+    "gender": "F",
+    "group": "Advanced",
+    "dateOfBirth": "2011-07-12",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2025-12-31"
+  },
+  {
+    "firstName": "Brodix",
+    "lastName": "Gooden",
+    "gender": "M",
+    "group": "Silver",
+    "dateOfBirth": "2016-03-04",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2025-12-31"
+  },
+  {
+    "firstName": "Hunter",
+    "lastName": "Savage",
+    "gender": "M",
+    "group": "Silver",
+    "dateOfBirth": "2015-07-05",
+    "usaSwimmingRegType": "Flex Athlete",
+    "usaSwimmingExpDate": "2025-12-31"
+  },
+  {
+    "firstName": "Sam",
+    "lastName": "Chapman",
+    "gender": "M",
+    "group": "Silver",
+    "dateOfBirth": "2014-09-08",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Brooke",
+    "lastName": "Rippee",
+    "gender": "F",
+    "group": "Advanced",
+    "dateOfBirth": "2013-02-22",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2025-12-31"
+  },
+  {
+    "firstName": "Tula",
+    "lastName": "Snow",
+    "gender": "F",
+    "group": "Silver",
+    "dateOfBirth": "2015-06-02",
+    "usaSwimmingRegType": "Flex Athlete",
+    "usaSwimmingExpDate": "2025-12-31"
+  },
+  {
+    "firstName": "Abbie",
+    "lastName": "Grooms Conn",
+    "gender": "F",
+    "group": "Gold",
+    "dateOfBirth": "2011-10-10",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2025-12-31"
+  },
+  {
+    "firstName": "Maycee",
+    "lastName": "Pritchard (Mackay)",
+    "gender": "F",
+    "group": "Silver",
+    "dateOfBirth": "2016-06-09",
+    "usaSwimmingRegType": "Flex Athlete",
+    "usaSwimmingExpDate": "2025-12-31"
+  },
+  {
+    "firstName": "Keegan",
+    "lastName": "Shaw",
+    "gender": "F",
+    "group": "Advanced",
+    "dateOfBirth": "2014-05-09",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Audrey",
+    "lastName": "Sekelsky",
+    "gender": "F",
+    "group": "Diamond",
+    "dateOfBirth": "2007-09-20",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2025-12-31"
+  },
+  {
+    "firstName": "Caroline",
+    "lastName": "Hooper",
+    "gender": "F",
+    "group": "Diamond",
+    "dateOfBirth": "2007-08-28",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2025-12-31"
+  },
+  {
+    "firstName": "Rowyn",
+    "lastName": "Durgin",
+    "gender": "F",
+    "group": "Silver",
+    "dateOfBirth": "2016-09-20",
+    "usaSwimmingRegType": "Flex Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Emily",
+    "lastName": "Van Hoesen",
+    "gender": "F",
+    "group": "Diamond",
+    "dateOfBirth": "2010-02-05",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Juniper",
+    "lastName": "Davenport",
+    "gender": "F",
+    "group": "Advanced",
+    "dateOfBirth": "2014-08-16",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Brooklyn",
+    "lastName": "Brim",
+    "gender": "F",
+    "group": "Silver",
+    "dateOfBirth": "2016-02-04",
+    "usaSwimmingRegType": "Flex Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Grant",
+    "lastName": "Evans",
+    "gender": "M",
+    "group": "Gold",
+    "dateOfBirth": "2012-03-18",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Bennett",
+    "lastName": "Straits",
+    "gender": "M",
+    "group": "Silver",
+    "dateOfBirth": "2016-05-12",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Emerson",
+    "lastName": "Gregg",
+    "gender": "F",
+    "group": "Bronze",
+    "dateOfBirth": "2015-06-09",
+    "usaSwimmingRegType": "Flex Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Jackson",
+    "lastName": "Bennett",
+    "gender": "M",
+    "group": "Advanced",
+    "dateOfBirth": "2012-10-02",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Eli",
+    "lastName": "Dennison",
+    "gender": "M",
+    "group": "Gold",
+    "dateOfBirth": "2010-12-26",
+    "usaSwimmingRegType": "Individual Season Athlete",
+    "usaSwimmingExpDate": "2026-06-04"
+  },
+  {
+    "firstName": "Evelyn",
+    "lastName": "Sweeney",
+    "gender": "F",
+    "group": "Advanced",
+    "dateOfBirth": "2012-10-01",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Jordan",
+    "lastName": "Moreno",
+    "gender": "F",
+    "group": "Bronze",
+    "dateOfBirth": "2015-07-21",
+    "usaSwimmingRegType": "Individual Season Athlete",
+    "usaSwimmingExpDate": "2026-01-30"
+  },
+  {
+    "firstName": "Charlotte",
+    "lastName": "VanRaden (Badgley)",
+    "gender": "F",
+    "group": "Bronze",
+    "dateOfBirth": "2018-04-26",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Andrea",
+    "lastName": "Alvarado",
+    "gender": "F",
+    "group": "Diamond",
+    "dateOfBirth": "2008-02-21",
+    "usaSwimmingRegType": "Individual Season Athlete",
+    "usaSwimmingExpDate": "2025-08-05"
+  },
+  {
+    "firstName": "Abby",
+    "lastName": "Green",
+    "gender": "F",
+    "group": "Diamond",
+    "dateOfBirth": "2009-06-01",
+    "usaSwimmingRegType": "Individual Season Athlete",
+    "usaSwimmingExpDate": "2025-09-21"
+  },
+  {
+    "firstName": "Abbie",
+    "lastName": "McDavitt",
+    "gender": "F",
+    "group": "Diamond",
+    "dateOfBirth": null,
+    "usaSwimmingRegType": null,
+    "usaSwimmingExpDate": null
+  },
+  {
+    "firstName": "Brantley",
+    "lastName": "Taylor (Self)",
+    "gender": "M",
+    "group": "Silver",
+    "dateOfBirth": "2018-01-08",
+    "usaSwimmingRegType": "Flex Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Liv",
+    "lastName": "Moore",
+    "gender": "F",
+    "group": "Silver",
+    "dateOfBirth": "2016-05-18",
+    "usaSwimmingRegType": "Flex Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Max",
+    "lastName": "Kugler",
+    "gender": "M",
+    "group": "Silver",
+    "dateOfBirth": "2011-09-01",
+    "usaSwimmingRegType": "Individual Season Athlete",
+    "usaSwimmingExpDate": "2026-06-04"
+  },
+  {
+    "firstName": "Connor",
+    "lastName": "White",
+    "gender": "M",
+    "group": "Advanced",
+    "dateOfBirth": "2013-08-23",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Olivia",
+    "lastName": "Davison",
+    "gender": "F",
+    "group": "Gold",
+    "dateOfBirth": "2014-06-28",
+    "usaSwimmingRegType": "Flex Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Charlotte",
+    "lastName": "Dolence",
+    "gender": "F",
+    "group": "Gold",
+    "dateOfBirth": "2016-12-29",
+    "usaSwimmingRegType": "Flex Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Cole",
+    "lastName": "Nelson",
+    "gender": "M",
+    "group": "Silver",
+    "dateOfBirth": "2015-02-25",
+    "usaSwimmingRegType": "Flex Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Harper",
+    "lastName": "Nelson",
+    "gender": "F",
+    "group": "Silver",
+    "dateOfBirth": "2017-04-03",
+    "usaSwimmingRegType": "Flex Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Andrii",
+    "lastName": "Shulha",
+    "gender": "M",
+    "group": "Bronze",
+    "dateOfBirth": "2016-07-15",
+    "usaSwimmingRegType": "Flex Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Oleksandr",
+    "lastName": "Shulha",
+    "gender": "M",
+    "group": "Gold",
+    "dateOfBirth": "2015-03-11",
+    "usaSwimmingRegType": "Flex Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Juliette",
+    "lastName": "Stasiak",
+    "gender": "F",
+    "group": "Gold",
+    "dateOfBirth": "2013-10-06",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Brynlee",
+    "lastName": "Gregg",
+    "gender": "F",
+    "group": "Bronze",
+    "dateOfBirth": "2018-03-13",
+    "usaSwimmingRegType": "Flex Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Aubrie",
+    "lastName": "Weisgerber",
+    "gender": "F",
+    "group": "Advanced",
+    "dateOfBirth": "2013-07-18",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Landon",
+    "lastName": "Brunk",
+    "gender": "M",
+    "group": "Advanced",
+    "dateOfBirth": "2015-05-05",
+    "usaSwimmingRegType": "Flex Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Dayton",
+    "lastName": "Kruger",
+    "gender": "M",
+    "group": "Diamond",
+    "dateOfBirth": "2009-12-25",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Brody",
+    "lastName": "Trueper",
+    "gender": "M",
+    "group": "Silver",
+    "dateOfBirth": "2016-06-02",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Andy",
+    "lastName": "Trueper",
+    "gender": "M",
+    "group": "Bronze",
+    "dateOfBirth": "2018-11-22",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Maddox",
+    "lastName": "Sanderholm",
+    "gender": "M",
+    "group": "Bronze",
+    "dateOfBirth": "2016-01-29",
+    "usaSwimmingRegType": "Flex Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Jorie",
+    "lastName": "Davenport",
+    "gender": "F",
+    "group": "Platinum",
+    "dateOfBirth": "2011-07-03",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "James",
+    "lastName": "Larson",
+    "gender": "M",
+    "group": "Gold",
+    "dateOfBirth": "2017-03-30",
+    "usaSwimmingRegType": "Flex Athlete",
+    "usaSwimmingExpDate": "2025-12-31"
+  },
+  {
+    "firstName": "Josie",
+    "lastName": "Johnson",
+    "gender": "F",
+    "group": "Gold",
+    "dateOfBirth": "2015-08-20",
+    "usaSwimmingRegType": null,
+    "usaSwimmingExpDate": null
+  },
+  {
+    "firstName": "Madelyn",
+    "lastName": "Leven",
+    "gender": "F",
+    "group": "Bronze",
+    "dateOfBirth": "2019-01-04",
+    "usaSwimmingRegType": "Flex Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Carter",
+    "lastName": "Paulsen",
+    "gender": "M",
+    "group": "Gold",
+    "dateOfBirth": "2011-11-06",
+    "usaSwimmingRegType": "Individual Season Athlete",
+    "usaSwimmingExpDate": "2026-01-30"
+  },
+  {
+    "firstName": "Bella",
+    "lastName": "Rinne",
+    "gender": "F",
+    "group": "Diamond",
+    "dateOfBirth": "2010-06-09",
+    "usaSwimmingRegType": "Premium Athlete",
+    "usaSwimmingExpDate": "2026-12-31"
+  },
+  {
+    "firstName": "Lucy",
+    "lastName": "Hutcherson",
+    "gender": "F",
+    "group": "Advanced",
+    "dateOfBirth": null,
+    "usaSwimmingRegType": null,
+    "usaSwimmingExpDate": null
+  },
+  {
+    "firstName": "Dominick",
+    "lastName": "Hernandez",
+    "gender": "M",
+    "group": "Gold",
+    "dateOfBirth": "2012-02-03",
+    "usaSwimmingRegType": null,
+    "usaSwimmingExpDate": null
+  }
+]

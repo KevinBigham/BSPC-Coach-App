@@ -3,7 +3,7 @@ import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-nati
 import { useLocalSearchParams, router } from 'expo-router';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { colors, spacing, fontSize, borderRadius, fontFamily } from '../../src/config/theme';
-import { subscribeEventsForDate } from '../../src/services/calendar';
+import { subscribeEventsForDate, sortEventsChronologically } from '../../src/services/calendar';
 import EventCard from '../../src/components/EventCard';
 import type { CalendarEvent } from '../../src/types/firestore.types';
 import { withScreenErrorBoundary } from '../../src/components/ScreenErrorBoundary';
@@ -29,15 +29,20 @@ function DayDetailScreen() {
       })
     : '';
 
+  const sortedEvents = sortEventsChronologically(events);
+
   return (
     <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.scroll}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+          <Text style={styles.backBtnText}>◀ BACK TO CALENDAR</Text>
+        </TouchableOpacity>
         <Text style={styles.date}>{displayDate}</Text>
         <Text style={styles.eventCount}>
-          {events.length} event{events.length !== 1 ? 's' : ''}
+          {sortedEvents.length} event{sortedEvents.length !== 1 ? 's' : ''}
         </Text>
 
-        {events.map((event) => (
+        {sortedEvents.map((event) => (
           <EventCard
             key={event.id}
             event={event}
@@ -45,7 +50,7 @@ function DayDetailScreen() {
           />
         ))}
 
-        {events.length === 0 && (
+        {sortedEvents.length === 0 && (
           <View style={styles.empty}>
             <Text style={styles.emptyTitle}>NO EVENTS</Text>
             <Text style={styles.emptyText}>Nothing scheduled for this day</Text>
@@ -65,6 +70,13 @@ function DayDetailScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bgBase },
   scroll: { padding: spacing.lg, paddingBottom: 100 },
+  backBtn: { paddingVertical: spacing.sm, marginBottom: spacing.md },
+  backBtnText: {
+    fontFamily: fontFamily.pixel,
+    fontSize: fontSize.pixel,
+    color: colors.gold,
+    letterSpacing: 1,
+  },
   date: {
     fontFamily: fontFamily.heading,
     fontSize: fontSize.xxl,

@@ -82,6 +82,9 @@ function NewEventScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+          <Text style={styles.backBtnText}>◀ BACK</Text>
+        </TouchableOpacity>
         {/* Event Type */}
         <Text style={styles.label}>EVENT TYPE</Text>
         <View style={styles.typeRow}>
@@ -211,6 +214,13 @@ function NewEventScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bgBase },
   scroll: { padding: spacing.lg, paddingBottom: 100 },
+  backBtn: { paddingVertical: spacing.sm, marginBottom: spacing.md },
+  backBtnText: {
+    fontFamily: fontFamily.pixel,
+    fontSize: fontSize.pixel,
+    color: colors.gold,
+    letterSpacing: 1,
+  },
   label: {
     fontFamily: fontFamily.bodySemi,
     fontSize: fontSize.xs,
