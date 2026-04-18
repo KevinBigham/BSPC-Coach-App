@@ -12,6 +12,7 @@ import {
   Image,
 } from 'react-native';
 import { useLocalSearchParams, Stack, router } from 'expo-router';
+import { ArrowLeft, Plus } from 'lucide-react-native';
 import {
   doc,
   onSnapshot,
@@ -27,6 +28,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../../src/config/firebase';
 import { useAuth } from '../../src/contexts/AuthContext';
+import { useToast } from '../../src/contexts/ToastContext';
 import { subscribeSwimmerAttendance } from '../../src/services/attendance';
 import {
   colors,
@@ -40,6 +42,7 @@ import { NOTE_TAGS, EVENTS, COURSES, type NoteTag, type Course } from '../../src
 import { exportTimesCSV, shareCSV } from '../../src/services/export';
 import { exportSwimmerReportDocx } from '../../src/services/docxExport';
 import { subscribeGoals } from '../../src/services/goals';
+import { addNote } from '../../src/services/notes';
 import { getAchievedStandard, calculateAge, getAgeGroup } from '../../src/data/timeStandards';
 import StandardBadge from '../../src/components/StandardBadge';
 import GoalCard from '../../src/components/GoalCard';
@@ -47,6 +50,7 @@ import SwimmerTimeline from '../../src/components/SwimmerTimeline';
 import SwimmerVideoClips from '../../src/components/SwimmerVideoClips';
 import VideoComparison from '../../src/components/VideoComparison';
 import SparkLine from '../../src/components/charts/SparkLine';
+import VoiceNoteRecorder from '../../src/components/voice-note-recorder';
 import type {
   Swimmer,
   SwimmerNote,
@@ -57,8 +61,12 @@ import type {
 } from '../../src/types/firestore.types';
 import { withScreenErrorBoundary } from '../../src/components/ScreenErrorBoundary';
 import { toDateSafe, type FirestoreTimestampLike } from '../../src/utils/date';
+import { getTodayString } from '../../src/utils/time';
 
-type Tab = 'overview' | 'notes' | 'times' | 'attendance' | 'timeline';
+type Tab = 'overview' | 'voice' | 'notes' | 'times' | 'attendance' | 'timeline';
+type ProfileNote = Omit<SwimmerNote, 'source'> & {
+  source: SwimmerNote['source'] | 'voice_inline';
+};
 
 const STATUS_COLORS: Record<string, string> = {
   normal: colors.success,
@@ -71,8 +79,9 @@ const STATUS_COLORS: Record<string, string> = {
 function SwimmerProfileScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { coach, isAdmin } = useAuth();
+  const { showToast } = useToast();
   const [swimmer, setSwimmer] = useState<Swimmer | null>(null);
-  const [notes, setNotes] = useState<(SwimmerNote & { id: string })[]>([]);
+  const [notes, setNotes] = useState<(ProfileNote & { id: string })[]>([]);
   const [times, setTimes] = useState<(SwimTime & { id: string })[]>([]);
   const [attendance, setAttendance] = useState<(AttendanceRecord & { id: string })[]>([]);
   const [activeTab, setActiveTab] = useState<Tab>('overview');
@@ -81,6 +90,7 @@ function SwimmerProfileScreen() {
   const [noteText, setNoteText] = useState('');
   const [selectedTags, setSelectedTags] = useState<NoteTag[]>([]);
   const [savingNote, setSavingNote] = useState(false);
+  const [showNoteComposer, setShowNoteComposer] = useState(false);
   const [goals, setGoals] = useState<(SwimmerGoal & { id: string })[]>([]);
 
   useEffect(() => {
@@ -103,7 +113,7 @@ function SwimmerProfileScreen() {
     );
     return onSnapshot(q, (snapshot) => {
       setNotes(
-        snapshot.docs.map((d) => ({ id: d.id, ...d.data() }) as SwimmerNote & { id: string }),
+        snapshot.docs.map((d) => ({ id: d.id, ...d.data() }) as ProfileNote & { id: string }),
       );
     });
   }, [id]);
@@ -137,22 +147,19 @@ function SwimmerProfileScreen() {
   };
 
   const handleAddNote = async () => {
-    if (!noteText.trim() || !id) return;
+    if (!noteText.trim() || !id || !coach) return;
     setSavingNote(true);
     try {
-      await addDoc(collection(db, 'swimmers', id, 'notes'), {
-        content: noteText.trim(),
-        tags: selectedTags,
-        source: 'manual',
-        coachId: coach?.uid || '',
-        coachName: coach?.displayName || 'Unknown',
-        practiceDate: new Date().toISOString().split('T')[0],
-        createdAt: serverTimestamp(),
+      await addNote(id, noteText.trim(), selectedTags, {
+        uid: coach.uid,
+        displayName: coach.displayName || 'Unknown',
       });
       setNoteText('');
       setSelectedTags([]);
+      setShowNoteComposer(false);
+      showToast('Note saved', 'success');
     } catch (err: unknown) {
-      Alert.alert('Error', err instanceof Error ? err.message : String(err));
+      showToast(err instanceof Error ? err.message : 'Unable to save note', 'error');
     }
     setSavingNote(false);
   };
@@ -166,8 +173,9 @@ function SwimmerProfileScreen() {
         onPress: async () => {
           try {
             await deleteDoc(doc(db, 'swimmers', id!, 'notes', noteId));
+            showToast('Note deleted', 'success');
           } catch (err: unknown) {
-            Alert.alert('Error', err instanceof Error ? err.message : String(err));
+            showToast(err instanceof Error ? err.message : 'Unable to delete note', 'error');
           }
         },
       },
@@ -183,13 +191,31 @@ function SwimmerProfileScreen() {
         onPress: async () => {
           try {
             await deleteDoc(doc(db, 'swimmers', id!, 'times', timeId));
+            showToast('Time deleted', 'success');
           } catch (err: unknown) {
-            Alert.alert('Error', err instanceof Error ? err.message : String(err));
+            showToast(err instanceof Error ? err.message : 'Unable to delete time', 'error');
           }
         },
       },
     ]);
   };
+
+  const dateOfBirth = toDateSafe(swimmer?.dateOfBirth as FirestoreTimestampLike);
+  const age = dateOfBirth ? calculateAge(dateOfBirth) : null;
+  const prCount = useMemo(() => times.filter((time) => time.isPR).length, [times]);
+  const todayAttendance = useMemo(() => {
+    const today = getTodayString();
+    return attendance.find((record) => record.practiceDate === today) || null;
+  }, [attendance]);
+
+  const headerAttendanceLabel = todayAttendance
+    ? todayAttendance.status && todayAttendance.status !== 'normal'
+      ? `TODAY ${todayAttendance.status.replace('_', ' ').toUpperCase()}`
+      : 'TODAY PRESENT'
+    : 'NO CHECK-IN TODAY';
+  const headerAttendanceColor = todayAttendance
+    ? STATUS_COLORS[todayAttendance.status || 'normal'] || colors.success
+    : colors.textSecondary;
 
   if (loading) {
     return (
@@ -209,8 +235,22 @@ function SwimmerProfileScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: swimmer.displayName.toUpperCase() }} />
+      <Stack.Screen options={{ title: swimmer.displayName.toUpperCase(), headerShown: false }} />
       <View style={styles.container}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => {
+            if (router.canGoBack()) {
+              router.back();
+              return;
+            }
+            router.replace('/(tabs)/roster');
+          }}
+        >
+          <ArrowLeft size={18} color={colors.text} strokeWidth={2.5} />
+          <Text style={styles.backButtonText}>ROSTER</Text>
+        </TouchableOpacity>
+
         {/* Scorebug Header */}
         <View style={styles.headerCard}>
           {swimmer.profilePhotoUrl ? (
@@ -244,10 +284,29 @@ function SwimmerProfileScreen() {
                   {swimmer.group}
                 </Text>
               </View>
-              <Text style={styles.headerGender}>{swimmer.gender === 'M' ? 'Male' : 'Female'}</Text>
+              {age !== null && <Text style={styles.headerGender}>AGE {age}</Text>}
               {swimmer.usaSwimmingId && (
                 <Text style={styles.headerUsaId}>USA #{swimmer.usaSwimmingId}</Text>
               )}
+            </View>
+            <View style={styles.headerPillRow}>
+              {swimmer.doNotPhotograph && (
+                <View style={[styles.headerPill, styles.headerWarningPill]}>
+                  <Text style={[styles.headerPillText, styles.headerWarningPillText]}>
+                    DO NOT PHOTOGRAPH
+                  </Text>
+                </View>
+              )}
+              <View style={styles.headerPill}>
+                <Text style={styles.headerPillText}>
+                  {prCount} PR{prCount === 1 ? '' : 'S'}
+                </Text>
+              </View>
+              <View style={[styles.headerPill, { borderColor: headerAttendanceColor }]}>
+                <Text style={[styles.headerPillText, { color: headerAttendanceColor }]}>
+                  {headerAttendanceLabel}
+                </Text>
+              </View>
             </View>
           </View>
           <View style={styles.headerButtons}>
@@ -290,25 +349,28 @@ function SwimmerProfileScreen() {
 
         {/* Tab Bar */}
         <View style={styles.tabBar}>
-          {(['overview', 'notes', 'times', 'attendance', 'timeline'] as Tab[]).map((tab) => {
-            let label = '';
-            if (tab === 'overview') label = 'OVERVIEW';
-            else if (tab === 'notes') label = `NOTES (${notes.length})`;
-            else if (tab === 'times') label = `TIMES (${times.length})`;
-            else if (tab === 'timeline') label = 'TIMELINE';
-            else label = 'ATTEND';
-            return (
-              <TouchableOpacity
-                key={tab}
-                style={[styles.tab, activeTab === tab && styles.tabActive]}
-                onPress={() => setActiveTab(tab)}
-              >
-                <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
-                  {label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
+          {(['overview', 'voice', 'notes', 'times', 'attendance', 'timeline'] as Tab[]).map(
+            (tab) => {
+              let label = '';
+              if (tab === 'overview') label = 'OVERVIEW';
+              else if (tab === 'voice') label = 'VOICE';
+              else if (tab === 'notes') label = `NOTES (${notes.length})`;
+              else if (tab === 'times') label = `TIMES (${times.length})`;
+              else if (tab === 'timeline') label = 'TIMELINE';
+              else label = 'ATTEND';
+              return (
+                <TouchableOpacity
+                  key={tab}
+                  style={[styles.tab, activeTab === tab && styles.tabActive]}
+                  onPress={() => setActiveTab(tab)}
+                >
+                  <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
+                    {label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            },
+          )}
         </View>
 
         {/* Tab Content */}
@@ -324,6 +386,13 @@ function SwimmerProfileScreen() {
               swimmerId={id!}
             />
           )}
+          {activeTab === 'voice' && coach?.uid && (
+            <VoiceNoteRecorder
+              swimmerId={id!}
+              coachId={coach.uid}
+              coachName={coach.displayName || 'Unknown'}
+            />
+          )}
           {activeTab === 'notes' && (
             <NotesTab
               notes={notes}
@@ -335,6 +404,8 @@ function SwimmerProfileScreen() {
               onDeleteNote={handleDeleteNote}
               saving={savingNote}
               currentCoachId={coach?.uid || ''}
+              showComposer={showNoteComposer}
+              onToggleComposer={() => setShowNoteComposer((value) => !value)}
             />
           )}
           {activeTab === 'times' && (
@@ -680,8 +751,10 @@ function NotesTab({
   onDeleteNote,
   saving,
   currentCoachId,
+  showComposer,
+  onToggleComposer,
 }: {
-  notes: (SwimmerNote & { id: string })[];
+  notes: (ProfileNote & { id: string })[];
   noteText: string;
   setNoteText: (t: string) => void;
   selectedTags: NoteTag[];
@@ -690,44 +763,55 @@ function NotesTab({
   onDeleteNote: (id: string) => void;
   saving: boolean;
   currentCoachId: string;
+  showComposer: boolean;
+  onToggleComposer: () => void;
 }) {
   return (
     <View>
-      <View style={styles.noteForm}>
-        <TextInput
-          style={styles.noteInput}
-          placeholder="Add an observation..."
-          placeholderTextColor={colors.textSecondary}
-          value={noteText}
-          onChangeText={setNoteText}
-          multiline
-        />
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tagScroll}>
-          <View style={styles.tagRow}>
-            {NOTE_TAGS.map((tag) => (
-              <TouchableOpacity
-                key={tag}
-                style={[styles.tag, selectedTags.includes(tag) && styles.tagActive]}
-                onPress={() => toggleTag(tag)}
-              >
-                <Text style={[styles.tagText, selectedTags.includes(tag) && styles.tagTextActive]}>
-                  {tag}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </ScrollView>
-        <TouchableOpacity
-          style={[
-            styles.addNoteButton,
-            (!noteText.trim() || saving) && styles.addNoteButtonDisabled,
-          ]}
-          onPress={onAddNote}
-          disabled={!noteText.trim() || saving}
-        >
-          <Text style={styles.addNoteButtonText}>{saving ? 'SAVING...' : 'ADD NOTE'}</Text>
-        </TouchableOpacity>
-      </View>
+      <TouchableOpacity style={styles.addNoteFab} onPress={onToggleComposer}>
+        <Plus size={18} color={colors.bgDeep} strokeWidth={2.5} />
+        <Text style={styles.addNoteFabText}>{showComposer ? 'CLOSE' : 'NOTE'}</Text>
+      </TouchableOpacity>
+
+      {showComposer && (
+        <View style={styles.noteForm}>
+          <TextInput
+            style={styles.noteInput}
+            placeholder="Add an observation..."
+            placeholderTextColor={colors.textSecondary}
+            value={noteText}
+            onChangeText={setNoteText}
+            multiline
+          />
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tagScroll}>
+            <View style={styles.tagRow}>
+              {NOTE_TAGS.map((tag) => (
+                <TouchableOpacity
+                  key={tag}
+                  style={[styles.tag, selectedTags.includes(tag) && styles.tagActive]}
+                  onPress={() => toggleTag(tag)}
+                >
+                  <Text
+                    style={[styles.tagText, selectedTags.includes(tag) && styles.tagTextActive]}
+                  >
+                    {tag}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </ScrollView>
+          <TouchableOpacity
+            style={[
+              styles.addNoteButton,
+              (!noteText.trim() || saving) && styles.addNoteButtonDisabled,
+            ]}
+            onPress={onAddNote}
+            disabled={!noteText.trim() || saving}
+          >
+            <Text style={styles.addNoteButtonText}>{saving ? 'SAVING...' : 'ADD NOTE'}</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {notes.map((note) => (
         <View key={note.id} style={styles.noteCard}>
@@ -754,14 +838,19 @@ function NotesTab({
           )}
           {note.source !== 'manual' && (
             <Text style={styles.noteSource}>
-              via {note.source === 'audio_ai' ? 'AUDIO AI' : 'VIDEO AI'}
+              via{' '}
+              {note.source === 'audio_ai'
+                ? 'AUDIO AI'
+                : note.source === 'video_ai'
+                  ? 'VIDEO AI'
+                  : 'VOICE NOTE'}
             </Text>
           )}
         </View>
       ))}
 
       {notes.length === 0 && (
-        <Text style={styles.emptyText}>No notes yet — add the first one above</Text>
+        <Text style={styles.emptyText}>No notes yet — tap NOTE to add the first one.</Text>
       )}
     </View>
   );
@@ -1104,6 +1193,22 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bgBase,
   },
   errorText: { fontFamily: fontFamily.heading, fontSize: fontSize.xl, color: colors.error },
+  backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    backgroundColor: colors.bgElevated,
+  },
+  backButtonText: {
+    fontFamily: fontFamily.bodySemi,
+    fontSize: fontSize.sm,
+    color: colors.text,
+    letterSpacing: 1,
+  },
 
   // Header Scorebug
   headerCard: {
@@ -1142,6 +1247,7 @@ const styles = StyleSheet.create({
   headerMeta: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'wrap',
     gap: spacing.sm,
     marginTop: spacing.xs,
   },
@@ -1157,6 +1263,32 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.statMono,
     color: colors.textSecondary,
     fontSize: fontSize.xs,
+  },
+  headerPillRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+    marginTop: spacing.sm,
+  },
+  headerPill: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: borderRadius.xs,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: 'rgba(0,0,0,0.25)',
+  },
+  headerPillText: {
+    fontFamily: fontFamily.pixel,
+    fontSize: fontSize.pixel,
+    color: colors.text,
+  },
+  headerWarningPill: {
+    borderColor: colors.error,
+    backgroundColor: 'rgba(244, 63, 94, 0.12)',
+  },
+  headerWarningPillText: {
+    color: colors.error,
   },
   headerButtons: { flexDirection: 'column', gap: spacing.xs },
   inviteBtn: {
@@ -1372,6 +1504,23 @@ const styles = StyleSheet.create({
   },
 
   // Notes
+  addNoteFab: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.full,
+    backgroundColor: colors.gold,
+    marginBottom: spacing.md,
+  },
+  addNoteFabText: {
+    fontFamily: fontFamily.heading,
+    fontSize: fontSize.lg,
+    color: colors.bgDeep,
+    letterSpacing: 1,
+  },
   noteForm: {
     backgroundColor: colors.bgDeep,
     borderRadius: borderRadius.lg,

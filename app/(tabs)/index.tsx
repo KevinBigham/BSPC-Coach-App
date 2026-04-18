@@ -35,6 +35,7 @@ import { subscribeUpcomingMeets } from '../../src/services/meets';
 import { getUnreadCount } from '../../src/services/notifications';
 import AttendanceHeatmap from '../../src/components/charts/AttendanceHeatmap';
 import SparkLine from '../../src/components/charts/SparkLine';
+import PracticePdfUploader from '../../src/components/practice-pdf-uploader';
 import { withScreenErrorBoundary } from '../../src/components/ScreenErrorBoundary';
 import type { DashboardActivityItem } from '../../src/types/firestore.types';
 import type { Meet } from '../../src/types/meet.types';
@@ -271,6 +272,8 @@ function DashboardScreen() {
       )}
 
       {/* Quick Stats */}
+      {coach?.uid && <PracticePdfUploader coachId={coach.uid} />}
+
       <View style={styles.statsRow}>
         <TouchableOpacity style={styles.statCard} onPress={() => router.push('/(tabs)/roster')}>
           <Text style={styles.statNumber}>{totalSwimmers}</Text>

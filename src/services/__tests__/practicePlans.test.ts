@@ -32,6 +32,17 @@ jest.mock('firebase/firestore', () => ({
   Timestamp: { fromDate: jest.fn((d: unknown) => d) },
 }));
 
+jest.mock('firebase/storage', () => ({
+  ref: jest.fn((_storage: unknown, path: string) => ({ path })),
+  uploadBytesResumable: jest.fn(() => ({
+    on: jest.fn((_event: string, _progress: unknown, _error: unknown, complete: () => void) =>
+      complete(),
+    ),
+    snapshot: { ref: { path: 'mock/path' } },
+  })),
+  getDownloadURL: jest.fn().mockResolvedValue('https://mock.url/practice.pdf'),
+}));
+
 import {
   subscribePracticePlans,
   addPracticePlan,
@@ -40,6 +51,10 @@ import {
   duplicateAsTemplate,
   calculateSetYardage,
   calculateTotalYardage,
+  subscribeTodayPracticePlan,
+  subscribePracticePlanPdf,
+  createDashboardPracticePlanPdf,
+  uploadDashboardPracticePlanPdf,
 } from '../practicePlans';
 
 const firestore = require('firebase/firestore');
@@ -110,6 +125,32 @@ describe('subscribePracticePlans', () => {
     expect(callback).toHaveBeenCalledWith([
       { id: 'p-1', title: 'Plan A', group: 'varsity' },
       { id: 'p-2', title: 'Plan B', group: 'jv' },
+    ]);
+  });
+
+  it('filters dashboard pdf documents out of the default subscription', () => {
+    firestore.onSnapshot.mockImplementation((_q: unknown, cb: (snap: unknown) => void) => {
+      cb({
+        docs: [
+          { id: 'p-1', data: () => ({ title: 'Plan A', sets: [], isTemplate: false }) },
+          {
+            id: 'pdf-1',
+            data: () => ({
+              documentType: 'dashboard_pdf',
+              filename: 'practice.pdf',
+              date: '2026-04-18',
+            }),
+          },
+        ],
+      });
+      return jest.fn();
+    });
+
+    const callback = jest.fn();
+    subscribePracticePlans(callback);
+
+    expect(callback).toHaveBeenCalledWith([
+      { id: 'p-1', title: 'Plan A', sets: [], isTemplate: false },
     ]);
   });
 });
@@ -219,5 +260,94 @@ describe('calculateTotalYardage', () => {
 
   it('returns 0 for empty sets', () => {
     expect(calculateTotalYardage([])).toBe(0);
+  });
+});
+
+describe('dashboard practice pdf helpers', () => {
+  it('creates a dashboard practice pdf document in practice_plans', async () => {
+    const id = await createDashboardPracticePlanPdf({
+      coachId: 'coach-1',
+      date: '2026-04-18',
+      storagePath: 'practice_plans/coach-1/2026-04-18/practice.pdf',
+      filename: 'practice.pdf',
+      uploadedAt: '2026-04-18T12:00:00.000Z' as any,
+      sizeBytes: 1024,
+      pageCount: 3,
+    });
+
+    expect(id).toBe('new-plan-id');
+    expect(firestore.addDoc).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        documentType: 'dashboard_pdf',
+        coachId: 'coach-1',
+        date: '2026-04-18',
+        filename: 'practice.pdf',
+        sizeBytes: 1024,
+        pageCount: 3,
+      }),
+    );
+  });
+
+  it("subscribes to today's dashboard practice plan for a coach", () => {
+    firestore.onSnapshot.mockReturnValue(jest.fn());
+
+    subscribeTodayPracticePlan('coach-1', jest.fn());
+
+    expect(firestore.where).toHaveBeenCalledWith('documentType', '==', 'dashboard_pdf');
+    expect(firestore.where).toHaveBeenCalledWith('coachId', '==', 'coach-1');
+    expect(firestore.where).toHaveBeenCalledWith('date', '==', '2026-04-18');
+  });
+
+  it('returns the most recent dashboard practice plan or null from today subscription', () => {
+    firestore.onSnapshot.mockImplementation((_q: unknown, cb: (snap: unknown) => void) => {
+      cb({
+        docs: [
+          {
+            id: 'pdf-2',
+            data: () => ({
+              documentType: 'dashboard_pdf',
+              filename: 'practice.pdf',
+              date: '2026-04-18',
+            }),
+          },
+        ],
+      });
+      return jest.fn();
+    });
+
+    const callback = jest.fn();
+    subscribeTodayPracticePlan('coach-1', callback);
+
+    expect(callback).toHaveBeenCalledWith({
+      id: 'pdf-2',
+      documentType: 'dashboard_pdf',
+      filename: 'practice.pdf',
+      date: '2026-04-18',
+    });
+  });
+
+  it('subscribes to a single dashboard practice pdf document by id', () => {
+    firestore.onSnapshot.mockReturnValue(jest.fn());
+
+    subscribePracticePlanPdf('pdf-1', jest.fn());
+
+    expect(firestore.doc).toHaveBeenCalledWith(expect.anything(), 'practice_plans', 'pdf-1');
+    expect(firestore.onSnapshot).toHaveBeenCalled();
+  });
+
+  it('uploads dashboard pdfs to the coach/date storage path', async () => {
+    global.fetch = jest
+      .fn()
+      .mockResolvedValue({ blob: jest.fn().mockResolvedValue(new Blob()) }) as jest.Mock;
+
+    const result = await uploadDashboardPracticePlanPdf(
+      'file://practice.pdf',
+      'coach-1',
+      '2026-04-18',
+      'practice.pdf',
+    );
+
+    expect(result.storagePath).toBe('practice_plans/coach-1/2026-04-18/practice.pdf');
   });
 });
