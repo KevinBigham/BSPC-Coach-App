@@ -125,6 +125,43 @@ describe('addNote', () => {
     const id = await addNote('sw-1', 'x', [] as any, { uid: 'c', displayName: 'C' });
     expect(id).toBe('custom-note-id');
   });
+
+  it('supports voice_inline source metadata when provided', async () => {
+    await addNote(
+      'sw-1',
+      'VOICE NOTE RECORDED - 1:23 - transcription pending',
+      [],
+      { uid: 'coach-1', displayName: 'Coach K' },
+      {
+        source: 'voice_inline',
+        sourceRefId: 'voice-1',
+        practiceDate: '2026-04-18',
+      },
+    );
+
+    expect(firestore.addDoc).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        source: 'voice_inline',
+        sourceRefId: 'voice-1',
+        practiceDate: '2026-04-18',
+      }),
+    );
+  });
+
+  it('defaults source to manual when options are omitted', async () => {
+    await addNote('sw-1', 'Manual note', [] as any, {
+      uid: 'coach-1',
+      displayName: 'Coach K',
+    });
+
+    expect(firestore.addDoc).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        source: 'manual',
+      }),
+    );
+  });
 });
 
 describe('deleteNote', () => {
