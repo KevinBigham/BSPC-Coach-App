@@ -54,6 +54,24 @@ export async function deleteNotificationRule(ruleId: string): Promise<void> {
   await deleteDoc(doc(db, 'notification_rules', ruleId));
 }
 
+/**
+ * True when the rule should fire for the given swimmer. A rule with no
+ * `config.group` matches every swimmer; a group-bound rule matches only when
+ * the swimmer's group equals `config.group`. Disabled rules never apply.
+ */
+export function ruleAppliesToSwimmer(
+  rule: Pick<NotificationRule, 'enabled' | 'config'>,
+  swimmer: { group: NotificationRule['config']['group'] },
+): boolean {
+  if (!rule.enabled) {
+    return false;
+  }
+  if (rule.config.group === undefined) {
+    return true;
+  }
+  return rule.config.group === swimmer.group;
+}
+
 /** Both inputs are "YYYY-MM-DD" arrays in descending order. */
 export function evaluateAttendanceStreak(
   practiceHistory: string[],

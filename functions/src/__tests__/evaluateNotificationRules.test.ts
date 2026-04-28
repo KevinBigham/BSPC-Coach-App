@@ -236,6 +236,56 @@ describe('evaluateRulesForAttendance', () => {
     expect(notificationSet).not.toHaveBeenCalled();
   });
 
+  it('skips a group-bound rule when the attendance record has no group', async () => {
+    const notificationSet = jest.fn().mockResolvedValue(undefined);
+    const notificationDoc = jest.fn().mockReturnValue({ set: notificationSet });
+    const ruleDocs = [
+      createMockDoc('rule-undef', {
+        name: 'Gold Only',
+        trigger: 'attendance_streak',
+        enabled: true,
+        coachId: 'coach-1',
+        config: { threshold: 1, group: 'Gold' },
+      }),
+    ];
+
+    db.collection.mockImplementation((path: string) => {
+      if (path === 'notification_rules') {
+        return buildRulesQuery(ruleDocs);
+      }
+      if (path === 'attendance') {
+        return {
+          where: jest.fn().mockReturnValue({
+            orderBy: jest.fn().mockReturnValue({
+              limit: jest.fn().mockReturnValue({
+                get: jest.fn().mockResolvedValue(createMockQuerySnapshot([])),
+              }),
+            }),
+          }),
+          orderBy: jest.fn().mockReturnValue({
+            limit: jest.fn().mockReturnValue({
+              get: jest.fn().mockResolvedValue(createMockQuerySnapshot([])),
+            }),
+          }),
+        };
+      }
+      if (path === 'notifications') {
+        return { doc: notificationDoc };
+      }
+      throw new Error(`Unexpected collection path: ${path}`);
+    });
+
+    await evaluateRulesForAttendance({
+      swimmerId: 'swimmer-undef',
+      swimmerName: 'Legacy Record',
+      // group intentionally omitted to mimic a legacy or hand-edited record.
+      practiceDate: '2026-04-10',
+      markedBy: 'coach-1',
+    });
+
+    expect(notificationSet).not.toHaveBeenCalled();
+  });
+
   it('skips rules that do not match the attendance group', async () => {
     const notificationSet = jest.fn().mockResolvedValue(undefined);
     const notificationDoc = jest.fn().mockReturnValue({ set: notificationSet });

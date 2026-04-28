@@ -1,0 +1,57 @@
+{
+  "$schema_version": "2026-04-28",
+  "$comment": "Portfolio-standard slice template. Match field names and shape exactly.",
+  "sprint_id": "BSPC-Sprint-NN-Slice",
+  "project": "BSPC Coach App",
+  "effort_level": "low",
+  "edit_radius": [
+    "src/services/<service>.ts",
+    "src/services/__tests__/<service>.test.ts"
+  ],
+  "read_first": [
+    "AGENTS.md",
+    ".codex/handoff.json",
+    "docs/verification/critical-operations.md",
+    "test/fixtures/coach/builders.ts",
+    "src/services/<service>.ts"
+  ],
+  "deliverables": [
+    "Concrete output 1.",
+    "Concrete output 2."
+  ],
+  "acceptance_criteria": [
+    "All existing tests still pass.",
+    "New behavior covered by at least one test in test/critical-ops/.",
+    "Critical-ops suite still runs under 30 seconds."
+  ],
+  "validation_commands": [
+    "npm run typecheck",
+    "npm run lint:errors",
+    "npx jest --runInBand test/critical-ops",
+    "npm test -- --runInBand"
+  ],
+  "out_of_scope": [
+    "Refactoring unrelated services.",
+    "UI styling changes.",
+    "Schema migrations."
+  ],
+  "stop_conditions": [
+    "A bug fix would require a Firestore schema change — halt and document.",
+    "An existing baseline test would change behavior — halt and apply the baseline_update_protocol."
+  ],
+  "baseline_update_protocol": [
+    "Run the existing corpus first.",
+    "If output changed, produce a human-readable diff (field, old, new, scenario id).",
+    "Classify the change: intended, unintended, or unclear.",
+    "Update expected outputs only when the change is intended and documented.",
+    "Store baseline metadata: corpus version, engine/schema version, seed/fixture id, generation command."
+  ],
+  "final_response_required_format": {
+    "plan": "Brief plan executed.",
+    "files_changed": "Every file touched.",
+    "verification": "Exact commands run and pass/fail.",
+    "regression_summary": "Fast corpus + slow corpus results (or N/A).",
+    "risks": "Remaining risks or follow-up work.",
+    "handoff": "Next recommended task or block."
+  }
+}

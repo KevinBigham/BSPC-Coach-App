@@ -140,7 +140,10 @@ export async function evaluateRulesForAttendance(attendance: AttendanceEventData
     const rule = ruleDoc.data() as NotificationRuleData;
     const threshold = Math.max(rule.config?.threshold ?? 1, 1);
 
-    if (rule.config?.group && attendance.group && rule.config.group !== attendance.group) {
+    // A group-bound rule must only fire when the attendance record's group
+    // matches. A missing attendance.group is treated as a non-match so legacy
+    // or hand-edited records cannot leak through a group filter.
+    if (rule.config?.group && rule.config.group !== attendance.group) {
       continue;
     }
 

@@ -20,6 +20,55 @@ type MeetWithId = Meet & { id: string };
 type EntryWithId = MeetEntry & { id: string };
 type RelayWithId = Relay & { id: string };
 
+// ── Validation (pure helpers, no Firestore IO) ──
+
+/**
+ * Throws if a meet entry has no swimmerId or references a swimmer that is not
+ * in the supplied roster. Callers pass the set of swimmer ids known to exist
+ * (typically the active roster from the swimmers store).
+ */
+export function validateMeetEntry(
+  entry: Pick<MeetEntry, 'swimmerId'>,
+  validSwimmerIds: Iterable<string>,
+): void {
+  if (!entry.swimmerId) {
+    throw new Error('Meet entry is missing swimmerId.');
+  }
+  const set = validSwimmerIds instanceof Set ? validSwimmerIds : new Set(validSwimmerIds);
+  if (!set.has(entry.swimmerId)) {
+    throw new Error(`Swimmer ${entry.swimmerId} is not on the roster.`);
+  }
+}
+
+/**
+ * Throws if a relay has the wrong leg count, a leg order outside 1..4,
+ * duplicate leg orders, or the same swimmer in more than one leg.
+ */
+export function validateRelay(relay: Pick<Relay, 'legs'> & { eventName?: string }): void {
+  const { legs } = relay;
+  if (!Array.isArray(legs) || legs.length !== 4) {
+    throw new Error('Relay must have exactly 4 legs.');
+  }
+  const orders = new Set<number>();
+  const swimmers = new Set<string>();
+  for (const leg of legs) {
+    if (!Number.isInteger(leg.order) || leg.order < 1 || leg.order > 4) {
+      throw new Error(`Relay leg order must be 1..4 (got ${leg.order}).`);
+    }
+    if (orders.has(leg.order)) {
+      throw new Error(`Relay has duplicate leg order ${leg.order}.`);
+    }
+    orders.add(leg.order);
+    if (!leg.swimmerId) {
+      throw new Error('Relay leg is missing swimmerId.');
+    }
+    if (swimmers.has(leg.swimmerId)) {
+      throw new Error(`Relay assigns swimmer ${leg.swimmerId} twice.`);
+    }
+    swimmers.add(leg.swimmerId);
+  }
+}
+
 // ── Meets ──
 
 export function subscribeMeets(callback: (meets: MeetWithId[]) => void, max = 50) {
@@ -74,7 +123,11 @@ export function subscribeEntries(meetId: string, callback: (entries: EntryWithId
 export async function addEntry(
   meetId: string,
   entry: Omit<MeetEntry, 'id' | 'createdAt'>,
+  validSwimmerIds?: Iterable<string>,
 ): Promise<string> {
+  if (validSwimmerIds !== undefined) {
+    validateMeetEntry(entry, validSwimmerIds);
+  }
   const ref = await addDoc(collection(db, 'meets', meetId, 'entries'), {
     ...entry,
     createdAt: serverTimestamp(),
@@ -85,7 +138,14 @@ export async function addEntry(
 export async function addEntriesBatch(
   meetId: string,
   entries: Omit<MeetEntry, 'id' | 'createdAt'>[],
+  validSwimmerIds?: Iterable<string>,
 ): Promise<void> {
+  if (validSwimmerIds !== undefined) {
+    const idSet = validSwimmerIds instanceof Set ? validSwimmerIds : new Set(validSwimmerIds);
+    for (const entry of entries) {
+      validateMeetEntry(entry, idSet);
+    }
+  }
   const batchSize = 400;
   for (let i = 0; i < entries.length; i += batchSize) {
     const batch = writeBatch(db);
@@ -123,6 +183,7 @@ export async function addRelay(
   meetId: string,
   relay: Omit<Relay, 'id' | 'createdAt'>,
 ): Promise<string> {
+  validateRelay(relay);
   const ref = await addDoc(collection(db, 'meets', meetId, 'relays'), {
     ...relay,
     createdAt: serverTimestamp(),

@@ -21,41 +21,34 @@ type SwimmerWithId = Swimmer & { id: string };
 
 export function subscribeTodayAttendance(
   date: string,
-  callback: (records: AttendanceWithId[]) => void
+  callback: (records: AttendanceWithId[]) => void,
 ): Unsubscribe {
-  const q = query(
-    collection(db, 'attendance'),
-    where('practiceDate', '==', date)
-  );
+  const q = query(collection(db, 'attendance'), where('practiceDate', '==', date));
   return onSnapshot(q, (snapshot) => {
-    callback(
-      snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as AttendanceWithId))
-    );
+    callback(snapshot.docs.map((d) => ({ id: d.id, ...d.data() }) as AttendanceWithId));
   });
 }
 
 export function subscribeSwimmerAttendance(
   swimmerId: string,
   callback: (records: AttendanceWithId[]) => void,
-  max: number = 90
+  max: number = 90,
 ): Unsubscribe {
   const q = query(
     collection(db, 'attendance'),
     where('swimmerId', '==', swimmerId),
     orderBy('practiceDate', 'desc'),
-    firestoreLimit(max)
+    firestoreLimit(max),
   );
   return onSnapshot(q, (snapshot) => {
-    callback(
-      snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as AttendanceWithId))
-    );
+    callback(snapshot.docs.map((d) => ({ id: d.id, ...d.data() }) as AttendanceWithId));
   });
 }
 
 export async function checkIn(
   swimmer: SwimmerWithId,
   coach: Pick<Coach, 'uid' | 'displayName'>,
-  date: string
+  date: string,
 ): Promise<string> {
   const docRef = await addDoc(collection(db, 'attendance'), {
     swimmerId: swimmer.id,
@@ -76,7 +69,7 @@ export async function checkIn(
 export async function checkOut(
   recordId: string,
   status?: AttendanceStatus,
-  note?: string
+  note?: string,
 ): Promise<void> {
   await updateDoc(doc(db, 'attendance', recordId), {
     departedAt: serverTimestamp(),
@@ -88,24 +81,29 @@ export async function checkOut(
 export async function batchCheckIn(
   swimmers: SwimmerWithId[],
   coach: Pick<Coach, 'uid' | 'displayName'>,
-  date: string
+  date: string,
 ): Promise<void> {
-  const batch = writeBatch(db);
-  for (const swimmer of swimmers) {
-    const ref = doc(collection(db, 'attendance'));
-    batch.set(ref, {
-      swimmerId: swimmer.id,
-      swimmerName: `${swimmer.firstName} ${swimmer.lastName}`,
-      group: swimmer.group,
-      practiceDate: date,
-      arrivedAt: serverTimestamp(),
-      departedAt: null,
-      status: null,
-      note: null,
-      markedBy: coach.uid,
-      coachName: coach.displayName || 'Unknown',
-      createdAt: serverTimestamp(),
-    });
+  // Chunk at 400 to stay under the 500-item Firestore writeBatch limit.
+  const chunkSize = 400;
+  for (let i = 0; i < swimmers.length; i += chunkSize) {
+    const batch = writeBatch(db);
+    const chunk = swimmers.slice(i, i + chunkSize);
+    for (const swimmer of chunk) {
+      const ref = doc(collection(db, 'attendance'));
+      batch.set(ref, {
+        swimmerId: swimmer.id,
+        swimmerName: `${swimmer.firstName} ${swimmer.lastName}`,
+        group: swimmer.group,
+        practiceDate: date,
+        arrivedAt: serverTimestamp(),
+        departedAt: null,
+        status: null,
+        note: null,
+        markedBy: coach.uid,
+        coachName: coach.displayName || 'Unknown',
+        createdAt: serverTimestamp(),
+      });
+    }
+    await batch.commit();
   }
-  await batch.commit();
 }

@@ -222,7 +222,15 @@ describe('subscribeRelays', () => {
 
 describe('addRelay', () => {
   it('adds relay with createdAt timestamp', async () => {
-    const relay = { eventName: '200 Free Relay', legs: [] } as any;
+    const relay = {
+      eventName: '200 Free Relay',
+      legs: [
+        { order: 1, swimmerId: 'sw-1', swimmerName: 'A', stroke: 'Freestyle' },
+        { order: 2, swimmerId: 'sw-2', swimmerName: 'B', stroke: 'Freestyle' },
+        { order: 3, swimmerId: 'sw-3', swimmerName: 'C', stroke: 'Freestyle' },
+        { order: 4, swimmerId: 'sw-4', swimmerName: 'D', stroke: 'Freestyle' },
+      ],
+    } as any;
     const id = await addRelay('m-1', relay);
 
     expect(firestore.addDoc).toHaveBeenCalled();

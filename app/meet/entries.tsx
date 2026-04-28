@@ -116,7 +116,10 @@ function EntriesScreen() {
       }
 
       if (toAdd.length > 0) {
-        await addEntriesBatch(meetId, toAdd);
+        const validSwimmerIds = new Set(
+          swimmers.map((s) => s.id).filter((id): id is string => Boolean(id)),
+        );
+        await addEntriesBatch(meetId, toAdd, validSwimmerIds);
       }
 
       router.back();

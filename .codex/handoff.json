@@ -2,6 +2,38 @@
   "project": "BSPC Coach App",
   "version": "1.3.0",
   "github": "KevinBigham/BSPC-Coach-App",
+  "portfolio_handoff_standard": {
+    "schema_version": "2026-04-28",
+    "slice_template": ".codex/templates/handoff-slice.json",
+    "required_fields": [
+      "effort_level",
+      "edit_radius",
+      "read_first",
+      "deliverables",
+      "acceptance_criteria",
+      "validation_commands",
+      "out_of_scope",
+      "stop_conditions"
+    ],
+    "baseline_update_protocol": [
+      "Run the existing corpus first.",
+      "If output changed, produce a human-readable diff (field, old, new, scenario id).",
+      "Classify the change: intended, unintended, or unclear.",
+      "Update expected outputs only when the change is intended and documented.",
+      "Store baseline metadata: corpus version, engine/schema version, seed/fixture id, generation command."
+    ],
+    "agent_split": {
+      "claude_code": "Reviewer/ops, visual polish, architecture review.",
+      "codex": "Implementation driver — service, store, and Cloud Functions logic."
+    },
+    "anti_goals": [
+      "No vector-memory migration.",
+      "No generic agent-orchestration framework.",
+      "No ECS/data-oriented refactor unless independently justified.",
+      "No live telemetry work.",
+      "No broad cleanup mixed into verification sprints."
+    ]
+  },
   "owner": "Kevin Bigham — high school teacher, head swim/dive coach at Blue Springs HS, founder of Blue Springs Power Cats swim team",
   "working_style": "Kevin directs AI agents but doesn't write code. Terse updates at milestones, not play-by-play. Once direction is clear, assume-label-proceed. Match his energy. No emoji in UIs — use lucide-react icons. Tests expected on all code.",
   "multi_agent_system": "4-agent workflow: ChatGPT (architect), Codex (builder), Claude Code (reviewer/ops), Kevin (director). Handoffs via JSON payloads and .codex/ docs.",

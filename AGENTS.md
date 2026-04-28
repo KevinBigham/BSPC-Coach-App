@@ -108,6 +108,21 @@ Every completed chunk should leave:
 - What should be reviewed.
 - What is next.
 
+### Portfolio Handoff Schema
+
+Hand-offs to Codex (or any other implementation agent) must include the following fields. They mirror the schema used by the MFD/MBD repos so a swap of agents stays cheap. A sample payload lives in [.codex/templates/handoff-slice.json](.codex/templates/handoff-slice.json).
+
+- `effort_level` — `low` | `medium` | `high`. Sets reviewer expectations.
+- `edit_radius` — explicit list of files or globs the slice may modify. Edits outside this list require justification.
+- `read_first` — files the agent must read before editing anything.
+- `deliverables` — bullet list of concrete outputs.
+- `acceptance_criteria` — falsifiable checks the slice must satisfy.
+- `validation_commands` — exact shell commands to run after the change.
+- `out_of_scope` — explicit non-goals so scope creep is easy to call.
+- `stop_conditions` — situations where the agent must stop and surface a question instead of pressing on.
+
+Baseline-changing slices must additionally follow the `baseline_update_protocol`: run the existing corpus first, produce a human-readable diff, classify intended vs. unintended, and only update expected outputs when the change is intended and documented.
+
 ## Hotkeys
 
 - `PATCH ONLY`: output only the code patch and files list.
