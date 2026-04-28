@@ -15,3 +15,10 @@
   - `.codex/FULL_APP_OVERVIEW.md`: header version 1.3.2 → 1.3.0; test summary 873/88 → 923/99 (client + functions combined).
 - Pre-existing dirty worktree was preserved: modifications to `package.json` and `src/services/__tests__/practicePlans.test.ts`, and untracked items under `docs/process/`, `scripts/`, `test/`, `CLAUDE.md` were not touched.
 - No runtime, schema, save/load, deployment, or UI behavior changes were made.
+
+## 2026-04-28 — Audit Follow-Up Cleanup
+
+- Removed six abandoned empty Expo Router group directories that were created on 2026-04-02 and never populated (`app/(app)/(tabs)/attendance`, `app/(app)/(tabs)/settings`, `app/(app)/(tabs)/roster`, `app/(app)/(tabs)/notes`, `app/(app)/admin`, `app/(auth)`). They were untracked, so the removal does not appear as a deletion in git, but it eliminates noise from the route inventory. Active routes for the same features live at `app/(tabs)/*.tsx` and were untouched.
+- Verified every `depcheck` candidate against config files; all seven are false positives (Expo plugins, EAS dev profile, Babel plugin, TS types). Recorded the per-package evidence in `CODEBASE_AUDIT.md` section 8 so future audits do not re-litigate. Zero dependencies were removed.
+- Post-cleanup gates: `npm run typecheck`, `npm run lint:errors`, and `npx knip --reporter compact` all pass.
+- No runtime, schema, save/load, deployment, or UI behavior changes were made.

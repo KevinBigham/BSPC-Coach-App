@@ -36,3 +36,10 @@
 - Did not touch: `package.json` (modified by user), `src/services/__tests__/practicePlans.test.ts` (modified by user), or any untracked in-progress files under `docs/process/`, `scripts/`, `test/`, or root `CLAUDE.md`. Worktree preserved.
 - Verification commands run after the change: `npm run typecheck`, `npm run lint:errors`, `npx knip --reporter compact`, `npm run quality:dead-code` (results recorded in the changelog).
 - No runtime, schema, save/load, deployment, or UI behavior changes.
+
+## 2026-04-28 Audit Follow-Up Cleanup
+
+- Removed six abandoned empty Expo Router group dirs from the working tree (`app/(app)/(tabs)/{attendance,settings,roster,notes}`, `app/(app)/admin`, `app/(auth)`). All were created 2026-04-02, never populated, and untracked. Active feature routes at `app/(tabs)/*.tsx` were not touched.
+- Reviewed the seven `depcheck` candidates against config evidence; all are false positives. Findings appended to `CODEBASE_AUDIT.md` section 8. No dependencies removed.
+- Verification: `npm run typecheck`, `npm run lint:errors`, `npx knip --reporter compact` all pass post-cleanup.
+- The dirty worktree continues to preserve the user's pre-audit in-progress work (`package.json`, `src/services/__tests__/practicePlans.test.ts`, untracked sim-process tooling).

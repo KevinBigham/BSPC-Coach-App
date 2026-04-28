@@ -420,3 +420,43 @@ Warnings to keep visible:
 - `knip` is clean and should be treated as stronger dead-code evidence than `ts-prune`.
 - `depcheck` output is useful but not deletion-grade evidence.
 - No save/schema/migration surface was changed.
+
+## 8. Audit Follow-Up Verification (2026-04-28)
+
+After the audit landed, the recommended follow-up cleanup classes were each evaluated:
+
+### Empty Scaffold Removal — Done
+
+Removed the abandoned Expo Router group directories created on 2026-04-02 and never populated:
+
+| Path | Last touched | Tracked in git | State |
+|---|---|---|---|
+| `app/(app)/(tabs)/attendance` | 2026-04-02 | No | Empty |
+| `app/(app)/(tabs)/settings` | 2026-04-02 | No | Empty |
+| `app/(app)/(tabs)/roster` | 2026-04-02 | No | Empty |
+| `app/(app)/(tabs)/notes` | 2026-04-02 | No | Empty |
+| `app/(app)/admin` | 2026-04-02 | No | Empty |
+| `app/(auth)` | 2026-04-02 | No | Empty |
+
+Active routes for these features live at `app/(tabs)/attendance.tsx`, `app/(tabs)/settings.tsx`, etc. — the `(app)`/`(auth)` group prefixes were never wired into the router stack. Post-removal: `npm run typecheck`, `npm run lint:errors`, and `npx knip --reporter compact` all pass.
+
+### Dependency Review — No Removals
+
+Each `depcheck` candidate was verified against config files. All seven are false positives:
+
+| Package | Evidence | Verdict |
+|---|---|---|
+| `@config-plugins/react-native-blob-util` | Listed in `app.json` `expo.plugins` array | KEEP |
+| `@config-plugins/react-native-pdf` | Listed in `app.json` `expo.plugins` array | KEEP |
+| `expo-font` | Listed in `app.json` `expo.plugins` array (Expo SDK 54 explicit-font-plugin contract) | KEEP |
+| `expo-dev-client` | `eas.json` development profile sets `developmentClient: true` | KEEP |
+| `expo-system-ui` | Required by Expo prebuild for status-bar/system-UI; standard Expo SDK 54 dependency | KEEP |
+| `@types/jest` | TypeScript ambient types, consumed implicitly during `tsc --noEmit` | KEEP |
+| `babel-plugin-transform-remove-console` | Referenced as `'transform-remove-console'` in `babel.config.js` (production-only push) | KEEP |
+
+No dependency changes are warranted. The audit's instruction in `.codex/decisions.md` ("do not delete dependencies solely from `depcheck` output") is reaffirmed with concrete evidence.
+
+### Deferred to Feature Work
+
+- Component decomposition for the largest screens (`app/swimmer/[id].tsx`, `app/(tabs)/practice.tsx`, `app/_layout.tsx`, etc.) — split only when paired with focused feature work or test-backed refactors.
+- Generated-output local cleanup (`.expo/`, `dist/`, `coverage/`, `functions/lib/`, `parent-portal/.next/`) — performed locally on demand; not a commit-class change.
