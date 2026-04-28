@@ -290,13 +290,18 @@ describe('dashboard practice pdf helpers', () => {
   });
 
   it("subscribes to today's dashboard practice plan for a coach", () => {
-    firestore.onSnapshot.mockReturnValue(jest.fn());
+    jest.useFakeTimers().setSystemTime(new Date('2026-04-18T12:00:00.000Z'));
+    try {
+      firestore.onSnapshot.mockReturnValue(jest.fn());
 
-    subscribeTodayPracticePlan('coach-1', jest.fn());
+      subscribeTodayPracticePlan('coach-1', jest.fn());
 
-    expect(firestore.where).toHaveBeenCalledWith('documentType', '==', 'dashboard_pdf');
-    expect(firestore.where).toHaveBeenCalledWith('coachId', '==', 'coach-1');
-    expect(firestore.where).toHaveBeenCalledWith('date', '==', '2026-04-18');
+      expect(firestore.where).toHaveBeenCalledWith('documentType', '==', 'dashboard_pdf');
+      expect(firestore.where).toHaveBeenCalledWith('coachId', '==', 'coach-1');
+      expect(firestore.where).toHaveBeenCalledWith('date', '==', '2026-04-18');
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('returns the most recent dashboard practice plan or null from today subscription', () => {
