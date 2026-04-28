@@ -187,3 +187,76 @@ describe('formatTime', () => {
     expect(formatTime(2599)).toBe('25.99');
   });
 });
+
+// ---------------------------------------------------------------------------
+// Data integrity audit — pins the SCY/LCM/SCM matrix so any future edit that
+// drops a bucket, zeroes a value, or inverts the level ordering trips a test
+// instead of silently producing wrong feedback to a coach.
+//
+// Locked floor numbers (current as of the LCM/SCM seeding pass): 30 buckets
+// (3 courses × 2 genders × 5 age groups), at least 420 events total. If a
+// future contributor adds events these floors should rise, not fall.
+// ---------------------------------------------------------------------------
+describe('time standards coverage matrix', () => {
+  const courses: Array<'SCY' | 'LCM' | 'SCM'> = ['SCY', 'LCM', 'SCM'];
+  const genders: Array<'M' | 'F'> = ['M', 'F'];
+  const ageGroups = ['10&U', '11-12', '13-14', '15-16', '17-18'] as const;
+
+  it('every (course × gender × ageGroup) bucket has at least one event', () => {
+    const empties: string[] = [];
+    for (const course of courses) {
+      for (const gender of genders) {
+        for (const ageGroup of ageGroups) {
+          const events = getAvailableEvents(course, gender, ageGroup);
+          if (events.length === 0) empties.push(`${course}/${gender}/${ageGroup}`);
+        }
+      }
+    }
+    expect(empties).toEqual([]);
+  });
+
+  it('totals at least 420 (event × bucket) entries across the matrix', () => {
+    let total = 0;
+    for (const course of courses) {
+      for (const gender of genders) {
+        for (const ageGroup of ageGroups) {
+          total += getAvailableEvents(course, gender, ageGroup).length;
+        }
+      }
+    }
+    expect(total).toBeGreaterThanOrEqual(420);
+  });
+
+  it('every event level set is strictly monotonic B > BB > A > AA > AAA > AAAA', () => {
+    const violations: string[] = [];
+    for (const course of courses) {
+      for (const gender of genders) {
+        for (const ageGroup of ageGroups) {
+          for (const event of getAvailableEvents(course, gender, ageGroup)) {
+            const s = getEventStandards(course, gender, ageGroup, event);
+            if (!s) {
+              violations.push(`${course}/${gender}/${ageGroup}/${event}: missing`);
+              continue;
+            }
+            const ordered = [s.B, s.BB, s.A, s.AA, s.AAA, s.AAAA];
+            for (let i = 0; i < ordered.length - 1; i++) {
+              if (!(ordered[i] > ordered[i + 1])) {
+                violations.push(
+                  `${course}/${gender}/${ageGroup}/${event}: ${ordered.join(' > ')} fails monotonicity`,
+                );
+                break;
+              }
+            }
+            for (const v of ordered) {
+              if (!Number.isFinite(v) || v <= 0) {
+                violations.push(`${course}/${gender}/${ageGroup}/${event}: bad value ${v}`);
+                break;
+              }
+            }
+          }
+        }
+      }
+    }
+    expect(violations).toEqual([]);
+  });
+});

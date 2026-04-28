@@ -137,7 +137,7 @@
   ],
   "future_directions": {
     "parent_portal": "parent-portal/ directory exists but is not built out yet. Parents can redeem invite codes via Cloud Function. Need: parent-facing app with swimmer view, meet schedule, push notifications",
-    "lcm_scm_standards": "Only SCY time standards populated in src/data/timeStandards.ts — need LCM and SCM data",
+    "lcm_scm_standards": "DONE 2026-04-28 — SCY, LCM, and SCM all populated across 30 buckets (3 courses × 2 genders × 5 age groups), 420+ events. Integrity test in src/data/__tests__/timeStandards.test.ts pins coverage and monotonicity.",
     "aggregations_pipeline": "Cloud Functions should populate the aggregations collection for dashboard stats (currently computed client-side)",
     "e2e_tests": "No Detox/Maestro tests — could add for critical flows (check-in, recording, meet management)",
     "deep_linking": "URL scheme bspc-coach:// registered but no handlers configured",
