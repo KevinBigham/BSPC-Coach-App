@@ -87,11 +87,15 @@ The current BSPC Coach App runtime contains no simulation engine. The repository
 
 **The following guardrails apply only when a task touches simulation, save/load, schema migration, RNG, or model balance — they do not apply to ordinary BSPC swim-app work:**
 
-- All randomness must go through a single seeded RNG module. No hidden randomness. No `Math.random()` in sim/engine/model/save code.
+- All randomness must go through a single RNG module with a seeded PRNG. No hidden randomness. No `Math.random()` in sim/engine/model/save code.
 - Same seed plus same inputs must produce the same outputs after reload.
 - Any save schema change requires: version bump, migration function, backwards-compatibility notes, sample save fixture update, and a test that an old save migrates and re-saves successfully.
 - Pure functions for sim steps; explicit state transitions.
+- Core sim must be UI-agnostic.
+- If a change would make Season 10 saves unreliable, stop and redesign.
 - Enforce the full checklist in `docs/process/sim-engine-quality-gates.md` when applicable.
+
+These phrases (single RNG module, no hidden randomness, version bump, migration function, sample save fixture, Core sim must be UI-agnostic, Season 10 saves unreliable) are required by `scripts/check-sim-process.mjs` to keep the sim-process contract from drifting. Edit them only as a deliberate guardrail change.
 
 If you are unsure whether a task is sim work or ordinary swim-app work, default to swim-app rules and ask.
 
