@@ -56,10 +56,10 @@ Each operation lists its inputs, the starting state required, the expected outpu
 ### 5. `attendance.batchCheckIn`
 - **Input:** array of swimmers, coach, practiceDate.
 - **Starting state:** No records for the practice date.
-- **Expected output:** Chunked `writeBatch` commits at 400 per chunk; an empty roster results in zero commits.
+- **Expected output:** Chunked `writeBatch` commits at 400 per chunk; an empty roster results in zero commits. On a mid-batch failure, throws `BatchPartialFailureError` with `committedItemCount`, `failedChunkIndex`, `remainingItemCount`, and the underlying `cause`.
 - **Code:** [src/services/attendance.ts:88](../../src/services/attendance.ts#L88).
-- **Mock-only tests today:** 2 (set count, swimmer payload).
-- **Gap:** Closed. The bulk-attendance path now chunks at the 400-item limit; the companion meet-entries path already did. The critical-ops suite includes a 401-swimmer scenario asserting two commits.
+- **Mock-only tests today:** Critical-ops suite covers happy path, empty roster, 401-swimmer chunking, mid-batch failure with full metadata, and first-chunk failure.
+- **Gap:** Closed. Chunking already met the 400-item Firestore limit; **Bug #5** added partial-failure transparency — callers can now show "saved X of Y, retry the rest" instead of a generic error.
 
 ### 6. `meets.addMeet`
 - **Input:** Meet payload minus id/timestamps.
@@ -78,12 +78,12 @@ Each operation lists its inputs, the starting state required, the expected outpu
 - **Gap:** **The service does not validate that `entry.swimmerId` exists in the `swimmers` collection.** A typo or stale cache produces an entry under a swimmer id that has no profile, which then breaks psych-sheet rendering (no name lookup) and time-attribution. Fix: add a `validateMeetEntry(entry, validSwimmerIds)` pure helper and accept an optional `validSwimmerIds` set on `addEntry`. New scenario asserts a thrown error when the id is unknown.
 
 ### 8. `meets.addEntriesBatch`
-- **Input:** meetId, entries array.
+- **Input:** meetId, entries array, optional `validSwimmerIds` set (Bug #1).
 - **Starting state:** Meet exists.
-- **Expected output:** Chunked `writeBatch` commits at 400 per chunk.
-- **Code:** [src/services/meets.ts:85](../../src/services/meets.ts#L85).
-- **Mock-only tests today:** 2 (500 entries, 1 entry).
-- **Gap:** No assertion that each batched entry preserves swimmerId; no test of an entry that survives chunking but references an unknown swimmer (interaction with bug #1).
+- **Expected output:** Chunked `writeBatch` commits at 400 per chunk. On a mid-batch failure, throws `BatchPartialFailureError` with `committedItemCount`, `failedChunkIndex`, `remainingItemCount`, and the underlying `cause`.
+- **Code:** [src/services/meets.ts:138](../../src/services/meets.ts#L138).
+- **Mock-only tests today:** Critical-ops suite covers happy path, 401-entry chunking, empty entries, validation against an unknown roster (Bug #1), and mid-batch partial failure (Bug #5).
+- **Gap:** Closed for Bugs #1 and #5.
 
 ### 9. `meets.addRelay`  ⚠️ **BUG #2**
 - **Input:** meetId, relay payload.
@@ -101,13 +101,13 @@ Each operation lists its inputs, the starting state required, the expected outpu
 - **Mock-only tests today:** Coverage exists in [times.test.ts](../../src/services/__tests__/times.test.ts) (assertions on PR flagging behavior).
 - **Gap:** None of the scenarios use a fixture-built roster; the PR un-flag path is asserted via mock spies, not via a deterministic before/after time set.
 
-### 11. `times.deleteTime`
+### 11. `times.deleteTime`  ⚠️ **BUG #5**
 - **Input:** swimmerId, timeId.
-- **Starting state:** Time doc exists.
-- **Expected output:** Deletion of `swimmers/{swimmerId}/times/{timeId}`.
+- **Starting state:** Time doc may or may not exist.
+- **Expected output:** Read the doc; if absent, no-op. Otherwise commit a single `writeBatch` that deletes the doc and — if the deleted time was the PR — promotes the next-fastest remaining time in the same event/course as the new PR (atomic, so a snapshot listener never observes a "no PR" window).
 - **Code:** [src/services/times.ts:92](../../src/services/times.ts#L92).
-- **Mock-only tests today:** 1.
-- **Gap:** None of the existing tests verify that the surviving rows still have an unambiguous PR (when a PR is deleted the next-fastest should become the PR — but the service does not currently re-flag on delete; this gap is documented but **out of scope** for this sprint per the meet-entry-validation focus).
+- **Mock-only tests today:** Critical-ops suite covers non-PR delete, non-existent doc no-op, PR delete with promotion, PR delete with multiple remaining (fastest wins), PR delete with no successor, and exclusion of the deleted doc itself from the next-fastest search.
+- **Gap:** Closed by Bug #5.
 
 ### 12. `notificationRules.createNotificationRule`
 - **Input:** rule payload (trigger, enabled, config, coachId).

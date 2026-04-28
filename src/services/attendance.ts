@@ -15,6 +15,7 @@ import {
 import { db } from '../config/firebase';
 import type { Swimmer, AttendanceRecord, AttendanceStatus } from '../types/firestore.types';
 import type { Coach } from '../types/firestore.types';
+import { BatchPartialFailureError } from '../utils/batchError';
 
 type AttendanceWithId = AttendanceRecord & { id: string };
 type SwimmerWithId = Swimmer & { id: string };
@@ -85,6 +86,7 @@ export async function batchCheckIn(
 ): Promise<void> {
   // Chunk at 400 to stay under the 500-item Firestore writeBatch limit.
   const chunkSize = 400;
+  let committedItemCount = 0;
   for (let i = 0; i < swimmers.length; i += chunkSize) {
     const batch = writeBatch(db);
     const chunk = swimmers.slice(i, i + chunkSize);
@@ -104,6 +106,16 @@ export async function batchCheckIn(
         createdAt: serverTimestamp(),
       });
     }
-    await batch.commit();
+    try {
+      await batch.commit();
+      committedItemCount += chunk.length;
+    } catch (cause) {
+      throw new BatchPartialFailureError({
+        committedItemCount,
+        failedChunkIndex: Math.floor(i / chunkSize),
+        remainingItemCount: swimmers.length - committedItemCount,
+        cause,
+      });
+    }
   }
 }

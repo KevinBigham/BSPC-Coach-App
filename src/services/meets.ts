@@ -15,6 +15,7 @@ import {
 import { db } from '../config/firebase';
 import type { Meet, MeetEntry, Relay, PsychSheetEntry } from '../types/meet.types';
 import { formatTime } from '../data/timeStandards';
+import { BatchPartialFailureError } from '../utils/batchError';
 
 type MeetWithId = Meet & { id: string };
 type EntryWithId = MeetEntry & { id: string };
@@ -147,6 +148,7 @@ export async function addEntriesBatch(
     }
   }
   const batchSize = 400;
+  let committedItemCount = 0;
   for (let i = 0; i < entries.length; i += batchSize) {
     const batch = writeBatch(db);
     const chunk = entries.slice(i, i + batchSize);
@@ -154,7 +156,17 @@ export async function addEntriesBatch(
       const ref = doc(collection(db, 'meets', meetId, 'entries'));
       batch.set(ref, { ...entry, createdAt: serverTimestamp() });
     }
-    await batch.commit();
+    try {
+      await batch.commit();
+      committedItemCount += chunk.length;
+    } catch (cause) {
+      throw new BatchPartialFailureError({
+        committedItemCount,
+        failedChunkIndex: Math.floor(i / batchSize),
+        remainingItemCount: entries.length - committedItemCount,
+        cause,
+      });
+    }
   }
 }
 

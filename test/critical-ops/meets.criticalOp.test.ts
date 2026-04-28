@@ -247,6 +247,48 @@ describe('meets.addEntriesBatch (critical op)', () => {
     expect(mockBatch.set).not.toHaveBeenCalled();
     expect(mockBatch.commit).not.toHaveBeenCalled();
   });
+
+  // ---------------------------------------------------------------------------
+  // BUG #5 — partial-failure transparency for addEntriesBatch.
+  // ---------------------------------------------------------------------------
+
+  it('failure mode (BUG #5): mid-batch failure throws BatchPartialFailureError with chunk metadata', async () => {
+    const { BatchPartialFailureError } = require('../../src/utils/batchError');
+    const okBatch = {
+      set: jest.fn(),
+      update: jest.fn(),
+      delete: jest.fn(),
+      commit: jest.fn().mockResolvedValue(undefined),
+    };
+    const failBatch = {
+      set: jest.fn(),
+      update: jest.fn(),
+      delete: jest.fn(),
+      commit: jest.fn().mockRejectedValue(new Error('storage exhausted')),
+    };
+    firestore.writeBatch.mockReturnValueOnce(okBatch).mockReturnValueOnce(failBatch);
+
+    const meet = buildMeet({ index: 1 });
+    const roster = buildRoster({ count: 401, group: 'Diamond' });
+    const entries = roster.map((swimmer, i) => {
+      const e = buildMeetEntry({ meet, swimmer, eventNumber: i + 1 });
+      const { createdAt: _c, ...rest } = e;
+      return rest;
+    });
+
+    let caught: unknown;
+    try {
+      await addEntriesBatch(meet.id, entries as never);
+    } catch (e) {
+      caught = e;
+    }
+
+    expect(caught).toBeInstanceOf(BatchPartialFailureError);
+    const err = caught as InstanceType<typeof BatchPartialFailureError>;
+    expect(err.committedItemCount).toBe(400);
+    expect(err.failedChunkIndex).toBe(1);
+    expect(err.remainingItemCount).toBe(1);
+  });
 });
 
 // ---------------------------------------------------------------------------

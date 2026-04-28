@@ -215,7 +215,15 @@ describe('addTime - PR detection logic', () => {
 });
 
 describe('deleteTime', () => {
-  it('calls deleteDoc with correct swimmer/time path', async () => {
+  function mockExistingTime(data: { event: string; course: string; time: number; isPR: boolean }) {
+    firestore.getDoc.mockResolvedValueOnce({
+      exists: () => true,
+      data: () => data,
+    });
+  }
+
+  it('reads the time at the swimmer/time path before deciding the next move', async () => {
+    mockExistingTime({ event: '50 Free', course: 'SCY', time: 2500, isPR: false });
     await deleteTime('sw-1', 't-1');
 
     expect(firestore.doc).toHaveBeenCalledWith(
@@ -225,6 +233,112 @@ describe('deleteTime', () => {
       'times',
       't-1',
     );
-    expect(firestore.deleteDoc).toHaveBeenCalled();
+    expect(firestore.getDoc).toHaveBeenCalled();
+  });
+
+  it('non-existent doc is a no-op: no batch is committed', async () => {
+    firestore.getDoc.mockResolvedValueOnce({
+      exists: () => false,
+      data: () => undefined,
+    });
+    await deleteTime('sw-1', 't-gone');
+
+    expect(firestore.writeBatch).not.toHaveBeenCalled();
+  });
+
+  it('non-PR delete commits a batch with delete only — no companion update', async () => {
+    const mockBatch = {
+      set: jest.fn(),
+      update: jest.fn(),
+      delete: jest.fn(),
+      commit: jest.fn().mockResolvedValue(undefined),
+    };
+    firestore.writeBatch.mockReturnValueOnce(mockBatch);
+    mockExistingTime({ event: '50 Free', course: 'SCY', time: 2500, isPR: false });
+
+    await deleteTime('sw-1', 't-1');
+
+    expect(mockBatch.delete).toHaveBeenCalled();
+    expect(mockBatch.update).not.toHaveBeenCalled();
+    expect(mockBatch.commit).toHaveBeenCalledTimes(1);
+  });
+
+  it('deleting a PR with one other remaining time promotes that other as the new PR', async () => {
+    const mockBatch = {
+      set: jest.fn(),
+      update: jest.fn(),
+      delete: jest.fn(),
+      commit: jest.fn().mockResolvedValue(undefined),
+    };
+    firestore.writeBatch.mockReturnValueOnce(mockBatch);
+    mockExistingTime({ event: '50 Free', course: 'SCY', time: 2400, isPR: true });
+
+    const otherRef = { id: 't-other' };
+    firestore.getDocs.mockResolvedValueOnce({
+      docs: [
+        {
+          id: 't-other',
+          ref: otherRef,
+          data: () => ({ event: '50 Free', course: 'SCY', time: 2500, isPR: false }),
+        },
+      ],
+    });
+
+    await deleteTime('sw-1', 't-1');
+
+    expect(mockBatch.delete).toHaveBeenCalled();
+    expect(mockBatch.update).toHaveBeenCalledWith(otherRef, { isPR: true });
+    expect(mockBatch.commit).toHaveBeenCalledTimes(1);
+  });
+
+  it('deleting a PR with multiple remaining times promotes the fastest', async () => {
+    const mockBatch = {
+      set: jest.fn(),
+      update: jest.fn(),
+      delete: jest.fn(),
+      commit: jest.fn().mockResolvedValue(undefined),
+    };
+    firestore.writeBatch.mockReturnValueOnce(mockBatch);
+    mockExistingTime({ event: '50 Free', course: 'SCY', time: 2400, isPR: true });
+
+    const fastRef = { id: 't-fast' };
+    const slowRef = { id: 't-slow' };
+    firestore.getDocs.mockResolvedValueOnce({
+      docs: [
+        {
+          id: 't-slow',
+          ref: slowRef,
+          data: () => ({ event: '50 Free', course: 'SCY', time: 2700, isPR: false }),
+        },
+        {
+          id: 't-fast',
+          ref: fastRef,
+          data: () => ({ event: '50 Free', course: 'SCY', time: 2500, isPR: false }),
+        },
+      ],
+    });
+
+    await deleteTime('sw-1', 't-1');
+
+    expect(mockBatch.update).toHaveBeenCalledWith(fastRef, { isPR: true });
+    expect(mockBatch.update).toHaveBeenCalledTimes(1);
+  });
+
+  it('deleting a PR with no other times leaves no successor', async () => {
+    const mockBatch = {
+      set: jest.fn(),
+      update: jest.fn(),
+      delete: jest.fn(),
+      commit: jest.fn().mockResolvedValue(undefined),
+    };
+    firestore.writeBatch.mockReturnValueOnce(mockBatch);
+    mockExistingTime({ event: '50 Free', course: 'SCY', time: 2400, isPR: true });
+    firestore.getDocs.mockResolvedValueOnce({ docs: [] });
+
+    await deleteTime('sw-1', 't-1');
+
+    expect(mockBatch.delete).toHaveBeenCalled();
+    expect(mockBatch.update).not.toHaveBeenCalled();
+    expect(mockBatch.commit).toHaveBeenCalledTimes(1);
   });
 });

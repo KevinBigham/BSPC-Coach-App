@@ -154,4 +154,69 @@ describe('attendance.batchCheckIn (critical op)', () => {
     expect(mockBatch.commit).toHaveBeenCalledTimes(2);
     expect(mockBatch.set).toHaveBeenCalledTimes(401);
   });
+
+  // ---------------------------------------------------------------------------
+  // BUG #5 — partial-failure transparency. When chunk N commits but chunk N+1
+  // throws, callers need to know how many items landed so the UI can show
+  // "saved X of Y, retry the rest" instead of a generic error.
+  // ---------------------------------------------------------------------------
+
+  it('failure mode (BUG #5): mid-batch failure throws BatchPartialFailureError with committed count', async () => {
+    const { BatchPartialFailureError } = require('../../src/utils/batchError');
+
+    // First chunk commits; second chunk throws. Use distinct batch instances.
+    const okBatch = {
+      set: jest.fn(),
+      update: jest.fn(),
+      delete: jest.fn(),
+      commit: jest.fn().mockResolvedValue(undefined),
+    };
+    const failBatch = {
+      set: jest.fn(),
+      update: jest.fn(),
+      delete: jest.fn(),
+      commit: jest.fn().mockRejectedValue(new Error('quota exceeded')),
+    };
+    firestore.writeBatch.mockReturnValueOnce(okBatch).mockReturnValueOnce(failBatch);
+
+    const roster = buildRoster({ count: 401, group: 'Diamond' });
+    let caught: unknown;
+    try {
+      await batchCheckIn(roster, { uid: 'coach-001', displayName: 'Coach One' }, '2026-04-28');
+    } catch (e) {
+      caught = e;
+    }
+
+    expect(caught).toBeInstanceOf(BatchPartialFailureError);
+    const err = caught as InstanceType<typeof BatchPartialFailureError>;
+    expect(err.committedItemCount).toBe(400);
+    expect(err.failedChunkIndex).toBe(1);
+    expect(err.remainingItemCount).toBe(1);
+    expect((err.cause as Error).message).toBe('quota exceeded');
+  });
+
+  it('failure mode (BUG #5): first-chunk failure reports zero committed', async () => {
+    const { BatchPartialFailureError } = require('../../src/utils/batchError');
+    const failBatch = {
+      set: jest.fn(),
+      update: jest.fn(),
+      delete: jest.fn(),
+      commit: jest.fn().mockRejectedValue(new Error('network down')),
+    };
+    firestore.writeBatch.mockReturnValueOnce(failBatch);
+
+    const roster = buildRoster({ count: 4, group: 'Gold' });
+    let caught: unknown;
+    try {
+      await batchCheckIn(roster, { uid: 'coach-001', displayName: 'Coach One' }, '2026-04-28');
+    } catch (e) {
+      caught = e;
+    }
+
+    expect(caught).toBeInstanceOf(BatchPartialFailureError);
+    const err = caught as InstanceType<typeof BatchPartialFailureError>;
+    expect(err.committedItemCount).toBe(0);
+    expect(err.failedChunkIndex).toBe(0);
+    expect(err.remainingItemCount).toBe(4);
+  });
 });
