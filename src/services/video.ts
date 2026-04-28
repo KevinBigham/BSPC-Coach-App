@@ -20,7 +20,7 @@ import type {
   Swimmer,
 } from '../types/firestore.types';
 import type { Group } from '../config/constants';
-import { canTagOrUploadMedia } from '../utils/mediaConsent';
+import { canTagOrUploadMedia, assertCanTagSwimmers } from '../utils/mediaConsent';
 
 type VideoSessionWithId = VideoSession & { id: string };
 
@@ -76,7 +76,15 @@ export async function createVideoSession(
   practiceDate: string,
   taggedSwimmerIds: string[],
   group?: Group,
+  swimmers?: Array<Swimmer & { id: string }>,
 ): Promise<string> {
+  // COPPA gate: when the caller supplies the roster, refuse to persist a
+  // session whose tagged swimmers fail the media-consent check. UI is still
+  // authoritative; this is the service-layer backstop.
+  if (swimmers) {
+    assertCanTagSwimmers(taggedSwimmerIds, swimmers);
+  }
+
   const docRef = await addDoc(collection(db, 'video_sessions'), {
     coachId,
     coachName,

@@ -13,7 +13,8 @@ import {
   type Unsubscribe,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
-import type { AIDraft, AudioSession } from '../types/firestore.types';
+import type { AIDraft, AudioSession, Swimmer } from '../types/firestore.types';
+import { assertCanTagSwimmer } from '../utils/mediaConsent';
 
 export type DraftWithContext = AIDraft & {
   id: string;
@@ -62,7 +63,15 @@ export async function approveDraft(
   coachUid: string,
   editedContent?: string,
   editedTags?: string[],
+  swimmer?: Swimmer,
 ): Promise<void> {
+  // COPPA gate: when the caller supplies the swimmer doc, refuse to commit
+  // the draft if media consent is missing/revoked/expired or do-not-photograph
+  // is set. UI is still authoritative; this is the service-layer backstop.
+  if (swimmer) {
+    assertCanTagSwimmer(swimmer);
+  }
+
   const content = editedContent || draft.observation;
   const tags = editedTags || draft.tags;
 
@@ -102,7 +111,18 @@ export async function approveAllDrafts(
   drafts: DraftWithContext[],
   coachUid: string,
   coachName: string,
+  swimmersById?: Map<string, Swimmer>,
 ): Promise<number> {
+  // COPPA gate: when the caller supplies a roster lookup, pre-flight every
+  // draft's swimmer before any batch commits. Throwing before the first
+  // commit keeps Firestore consistent — no partial writes.
+  if (swimmersById) {
+    for (const draft of drafts) {
+      const swimmer = swimmersById.get(draft.swimmerId);
+      if (swimmer) assertCanTagSwimmer(swimmer);
+    }
+  }
+
   let approved = 0;
 
   // Process in batches of 400

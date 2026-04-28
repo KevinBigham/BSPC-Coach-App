@@ -5,6 +5,8 @@ import {
   canTagOrUploadMedia,
   grantConsent,
   revokeConsent,
+  assertCanTagSwimmer,
+  assertCanTagSwimmers,
 } from '../mediaConsent';
 
 describe('hasMediaConsent', () => {
@@ -176,5 +178,83 @@ describe('revokeConsent', () => {
     expect(consent.granted).toBe(false);
     expect(consent.notes).toBe('Parent requested removal via email');
     expect(consent.date).toBeTruthy();
+  });
+});
+
+describe('assertCanTagSwimmer (BUG #4 service-layer COPPA gate)', () => {
+  it('does not throw for an active, consented swimmer', () => {
+    expect(() =>
+      assertCanTagSwimmer({
+        active: true,
+        displayName: 'Alice',
+        mediaConsent: { granted: true, date: new Date() },
+      }),
+    ).not.toThrow();
+  });
+
+  it('throws when consent is missing', () => {
+    expect(() => assertCanTagSwimmer({ active: true, displayName: 'Bob' })).toThrow(
+      /Bob.*missing_consent/,
+    );
+  });
+
+  it('throws when do-not-photograph is set even with granted consent', () => {
+    expect(() =>
+      assertCanTagSwimmer({
+        active: true,
+        displayName: 'Charlie',
+        doNotPhotograph: true,
+        mediaConsent: { granted: true, date: new Date() },
+      }),
+    ).toThrow(/Charlie.*do_not_photograph/);
+  });
+
+  it('throws when consent is expired', () => {
+    expect(() =>
+      assertCanTagSwimmer({
+        active: true,
+        displayName: 'Dana',
+        mediaConsent: {
+          granted: true,
+          date: new Date('2025-01-01'),
+          expiresAt: new Date('2025-12-31'),
+        },
+      }),
+    ).toThrow(/Dana.*expired_consent/);
+  });
+});
+
+describe('assertCanTagSwimmers (multi-swimmer COPPA gate)', () => {
+  const consented = {
+    id: 's1',
+    displayName: 'Alice',
+    active: true,
+    mediaConsent: { granted: true, date: new Date() },
+  };
+  const denied = {
+    id: 's2',
+    displayName: 'Bob',
+    mediaConsent: { granted: false, date: new Date() },
+  };
+  const dnp = {
+    id: 's3',
+    displayName: 'Charlie',
+    active: true,
+    doNotPhotograph: true,
+    mediaConsent: { granted: true, date: new Date() },
+  };
+
+  it('does not throw when all tagged swimmers are consented', () => {
+    expect(() => assertCanTagSwimmers(['s1'], [consented, denied, dnp])).not.toThrow();
+  });
+
+  it('throws once with every blocked name joined by commas', () => {
+    expect(() => assertCanTagSwimmers(['s1', 's2', 's3'], [consented, denied, dnp])).toThrow(
+      /Bob, Charlie/,
+    );
+  });
+
+  it('skips unknown IDs (no swimmer in roster) silently — matches validateMediaConsent semantics', () => {
+    expect(() => assertCanTagSwimmers(['unknown-id'], [consented])).not.toThrow();
   });
 });

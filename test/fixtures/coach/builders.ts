@@ -5,9 +5,18 @@ import type {
   AttendanceStatus,
   NotificationRule,
   NotificationTrigger,
+  MediaConsent,
+  AIDraft,
+  AudioSession,
+  AudioSessionStatus,
+  VideoSession,
+  VideoSessionStatus,
+  VideoAnalysisDraft,
+  VideoAnalysisPhase,
+  ParentInvite,
 } from '../../../src/types/firestore.types';
 import type { Meet, MeetEntry, Relay, RelayLeg } from '../../../src/types/meet.types';
-import type { Group, Course, MeetStatus } from '../../../src/config/constants';
+import type { Group, Course, MeetStatus, NoteTag } from '../../../src/config/constants';
 
 const FIXED_NOW = new Date('2026-04-28T12:00:00.000Z');
 
@@ -276,4 +285,204 @@ export function buildPracticeDates(count: number, endDate = '2026-04-28'): strin
     dates.push(d.toISOString().slice(0, 10));
   }
   return dates;
+}
+
+// ---------------------------------------------------------------------------
+// Media-consent + AI/video draft + parent invite builders
+// ---------------------------------------------------------------------------
+
+export interface BuildMediaConsentOptions {
+  granted?: boolean;
+  expired?: boolean;
+  grantedBy?: string;
+  notes?: string;
+  overrides?: Partial<MediaConsent>;
+}
+
+/**
+ * Build a deterministic MediaConsent. Defaults to granted, no expiry.
+ * Pass `expired: true` to set expiresAt to one day before fixedNow().
+ */
+export function buildMediaConsent(opts: BuildMediaConsentOptions = {}): MediaConsent {
+  const granted = opts.granted ?? true;
+  const date = fixedNow();
+  const expiresAt = opts.expired ? new Date(date.getTime() - 24 * 60 * 60 * 1000) : undefined;
+  return {
+    granted,
+    date,
+    ...(expiresAt ? { expiresAt } : {}),
+    grantedBy: opts.grantedBy ?? (granted ? 'Parent Test' : 'Parent Test'),
+    notes: opts.notes,
+    ...opts.overrides,
+  };
+}
+
+export interface BuildAIDraftOptions {
+  index?: number;
+  swimmer: Swimmer & { id: string };
+  approved?: boolean;
+  observation?: string;
+  tags?: NoteTag[];
+  confidence?: number;
+  reviewedBy?: string;
+  overrides?: Partial<AIDraft>;
+}
+
+/**
+ * Build a deterministic audio AI draft (status pending unless `approved` is set).
+ * Stable IDs are draft-AI-001..NNN.
+ */
+export function buildAIDraft(opts: BuildAIDraftOptions): AIDraft & { id: string } {
+  const index = opts.index ?? 1;
+  const id = `draft-AI-${pad(index, 3)}`;
+  return {
+    id,
+    swimmerId: opts.swimmer.id,
+    swimmerName: opts.swimmer.displayName,
+    observation: opts.observation ?? `Observation ${pad(index, 3)} for ${opts.swimmer.displayName}`,
+    tags: opts.tags ?? ['general'],
+    confidence: opts.confidence ?? 0.85,
+    ...(opts.approved !== undefined ? { approved: opts.approved } : {}),
+    ...(opts.reviewedBy ? { reviewedBy: opts.reviewedBy } : {}),
+    ...(opts.approved !== undefined ? { reviewedAt: fixedNow() } : {}),
+    createdAt: fixedNow(),
+    ...opts.overrides,
+  };
+}
+
+export interface BuildVideoDraftOptions {
+  index?: number;
+  swimmer: Swimmer & { id: string };
+  phase?: VideoAnalysisPhase;
+  observation?: string;
+  diagnosis?: string;
+  drillRecommendation?: string;
+  tags?: NoteTag[];
+  confidence?: number;
+  approved?: boolean;
+  overrides?: Partial<VideoAnalysisDraft>;
+}
+
+/** Stable IDs are draft-VID-001..NNN. */
+export function buildVideoDraft(opts: BuildVideoDraftOptions): VideoAnalysisDraft & { id: string } {
+  const index = opts.index ?? 1;
+  const id = `draft-VID-${pad(index, 3)}`;
+  return {
+    id,
+    swimmerId: opts.swimmer.id,
+    swimmerName: opts.swimmer.displayName,
+    observation: opts.observation ?? `Stroke observation ${pad(index, 3)}`,
+    diagnosis: opts.diagnosis ?? 'Late catch on freestyle',
+    drillRecommendation: opts.drillRecommendation ?? 'Catch-up drill 4x50',
+    phase: opts.phase ?? 'stroke',
+    tags: opts.tags ?? ['technique'],
+    confidence: opts.confidence ?? 0.8,
+    ...(opts.approved !== undefined ? { approved: opts.approved } : {}),
+    ...(opts.approved !== undefined ? { reviewedAt: fixedNow() } : {}),
+    createdAt: fixedNow(),
+    ...opts.overrides,
+  };
+}
+
+export interface BuildAudioSessionOptions {
+  index?: number;
+  status?: AudioSessionStatus;
+  group?: Group;
+  practiceDate?: string;
+  duration?: number;
+  coach?: Coach & { uid: string };
+  overrides?: Partial<AudioSession>;
+}
+
+/** Stable IDs are sess-AUD-001..NNN. */
+export function buildAudioSession(
+  opts: BuildAudioSessionOptions = {},
+): AudioSession & { id: string } {
+  const index = opts.index ?? 1;
+  const coach = opts.coach ?? buildCoach();
+  const id = `sess-AUD-${pad(index, 3)}`;
+  return {
+    id,
+    coachId: coach.uid,
+    coachName: coach.displayName,
+    storagePath: `audio/${coach.uid}/2026-04-28/audio_${pad(index, 3)}.m4a`,
+    duration: opts.duration ?? 600,
+    practiceDate: opts.practiceDate ?? '2026-04-28',
+    group: opts.group,
+    status: opts.status ?? 'review',
+    createdAt: fixedNow(),
+    updatedAt: fixedNow(),
+    ...opts.overrides,
+  };
+}
+
+export interface BuildVideoSessionOptions {
+  index?: number;
+  status?: VideoSessionStatus;
+  group?: Group;
+  practiceDate?: string;
+  duration?: number;
+  coach?: Coach & { uid: string };
+  taggedSwimmers?: Array<Swimmer & { id: string }>;
+  overrides?: Partial<VideoSession>;
+}
+
+/** Stable IDs are sess-VID-001..NNN. */
+export function buildVideoSession(
+  opts: BuildVideoSessionOptions = {},
+): VideoSession & { id: string } {
+  const index = opts.index ?? 1;
+  const coach = opts.coach ?? buildCoach();
+  const id = `sess-VID-${pad(index, 3)}`;
+  const taggedSwimmerIds = (opts.taggedSwimmers ?? []).map((s) => s.id);
+  return {
+    id,
+    coachId: coach.uid,
+    coachName: coach.displayName,
+    storagePath: `video/${coach.uid}/2026-04-28/video_${pad(index, 3)}.mp4`,
+    duration: opts.duration ?? 30,
+    practiceDate: opts.practiceDate ?? '2026-04-28',
+    group: opts.group,
+    taggedSwimmerIds,
+    status: opts.status ?? 'review',
+    createdAt: fixedNow(),
+    updatedAt: fixedNow(),
+    ...opts.overrides,
+  };
+}
+
+export interface BuildParentInviteOptions {
+  index?: number;
+  swimmer: Swimmer & { id: string };
+  coach?: Coach & { uid: string };
+  /** Days until expiry, relative to fixedNow(). Default 7. Negative = already expired. */
+  expiresInDays?: number;
+  redeemed?: boolean;
+  redeemedBy?: string;
+  code?: string;
+  overrides?: Partial<ParentInvite>;
+}
+
+/** Stable IDs are invite-001..NNN; codes are deterministic INVT-NNN unless overridden. */
+export function buildParentInvite(opts: BuildParentInviteOptions): ParentInvite & { id: string } {
+  const index = opts.index ?? 1;
+  const coach = opts.coach ?? buildCoach();
+  const id = `invite-${pad(index, 3)}`;
+  const code = opts.code ?? `INVT-${pad(index, 3)}`;
+  const days = opts.expiresInDays ?? 7;
+  const expiresAt = new Date(fixedNow().getTime() + days * 24 * 60 * 60 * 1000);
+  const redeemed = opts.redeemed ?? false;
+  return {
+    id,
+    code,
+    swimmerId: opts.swimmer.id,
+    swimmerName: opts.swimmer.displayName,
+    coachId: coach.uid,
+    coachName: coach.displayName,
+    redeemed,
+    ...(redeemed && opts.redeemedBy ? { redeemedBy: opts.redeemedBy, redeemedAt: fixedNow() } : {}),
+    expiresAt,
+    createdAt: fixedNow(),
+    ...opts.overrides,
+  };
 }

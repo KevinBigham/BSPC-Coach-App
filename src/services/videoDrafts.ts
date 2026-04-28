@@ -1,7 +1,8 @@
 import { doc, updateDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import type { NoteTag } from '../config/constants';
-import type { FirebaseTimestamp } from '../types/firestore.types';
+import type { FirebaseTimestamp, Swimmer } from '../types/firestore.types';
+import { assertCanTagSwimmer } from '../utils/mediaConsent';
 
 export interface VideoDraft {
   id: string;
@@ -24,7 +25,15 @@ export async function approveVideoDraft(
   draft: VideoDraft,
   coachUid: string,
   coachName: string,
+  swimmer?: Swimmer,
 ): Promise<void> {
+  // COPPA gate: when the caller supplies the swimmer doc, refuse to commit
+  // a video-AI note if consent is missing/revoked/expired or
+  // do-not-photograph is set. UI is still authoritative.
+  if (swimmer) {
+    assertCanTagSwimmer(swimmer);
+  }
+
   await updateDoc(doc(db, 'video_sessions', sessionId, 'drafts', draft.id), {
     approved: true,
     reviewedBy: coachUid,

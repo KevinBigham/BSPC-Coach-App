@@ -50,6 +50,50 @@ export function hasMediaConsent(swimmer: Partial<MediaEligibleSwimmer>): boolean
 }
 
 /**
+ * Service-layer COPPA gate for a single swimmer.
+ *
+ * Throws when the swimmer fails `canTagOrUploadMedia`. Use this at any
+ * service boundary that commits a tagging decision to Firestore (e.g.,
+ * approving an AI/video draft, creating a video session). The error
+ * message names the swimmer and the eligibility reason so callers can
+ * surface a precise message to the coach.
+ */
+export function assertCanTagSwimmer(
+  swimmer: Partial<MediaEligibleSwimmer> & { displayName?: string },
+): void {
+  const result = canTagOrUploadMedia(swimmer);
+  if (!result.allowed) {
+    const name = swimmer.displayName ?? '<unknown swimmer>';
+    throw new Error(`Cannot tag ${name}: media consent ${result.reason}`);
+  }
+}
+
+/**
+ * Multi-swimmer COPPA gate. Throws once with a comma-separated list of
+ * blocked names so the coach sees every offender, not just the first.
+ *
+ * Unknown IDs (no matching swimmer in the supplied roster) are silently
+ * skipped — same semantics as `validateMediaConsent` in `services/video.ts`.
+ * Callers that need to enforce roster membership should pair this with a
+ * separate roster-validation step.
+ */
+export function assertCanTagSwimmers<
+  T extends Partial<MediaEligibleSwimmer> & { id?: string; displayName: string },
+>(taggedIds: string[], swimmers: T[]): void {
+  const blocked: T[] = [];
+  for (const id of taggedIds) {
+    const swimmer = swimmers.find((s) => s.id === id);
+    if (swimmer && !canTagOrUploadMedia(swimmer).allowed) {
+      blocked.push(swimmer);
+    }
+  }
+  if (blocked.length > 0) {
+    const names = blocked.map((s) => s.displayName).join(', ');
+    throw new Error(`Cannot tag swimmers without media consent: ${names}`);
+  }
+}
+
+/**
  * Filter a list of swimmers to only those with active media consent.
  * Use this to populate video tagging pickers and AI analysis swimmer lists.
  */
