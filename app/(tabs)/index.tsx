@@ -1,9 +1,7 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl } from 'react-native';
 import { router } from 'expo-router';
 import { Bell } from 'lucide-react-native';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
-import { db } from '../../src/config/firebase';
 import { useAuth } from '../../src/contexts/AuthContext';
 import {
   colors,
@@ -14,24 +12,13 @@ import {
   groupColors,
 } from '../../src/config/theme';
 import { GROUPS } from '../../src/config/constants';
-import { getTodayString } from '../../src/utils/time';
 import { formatRelativeTime } from '../../src/utils/date';
-import { useSwimmersStore } from '../../src/stores/swimmersStore';
-import { useAttendanceStore } from '../../src/stores/attendanceStore';
 import { useVideoStore } from '../../src/stores/videoStore';
-import {
-  subscribeDashboardActivityAggregation,
-  subscribeDashboardAttendanceAggregation,
-  subscribeDashboardRecentPRsAggregation,
-} from '../../src/services/aggregations';
-import { subscribeUpcomingMeets } from '../../src/services/meets';
-import { getUnreadCount } from '../../src/services/notifications';
+import { useDashboardData } from '../../src/hooks/useDashboardData';
 import AttendanceHeatmap from '../../src/components/charts/AttendanceHeatmap';
 import SparkLine from '../../src/components/charts/SparkLine';
 import PracticePdfUploader from '../../src/components/practice-pdf-uploader';
 import { withScreenErrorBoundary } from '../../src/components/ScreenErrorBoundary';
-import type { DashboardActivityItem } from '../../src/types/firestore.types';
-import type { Meet } from '../../src/types/meet.types';
 
 const ACTIVITY_CONFIG = {
   attendance: { label: 'CHECK-IN', color: colors.success, bgColor: 'rgba(204, 176, 0, 0.08)' },
@@ -41,123 +28,23 @@ const ACTIVITY_CONFIG = {
   video: { label: 'VIDEO', color: '#6366f1', bgColor: 'rgba(99, 102, 241, 0.08)' },
 } as const;
 
-const DAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
-
 function DashboardScreen() {
   const { coach } = useAuth();
-  const storeSwimmers = useSwimmersStore((s) => s.swimmers);
-  const todayRecords = useAttendanceStore((s) => s.todayRecords);
   const uploadProgress = useVideoStore((state) => state.uploadProgress);
-  const [recentActivity, setRecentActivity] = useState<DashboardActivityItem[]>([]);
-  const [weekAttendance, setWeekAttendance] = useState<Record<string, number>>({});
-  const [pendingDrafts, setPendingDrafts] = useState(0);
-  const [unreadCount, setUnreadCount] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
-  const [nextMeet, setNextMeet] = useState<(Meet & { id: string }) | null>(null);
-  const [recentPRs, setRecentPRs] = useState<
-    { id: string; event: string; course: string; timeDisplay: string; swimmerName?: string }[]
-  >([]);
-  const today = getTodayString();
-
-  const totalSwimmers = storeSwimmers.length;
-  const swimmerCounts = useMemo(() => {
-    const counts: Record<string, number> = {};
-    storeSwimmers.forEach((s) => {
-      counts[s.group] = (counts[s.group] || 0) + 1;
-    });
-    return counts;
-  }, [storeSwimmers]);
-  const todayAttendance = useMemo(() => {
-    return new Set(todayRecords.filter((r) => !r.departedAt).map((r) => r.swimmerId)).size;
-  }, [todayRecords]);
-
-  // Upcoming meet countdown
-  useEffect(() => {
-    return subscribeUpcomingMeets((meets) => {
-      setNextMeet(meets.length > 0 ? meets[0] : null);
-    });
-  }, []);
-
-  // Recent PRs feed — read from the server-computed aggregation rather than
-  // running a collectionGroup query on every dashboard mount.
-  useEffect(() => {
-    return subscribeDashboardRecentPRsAggregation((aggregation) => {
-      setRecentPRs(
-        (aggregation?.items ?? []).map((item) => ({
-          id: item.id,
-          event: item.event,
-          course: item.course,
-          timeDisplay: item.timeDisplay,
-          swimmerName: item.swimmerName,
-        })),
-      );
-    });
-  }, []);
-
-  // 7-day attendance for spark chart
-  useEffect(() => {
-    return subscribeDashboardAttendanceAggregation((aggregation) => {
-      setWeekAttendance(aggregation?.countsByDate ?? {});
-    });
-  }, []);
-
-  // Pending AI drafts count (audio + video)
-  useEffect(() => {
-    let audioCount = 0;
-    let videoCount = 0;
-    const update = () => setPendingDrafts(audioCount + videoCount);
-
-    const unsubAudio = onSnapshot(
-      query(collection(db, 'audio_sessions'), where('status', '==', 'review')),
-      (snap) => {
-        audioCount = snap.size;
-        update();
-      },
-    );
-    const unsubVideo = onSnapshot(
-      query(collection(db, 'video_sessions'), where('status', '==', 'review')),
-      (snap) => {
-        videoCount = snap.size;
-        update();
-      },
-    );
-    return () => {
-      unsubAudio();
-      unsubVideo();
-    };
-  }, []);
-
-  // Unified activity feed: attendance + notes + times
-  useEffect(() => {
-    return subscribeDashboardActivityAggregation((aggregation) => {
-      setRecentActivity(aggregation?.items ?? []);
-    });
-  }, []);
-
-  useEffect(() => {
-    if (!coach?.uid) {
-      setUnreadCount(0);
-      return;
-    }
-
-    return getUnreadCount(coach.uid, setUnreadCount);
-  }, [coach?.uid]);
-
-  // 7-day spark chart data
-  const sparkData = useMemo(() => {
-    const data: { date: string; count: number; dayLabel: string }[] = [];
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      const dateStr = d.toISOString().split('T')[0];
-      data.push({
-        date: dateStr,
-        count: weekAttendance[dateStr] || 0,
-        dayLabel: DAY_LABELS[d.getDay()],
-      });
-    }
-    return data;
-  }, [weekAttendance]);
+  const {
+    totalSwimmers,
+    swimmerCounts,
+    todayAttendance,
+    recentActivity,
+    recentPRs,
+    weekAttendance,
+    pendingDrafts,
+    unreadCount,
+    nextMeet,
+    sparkData,
+    today,
+  } = useDashboardData(coach?.uid);
 
   const onRefresh = () => {
     setRefreshing(true);
