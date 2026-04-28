@@ -171,6 +171,22 @@ export interface DashboardActivityAggregation {
   updatedAt: FirebaseTimestamp;
 }
 
+export interface DashboardRecentPR {
+  id: string;
+  swimmerId: string;
+  swimmerName: string;
+  event: string;
+  course: string;
+  timeDisplay: string;
+  meetName: string | null;
+  createdAt: FirebaseTimestamp;
+}
+
+export interface DashboardRecentPRsAggregation {
+  items: DashboardRecentPR[];
+  updatedAt: FirebaseTimestamp;
+}
+
 export type AudioSessionStatus =
   | 'queued'
   | 'uploading'

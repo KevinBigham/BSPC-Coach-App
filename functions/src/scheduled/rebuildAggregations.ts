@@ -6,6 +6,7 @@ import { recomputeNotesAggregation } from '../triggers/onNotesWritten';
 import {
   recomputeDashboardAttendanceAggregation,
   recomputeDashboardActivityAggregation,
+  recomputeDashboardRecentPRsAggregation,
 } from '../triggers/dashboardAggregations';
 
 if (!admin.apps.length) admin.initializeApp();
@@ -37,4 +38,5 @@ export const rebuildAggregations = onSchedule('every day 04:00', async () => {
 
   await recomputeDashboardAttendanceAggregation();
   await recomputeDashboardActivityAggregation();
+  await recomputeDashboardRecentPRsAggregation();
 });

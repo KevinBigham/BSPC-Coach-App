@@ -2,15 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl } from 'react-native';
 import { router } from 'expo-router';
 import { Bell } from 'lucide-react-native';
-import {
-  collection,
-  collectionGroup,
-  query,
-  where,
-  onSnapshot,
-  orderBy,
-  limit,
-} from 'firebase/firestore';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../../src/config/firebase';
 import { useAuth } from '../../src/contexts/AuthContext';
 import {
@@ -30,6 +22,7 @@ import { useVideoStore } from '../../src/stores/videoStore';
 import {
   subscribeDashboardActivityAggregation,
   subscribeDashboardAttendanceAggregation,
+  subscribeDashboardRecentPRsAggregation,
 } from '../../src/services/aggregations';
 import { subscribeUpcomingMeets } from '../../src/services/meets';
 import { getUnreadCount } from '../../src/services/notifications';
@@ -85,26 +78,18 @@ function DashboardScreen() {
     });
   }, []);
 
-  // Recent PRs feed
+  // Recent PRs feed — read from the server-computed aggregation rather than
+  // running a collectionGroup query on every dashboard mount.
   useEffect(() => {
-    const q = query(
-      collectionGroup(db, 'times'),
-      where('isPR', '==', true),
-      orderBy('createdAt', 'desc'),
-      limit(5),
-    );
-    return onSnapshot(q, (snap) => {
+    return subscribeDashboardRecentPRsAggregation((aggregation) => {
       setRecentPRs(
-        snap.docs.map((d) => {
-          const data = d.data();
-          return {
-            id: d.id,
-            event: data.event,
-            course: data.course,
-            timeDisplay: data.timeDisplay,
-            swimmerName: data.swimmerName,
-          };
-        }),
+        (aggregation?.items ?? []).map((item) => ({
+          id: item.id,
+          event: item.event,
+          course: item.course,
+          timeDisplay: item.timeDisplay,
+          swimmerName: item.swimmerName,
+        })),
       );
     });
   }, []);

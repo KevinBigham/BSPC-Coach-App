@@ -7,11 +7,13 @@ const DAY_MS = 86_400_000;
 const ATTENDANCE_HISTORY_DAYS = 84;
 const ATTENDANCE_DOC_PATH = 'aggregations/dashboard_attendance';
 const ACTIVITY_DOC_PATH = 'aggregations/dashboard_activity';
+const RECENT_PRS_DOC_PATH = 'aggregations/dashboard_recent_prs';
 const ATTENDANCE_LIMIT = 8;
 const NOTE_LIMIT = 5;
 const TIME_LIMIT = 5;
 const VIDEO_LIMIT = 5;
 const ACTIVITY_ITEM_LIMIT = 15;
+const RECENT_PRS_LIMIT = 5;
 
 type RawTimestamp =
   | admin.firestore.Timestamp
@@ -133,6 +135,47 @@ export async function recomputeDashboardActivityAggregation(): Promise<void> {
   await db.doc(ACTIVITY_DOC_PATH).set(
     {
       items: items.slice(0, ACTIVITY_ITEM_LIMIT),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    },
+    { merge: true },
+  );
+}
+
+/**
+ * Recompute the "recent PRs" dashboard slice: the N newest swimmer times
+ * flagged isPR=true, written to a single doc the dashboard reads on mount.
+ *
+ * Replaces a client-side `collectionGroup('times').where('isPR', '==', true)`
+ * query that ran on every dashboard render. The aggregation cuts that read
+ * cost to one doc fetch per dashboard mount and lets us add denormalized
+ * fields (swimmerName etc.) without re-walking the times collection.
+ */
+export async function recomputeDashboardRecentPRsAggregation(): Promise<void> {
+  const snap = await db
+    .collectionGroup('times')
+    .where('isPR', '==', true)
+    .orderBy('createdAt', 'desc')
+    .limit(RECENT_PRS_LIMIT)
+    .get();
+
+  const items = snap.docs.map((doc) => {
+    const data = doc.data();
+    return {
+      id: doc.id,
+      // ref.parent.parent is the swimmer doc the time hangs off of.
+      swimmerId: doc.ref.parent.parent?.id ?? '',
+      swimmerName: (data.swimmerName as string | undefined) ?? '',
+      event: (data.event as string | undefined) ?? '',
+      course: (data.course as string | undefined) ?? '',
+      timeDisplay: (data.timeDisplay as string | undefined) ?? '',
+      meetName: (data.meetName as string | undefined) ?? null,
+      createdAt: data.createdAt as RawTimestamp,
+    };
+  });
+
+  await db.doc(RECENT_PRS_DOC_PATH).set(
+    {
+      items,
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     },
     { merge: true },

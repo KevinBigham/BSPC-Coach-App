@@ -138,7 +138,7 @@
   "future_directions": {
     "parent_portal": "parent-portal/ directory exists but is not built out yet. Parents can redeem invite codes via Cloud Function. Need: parent-facing app with swimmer view, meet schedule, push notifications",
     "lcm_scm_standards": "DONE 2026-04-28 — SCY, LCM, and SCM all populated across 30 buckets (3 courses × 2 genders × 5 age groups), 420+ events. Integrity test in src/data/__tests__/timeStandards.test.ts pins coverage and monotonicity.",
-    "aggregations_pipeline": "Cloud Functions should populate the aggregations collection for dashboard stats (currently computed client-side)",
+    "aggregations_pipeline": "DONE — Cloud Functions populate aggregations/* on every onAttendanceWritten/onTimesWritten/onNotesWritten with a daily 04:00 rebuildAggregations safety net. Client subscribes via src/services/aggregations.ts. Dashboard slices: dashboard_attendance, dashboard_activity, dashboard_recent_prs. Adding a new slice = recompute fn in dashboardAggregations.ts + trigger wiring + scheduled rebuild + client subscriber + screen consumer.",
     "e2e_tests": "No Detox/Maestro tests — could add for critical flows (check-in, recording, meet management)",
     "deep_linking": "URL scheme bspc-coach:// registered but no handlers configured",
     "eas_submit": "Apple/Google store credentials need filling in eas.json after enrollment",
