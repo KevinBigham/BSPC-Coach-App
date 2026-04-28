@@ -13,3 +13,4 @@ export { onNotesWritten } from './triggers/onNotesWritten';
 export { onVideoSessionWritten } from './triggers/onVideoSessionWritten';
 export { evaluateNotificationRules } from './triggers/evaluateNotificationRules';
 export { rebuildAggregations } from './scheduled/rebuildAggregations';
+export { syncCalendar } from './scheduled/syncCalendar';
