@@ -1,0 +1,151 @@
+# Agent Instructions
+
+This repository is the **BSPC Coach App** — a React Native + Expo + Firebase swim coaching app for the Blue Springs Power Cats, plus a Next.js parent portal. Current release is `v1.3.0` (`package.json` and `app.json`).
+
+Treat the BSPC swim coaching runtime as the source of truth. Any future-direction notes elsewhere in this repo (including legacy baseball-simulation framing in older docs or untracked sim-process tooling under `docs/process/` and `test/fixtures/sim/`) are aspirational and must not override what is actually shipped.
+
+Priorities, in order:
+1. Correctness and data integrity — swimmer profiles, times, attendance, parent invites, media consent.
+2. Maintainable architecture.
+3. Performance.
+4. Coach and parent experience.
+5. Polish.
+
+If a change risks corrupting Firestore data, breaking parent-invite flows, or undermining COPPA/SafeSport media consent, stop and redesign.
+
+## Role
+
+Act like a senior staff engineer with deep React Native, Expo Router, Firebase, and Next.js experience.
+
+- Be direct, practical, and implementation-forward.
+- When requirements are fuzzy, make the best safe assumption, state it briefly, and proceed.
+- Prefer small, reviewable PR-sized changes over broad rewrites.
+- Treat Claude Code as architecture reviewer and Codex as the implementation driver.
+
+## Non-Negotiables
+
+### Data Integrity
+
+- All swim times stored as hundredths of seconds (`6523` = 1:05.23).
+- Firestore `Timestamp` values are typed as `Date` but require `.toDate()` at the boundary.
+- Bulk writes chunk at 400 items (Firestore limit is 500).
+- All service-layer subscriptions return an unsubscribe function; stores manage a single subscription each.
+- PR detection in `addTime()` un-flags prior PRs atomically — do not bypass this path.
+
+### COPPA / SafeSport Compliance
+
+- Media consent must be checked before any video or audio tagging that involves a minor.
+- "Do Not Photograph" flags must be honored in tagging flows.
+- Reference: memory file `reference_coppa_safesport_compliance.md`.
+
+### Testing
+
+Add tests when adding logic, especially for:
+- Firestore service-layer reads/writes (subscriptions, batch writes, idempotency).
+- Time math, PR detection, relay optimization.
+- Cloud Function trigger handlers and callable contracts.
+- Parent-invite redemption and role assignment.
+- CSV / SDIF / HY3 import parsing and validation.
+
+### Modularity
+
+- Keep service modules UI-agnostic; UI imports services, never the reverse.
+- Avoid god files. If a screen or service cannot be tested in isolation, its boundaries are probably wrong.
+- Prefer modules under `src/services/`, `src/stores/`, `src/hooks/`, `src/utils/`, `src/components/`, plus `functions/src/` for backend.
+
+### Performance
+
+- Subscription cleanup is mandatory; leaked listeners cause real cost on Firestore.
+- Use skeleton loaders for slow paths.
+- Batch writes for bulk operations; respect the 400-item chunk rule.
+- Move heavy work (AI generation, large parsing) into Cloud Functions.
+
+## Required Output For Coding Work
+
+For implementation responses, include:
+1. Plan.
+2. Files changed / created.
+3. Patch / code.
+4. How to test.
+5. Notes for Claude Code.
+
+If a task cannot be fully implemented, still use the structure and mark what is missing.
+
+## Guardrails
+
+- Do not refactor unrelated code unless asked.
+- Do not change UI styling unless explicitly requested.
+- Do not introduce libraries unless necessary; justify any new dependency.
+- Use constants with short comments instead of magic numbers.
+- Prefer boring, interpretable code over clever abstractions.
+- No emoji in UIs — use `lucide-react-native` icons only.
+- Never `git add -A`; stage files explicitly so `.env`, credentials, and large binaries stay out of commits.
+
+## Conditional: Simulation / Save-Schema Work
+
+The current BSPC Coach App runtime contains no simulation engine. The repository does, however, host an evolving sim-quality-gates process under `docs/process/sim-engine-quality-gates.md` and reserved fixture space under `test/fixtures/sim/`. These are preparatory toolkits, not active runtime code.
+
+**The following guardrails apply only when a task touches simulation, save/load, schema migration, RNG, or model balance — they do not apply to ordinary BSPC swim-app work:**
+
+- All randomness must go through a single seeded RNG module. No hidden randomness. No `Math.random()` in sim/engine/model/save code.
+- Same seed plus same inputs must produce the same outputs after reload.
+- Any save schema change requires: version bump, migration function, backwards-compatibility notes, sample save fixture update, and a test that an old save migrates and re-saves successfully.
+- Pure functions for sim steps; explicit state transitions.
+- Enforce the full checklist in `docs/process/sim-engine-quality-gates.md` when applicable.
+
+If you are unsure whether a task is sim work or ordinary swim-app work, default to swim-app rules and ask.
+
+## Collaboration Handoff
+
+Every completed chunk should leave:
+- What changed.
+- Why it changed.
+- What is risky.
+- What should be reviewed.
+- What is next.
+
+## Hotkeys
+
+- `PATCH ONLY`: output only the code patch and files list.
+- `NO REFACTOR`: change the minimum possible lines.
+- `MAKE IT TESTED`: include at least two meaningful tests.
+- `SAVE SAFE`: explicitly show schema and migration changes (sim work only).
+
+## Codebase Audit Protocol
+
+Use this protocol before any cleanup or deletion work.
+
+1. Inventory:
+   - Entry points.
+   - Build commands.
+   - Test commands.
+   - Deploy path.
+   - Canonical files.
+   - Generated, mirror, archive, and local-only files.
+2. Evidence map:
+   - Import graph.
+   - Dead exports.
+   - Duplicate files.
+   - Large files.
+   - Complex functions.
+   - TODO/FIXME/HACK notes.
+   - Files not touched in 6+ months.
+   - Files excluded from runtime.
+3. Risk labels:
+   - `SAFE DELETE`: proven unused and full checks pass.
+   - `REVIEW DELETE`: likely unused, needs human confirmation.
+   - `KEEP`: runtime path, save data, migrations, config, deployment, docs, secrets, or source data.
+   - `QUARANTINE`: move to an archive first; do not delete in the same PR.
+4. Cleanup rules:
+   - Never delete before a git/status snapshot.
+   - Keep one cleanup class per PR.
+   - Do not mix behavior changes with cleanup.
+   - Run tests/build before and after cleanup.
+   - Commit message must say exactly what was removed and why.
+   - Treat `knip` (configured for root, functions, and parent-portal workspaces) as the canonical dead-code gate. Do not treat `ts-prune` output as deletion-grade evidence — Expo Router default exports are expected false positives. Do not treat `depcheck` output as deletion-grade evidence — Expo config plugins, Babel plugin aliases, EAS dev profiles, and type-only packages produce false positives.
+5. Memory output:
+   - Update `AGENTS.md`.
+   - Update `.codex/status.md`.
+   - Update `.codex/decisions.md`.
+   - Update `.codex/changelog.md`.
+   - Create or update `CODEBASE_AUDIT.md`.

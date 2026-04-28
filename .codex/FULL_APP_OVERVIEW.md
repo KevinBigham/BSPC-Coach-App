@@ -1,7 +1,7 @@
 # BSPC Coach App — Complete Project Overview
 
-**Version**: 1.3.2 | **Framework**: React Native + Expo SDK 54 | **Backend**: Firebase
-**Tests**: 873 passing (817 client + 56 functions) across 88 suites
+**Version**: 1.3.0 | **Framework**: React Native + Expo SDK 54 | **Backend**: Firebase
+**Tests**: 923 passing (858 client + 65 functions) across 99 suites
 **Screens**: 51 | **Services**: 31 | **Stores**: 8 | **Hooks**: 6 | **Components**: 22
 **Cloud Functions**: 13 deployed (20 source files) | **AI Knowledge Base**: 1,702 lines
 **GitHub**: KevinBigham/BSPC-Coach-App (private) | **Commits**: 45
