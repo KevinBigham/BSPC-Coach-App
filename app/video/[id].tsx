@@ -26,6 +26,7 @@ import { useToast } from '../../src/contexts/ToastContext';
 import { handleError } from '../../src/utils/errorHandler';
 import { colors, spacing, fontSize, borderRadius, fontFamily } from '../../src/config/theme';
 import { useVideoStore } from '../../src/stores/videoStore';
+import { useSwimmersStore } from '../../src/stores/swimmersStore';
 import { withScreenErrorBoundary } from '../../src/components/ScreenErrorBoundary';
 import type { VideoSession } from '../../src/types/firestore.types';
 
@@ -46,6 +47,7 @@ function VideoDetailScreen() {
   const { showToast } = useToast();
   const session = useVideoStore((state) => state.selectedSession);
   const setSelectedSession = useVideoStore((state) => state.setSelectedSession);
+  const swimmers = useSwimmersStore((s) => s.swimmers);
   const [drafts, setDrafts] = useState<VideoDraft[]>([]);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState<Set<string>>(new Set());
@@ -70,7 +72,8 @@ function VideoDetailScreen() {
     if (!coach || !id) return;
     setProcessing((prev) => new Set(prev).add(draft.id));
     try {
-      await approveVideoDraft(id, draft, coach.uid, coach.displayName || 'Coach');
+      const swimmer = swimmers.find((s) => s.id === draft.swimmerId);
+      await approveVideoDraft(id, draft, coach.uid, coach.displayName || 'Coach', swimmer);
       showToast('Observation posted to swimmer profile', 'success');
     } catch (err) {
       handleError(err, 'Approve draft');

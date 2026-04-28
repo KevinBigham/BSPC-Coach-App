@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { Stack } from 'expo-router';
 import { useAuth } from '../src/contexts/AuthContext';
+import { useSwimmersStore } from '../src/stores/swimmersStore';
 import {
   subscribePendingDrafts,
   approveDraft,
@@ -23,15 +24,27 @@ import { NOTE_TAGS, type NoteTag } from '../src/config/constants';
 import { colors, spacing, fontSize, borderRadius, fontFamily } from '../src/config/theme';
 import { tapLight, notifySuccess } from '../src/utils/haptics';
 import { withScreenErrorBoundary } from '../src/components/ScreenErrorBoundary';
+import type { Swimmer } from '../src/types/firestore.types';
 
 function AIReviewScreen() {
   const { coach } = useAuth();
+  const swimmers = useSwimmersStore((s) => s.swimmers);
   const [drafts, setDrafts] = useState<DraftWithContext[]>([]);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState<Set<string>>(new Set());
   const [editingDraft, setEditingDraft] = useState<string | null>(null);
   const [editContent, setEditContent] = useState('');
   const [editTags, setEditTags] = useState<NoteTag[]>([]);
+
+  // Indexed lookup so the COPPA backstop on approveDraft / approveAllDrafts
+  // can resolve a draft's swimmerId to its current consent state in O(1).
+  const swimmersById = useMemo(() => {
+    const map = new Map<string, Swimmer>();
+    for (const s of swimmers) {
+      if (s.id) map.set(s.id, s);
+    }
+    return map;
+  }, [swimmers]);
 
   useEffect(() => {
     const unsub = subscribePendingDrafts((d) => {
@@ -49,8 +62,9 @@ function AIReviewScreen() {
     try {
       const content = editingDraft === draft.id ? editContent : undefined;
       const tags = editingDraft === draft.id ? editTags : undefined;
+      const swimmer = swimmersById.get(draft.swimmerId);
 
-      await approveDraft(draft.sessionId, draft.id, draft, coach.uid, content, tags);
+      await approveDraft(draft.sessionId, draft.id, draft, coach.uid, content, tags, swimmer);
       await checkAndCompleteSession(draft.sessionId);
       notifySuccess();
       setEditingDraft(null);
@@ -99,7 +113,7 @@ function AIReviewScreen() {
         onPress: async () => {
           setLoading(true);
           try {
-            await approveAllDrafts(drafts, coach.uid, coach.displayName || 'Unknown');
+            await approveAllDrafts(drafts, coach.uid, coach.displayName || 'Unknown', swimmersById);
             // Check all unique sessions
             const sessionIds = [...new Set(drafts.map((d) => d.sessionId))];
             for (const sid of sessionIds) {

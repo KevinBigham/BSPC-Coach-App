@@ -114,6 +114,7 @@ function VideoScreen() {
         practiceDate,
         selectedSwimmerIds,
         (selectedGroup as Group) || undefined,
+        swimmersWithIds,
       );
 
       const networkState = await NetInfo.fetch();
