@@ -15,6 +15,7 @@
 
 import type { SDIFParseResult } from './sdifImport';
 import { parseSwimTimeString } from '../utils/time';
+import { logger } from '../utils/logger';
 
 // Hy-Tek event code mapping
 // HY3 encodes events as numeric codes
@@ -157,7 +158,11 @@ export function parseHY3(content: string): SDIFParseResult {
           gender,
         });
       }
-    } catch {
+    } catch (err) {
+      logger.warn('hy3Import:parseHY3:lineParseFail', {
+        error: String(err),
+        line: i + 1,
+      });
       result.errors.push(`Line ${i + 1}: Parse error`);
     }
   }

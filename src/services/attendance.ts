@@ -16,6 +16,7 @@ import { db } from '../config/firebase';
 import type { Swimmer, AttendanceRecord, AttendanceStatus } from '../types/firestore.types';
 import type { Coach } from '../types/firestore.types';
 import { BatchPartialFailureError } from '../utils/batchError';
+import { logger } from '../utils/logger';
 
 type AttendanceWithId = AttendanceRecord & { id: string };
 type SwimmerWithId = Swimmer & { id: string };
@@ -110,6 +111,12 @@ export async function batchCheckIn(
       await batch.commit();
       committedItemCount += chunk.length;
     } catch (cause) {
+      logger.error('attendance:batchCheckIn:fail', {
+        error: String(cause),
+        failedChunkIndex: Math.floor(i / chunkSize),
+        committedItemCount,
+        remainingItemCount: swimmers.length - committedItemCount,
+      });
       throw new BatchPartialFailureError({
         committedItemCount,
         failedChunkIndex: Math.floor(i / chunkSize),

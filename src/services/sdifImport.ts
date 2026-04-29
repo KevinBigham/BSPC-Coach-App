@@ -1,5 +1,6 @@
 import { parseSwimTimeString } from '../utils/time';
 import type { SDIFParseResult } from './meetImportTypes';
+import { logger } from '../utils/logger';
 
 // Re-export shared meet-import types so existing callers can continue to
 // import them from this module. The canonical definitions live in
@@ -114,6 +115,10 @@ export function parseSDIF(content: string): SDIFParseResult {
         });
       }
     } catch (err) {
+      logger.warn('sdifImport:parseSDIF:lineParseFail', {
+        error: String(err),
+        line: i + 1,
+      });
       result.errors.push(`Line ${i + 1}: Parse error`);
     }
   }

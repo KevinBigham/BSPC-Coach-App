@@ -16,6 +16,7 @@ import { db } from '../config/firebase';
 import type { Meet, MeetEntry, Relay, PsychSheetEntry } from '../types/meet.types';
 import { formatTime } from '../data/timeStandards';
 import { BatchPartialFailureError } from '../utils/batchError';
+import { logger } from '../utils/logger';
 
 type MeetWithId = Meet & { id: string };
 type EntryWithId = MeetEntry & { id: string };
@@ -160,6 +161,13 @@ export async function addEntriesBatch(
       await batch.commit();
       committedItemCount += chunk.length;
     } catch (cause) {
+      logger.error('meets:addEntriesBatch:fail', {
+        error: String(cause),
+        meetId,
+        failedChunkIndex: Math.floor(i / batchSize),
+        committedItemCount,
+        remainingItemCount: entries.length - committedItemCount,
+      });
       throw new BatchPartialFailureError({
         committedItemCount,
         failedChunkIndex: Math.floor(i / batchSize),

@@ -39,7 +39,7 @@ export async function deleteProfilePhoto(swimmerId: string): Promise<void> {
   try {
     await deleteObject(ref(storage, storagePath));
   } catch {
-    // File may not exist in storage — continue to clear the field
+    // Intentionally not logged: missing storage object still needs the profile field cleared.
   }
   await updateDoc(doc(db, 'swimmers', swimmerId), {
     profilePhotoUrl: null,

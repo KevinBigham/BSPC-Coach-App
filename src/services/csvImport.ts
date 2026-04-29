@@ -2,6 +2,7 @@ import { collection, query, getDocs, writeBatch, doc, serverTimestamp } from 'fi
 import { db } from '../config/firebase';
 import { GROUPS } from '../config/constants';
 import { createImportJob, updateImportJob } from './importJobs';
+import { logger } from '../utils/logger';
 
 const CSV_IMPORT_FILE_NAME = 'pasted-roster.csv';
 const CSV_IMPORT_STORAGE_PATH = 'manual/pasted-roster.csv';
@@ -208,6 +209,11 @@ export async function importSwimmers(rows: ParsedRow[], coachUid: string): Promi
       try {
         await batch.commit();
       } catch (err: unknown) {
+        logger.error('csvImport:importSwimmers:batchCommitFail', {
+          error: String(err),
+          created,
+          skipped,
+        });
         errors.push(`Batch error: ${err instanceof Error ? err.message : String(err)}`);
       }
     }
@@ -226,6 +232,10 @@ export async function importSwimmers(rows: ParsedRow[], coachUid: string): Promi
     return { created, skipped, errors };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Import failed';
+    logger.error('csvImport:importSwimmers:fail', {
+      error: String(error),
+      recordsProcessed: rows.length,
+    });
     await updateImportJob(importJobId, {
       status: 'failed',
       errorMessage,

@@ -18,6 +18,7 @@ import { db } from '../config/firebase';
 import type { Swimmer, SwimTime } from '../types/firestore.types';
 import type { SDIFRecord, MatchResult, ImportResult } from './meetImportTypes';
 import { createImportJob, updateImportJob } from './importJobs';
+import { logger } from '../utils/logger';
 
 type SwimmerWithId = Swimmer & { id: string };
 type ImportSource = 'sdif_import' | 'hy3_import';
@@ -156,6 +157,10 @@ export async function importMatchedResults(
         try {
           await batch.commit();
         } catch (err: unknown) {
+          logger.error('meetResultsImport:importMatchedResults:batchCommitFail', {
+            error: String(err),
+            swimmerId,
+          });
           result.errors.push(
             `Batch write failed for swimmer ${swimmerId}: ${err instanceof Error ? err.message : String(err)}`,
           );
@@ -183,6 +188,11 @@ export async function importMatchedResults(
             }
           }
         } catch (err: unknown) {
+          logger.error('meetResultsImport:importMatchedResults:meetEntryUpdateFail', {
+            error: String(err),
+            meetId,
+            swimmerId,
+          });
           result.errors.push(
             `Meet entry update failed: ${err instanceof Error ? err.message : String(err)}`,
           );
@@ -204,6 +214,11 @@ export async function importMatchedResults(
     return result;
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Meet import failed';
+    logger.error('meetResultsImport:importMatchedResults:fail', {
+      error: String(error),
+      recordsProcessed: matches.length,
+      imported: result.imported,
+    });
     await updateImportJob(importJobId, {
       status: 'failed',
       errorMessage,

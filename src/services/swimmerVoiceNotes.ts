@@ -15,6 +15,7 @@ import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../config/firebase';
 import { addNote } from './notes';
 import type { QueuedSwimmerVoiceNoteUpload, SwimmerVoiceNote } from '../types/voiceNote';
+import { logger } from '../utils/logger';
 
 const QUEUE_KEY = '@bspc/swimmer-voice-note-queue';
 const MAX_RETRIES = 3;
@@ -40,7 +41,8 @@ async function readQueue(): Promise<QueuedSwimmerVoiceNoteUpload[]> {
   try {
     const raw = await AsyncStorage.getItem(QUEUE_KEY);
     return raw ? (JSON.parse(raw) as QueuedSwimmerVoiceNoteUpload[]) : [];
-  } catch {
+  } catch (err) {
+    logger.warn('swimmerVoiceNotes:readQueue:fail', { error: String(err) });
     return [];
   }
 }
@@ -188,7 +190,12 @@ export async function flushQueuedSwimmerVoiceNotes(
     try {
       await processItem(item);
       processed++;
-    } catch {
+    } catch (err) {
+      logger.warn('swimmerVoiceNotes:flushQueuedSwimmerVoiceNotes:itemFail', {
+        error: String(err),
+        noteId: item.noteId,
+        retryCount: item.retryCount + 1,
+      });
       item.retryCount += 1;
       failed++;
       if (item.retryCount < MAX_RETRIES) {
