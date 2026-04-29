@@ -131,3 +131,32 @@
   - Detox / Maestro E2E coverage (`e2e/maestro/` exists with stub flows).
   - Service-layer logger audit on long-tail services (Wave-1 P4 covered the high-traffic set).
   - Nested sub-component extraction in `app/swimmer/[id].tsx` and `app/(tabs)/practice.tsx` if deeper screen reduction becomes desired.
+
+## 2026-04-29 — Sprint-NEXT-Pivot-Features (`codex/sprint-next-pivot-features`, with reviewer fix)
+
+- Baseline: `1192108` on `main` (post Wave-2 merge). Pre-sprint corpus: 998 / 100 client + 111 / 18 functions.
+- Three commits stacked:
+  - **P1** (`0c7e544`) — `refactor(notifications): share rule evaluation helpers`. Extracted `ruleAppliesToSwimmer`, `evaluateAttendanceStreakCount`, `evaluateMissedPracticeGap`, and `evaluateMissedPractice` into `src/utils/notificationRules/evaluation.ts`. Both client and Cloud Functions now import from the same module. Pure helper test at `src/utils/notificationRules/__tests__/evaluation.test.ts`.
+  - **P2** (`14cf5e4`) — `feat(workouts): add public plan sharing MVP`. Added `public?: boolean` to PracticePlan; added `subscribePublicWorkouts` and `setPlanPublicStatus` services; tightened `firestore.rules` for `/practice_plans` (read = owner-or-public; create/update/delete = owner-only with coachId protection); added 4 composite indexes; new browse screen at `app/practice/browse.tsx` (364 lines); publish toggle on `app/practice/builder.tsx`; entry-point button on `(tabs)/practice.tsx`.
+  - **Reviewer fix** (`c3655d7`) — `fix(workouts): scope subscribeWorkouts + searchWorkouts to coachId for new rule`. The new Firestore rule rejects queries that don't structurally filter on `coachId` or `public`. Codex's P2 missed `subscribeWorkouts` (used by `app/practice/library.tsx`, reachable from `_layout`, the practice tab, and the more menu) and `searchWorkouts`. Without this fix the deploy would have hit permission-denied. Added the missing filter, regression tests, and 2 composite indexes for the (isTemplate, coachId, ...) query shape. Library now scopes to "my templates"; the new browse screen scopes to "public templates."
+- P1 honest finding: client and Cloud Functions had a real semantic divergence on missed-practice — client treated missing attendance as "matching" while the Cloud Function treated it as "no gap." Codex preserved both as distinct exports (`evaluateMissedPractice` and `evaluateMissedPracticeGap`) with tests pinning each behavior. Future audit can decide which surface should change.
+- P1 architectural note: Codex chose a filesystem symlink at `functions/src/utils/notificationRules/evaluation.ts` → `src/utils/notificationRules/evaluation.ts` plus `preserveSymlinks: true` and `rootDir: "src"` in `functions/tsconfig.json`. Works on Mac and clean tsc compile, but symlinks are brittle cross-platform (Windows requires admin, some CI pipelines strip them). Worth a follow-up to either copy + sync, monorepo workspaces, or a path alias.
+- Test corpus deltas:
+  - Client: 998 / 100 → **1023 / 102**.
+  - Functions: 111 / 18 unchanged.
+  - Combined: 1109 / 118 → **1134 / 120**.
+- Validation:
+  - `npm test -- --runInBand`: 1023 / 102 in ~4s.
+  - `cd functions && npm test -- --runInBand`: 111 / 18.
+  - `npm run typecheck`: passed.
+  - `npm run lint`: 0 errors, 181 pre-existing warnings (was 183; reviewer fix removed 2 unused imports via eslint --fix).
+  - `cd functions && npm run build`: passed.
+- **Original 10-list is now fully closed.** 7 items done in Waves 1+2, 2 done in Wave 3, 1 stale-found-done during reviews:
+  - #1 Trigger tests (Wave 1 P1) · #2 useDashboardData test (Wave 1 P2) · #3 batchCheckIn recovery (pre-Wave 1; stale note) · #4 COPPA mandatory (Wave 1 P3) · #5 swimmer/[id].tsx hook (Wave 2 P1) · #6 practice.tsx hook (Wave 2 P2) · #7 DRY notification rules (Wave 3 P1) · #8 Service logger audit (Wave 1 P4) · #9 Workout sharing MVP (Wave 3 P2 + reviewer fix) · #10 Deep linking (stale-found-done).
+- Loose-ends still open (carried forward):
+  - Symlink mechanism in `functions/src/utils/notificationRules/` (architectural follow-up, low urgency).
+  - Detox / Maestro E2E coverage (`e2e/maestro/` exists with stub flows).
+  - Service-layer logger audit on long-tail services.
+  - Nested sub-component extraction in `app/swimmer/[id].tsx` and `app/(tabs)/practice.tsx` if deeper screen reduction becomes desired.
+  - Resolving the missed-practice semantic divergence preserved by P1.
+- Deploy reminder: Firestore rules + composite indexes must deploy together. The branch's `firestore.rules` AND `firestore.indexes.json` changes are bundled in the same deploy unit — verify the firebase CLI step covers both before pushing rules to production.

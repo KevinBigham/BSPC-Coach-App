@@ -75,3 +75,17 @@
 - Validation: `npm test`, `npm run typecheck`, `npm run lint` — all pass (lint 0 errors, 183 pre-existing warnings).
 - No schema, time-precision, deployment, or UI behavior changes.
 - Confirmed already complete during review: deep-link handlers (`app/_layout.tsx:120-140` + `src/utils/deepLinking.ts` + its 96-line test). Original audit note flagging this as "future work" was stale.
+
+## 2026-04-29 — Sprint-NEXT-Pivot-Features
+
+- Branch `codex/sprint-next-pivot-features` stacked on `1192108` (main, post Wave-2). Three commits:
+  - `0c7e544` — `refactor(notifications): share rule evaluation helpers`
+  - `14cf5e4` — `feat(workouts): add public plan sharing MVP`
+  - `c3655d7` — `fix(workouts): scope subscribeWorkouts + searchWorkouts to coachId for new rule` (reviewer)
+- **P1** Single source of truth for notification-rule evaluation. `ruleAppliesToSwimmer`, `evaluateAttendanceStreakCount`, `evaluateMissedPracticeGap`, and `evaluateMissedPractice` now live in `src/utils/notificationRules/evaluation.ts`. Both the client service and the Cloud Function trigger import from the same module via a symlink at `functions/src/utils/notificationRules/evaluation.ts` (with `preserveSymlinks: true` in functions/tsconfig.json). New shared test suite covers each helper. One real semantic divergence between client and functions on missed-practice surfaced and was preserved as two distinct exports.
+- **P2** Workout sharing MVP. `PracticePlan.public?: boolean` flag, `subscribePublicWorkouts` and `setPlanPublicStatus` services, tightened `firestore.rules` (read = owner-or-public; create/update/delete = owner-only with coachId protection), 4 composite indexes, browse screen at `app/practice/browse.tsx`, publish toggle on the plan builder, library entry-point button on the practice tab.
+- **Reviewer fix** caught a deploy-blocking gap: the new rule's structural filtering requirement rejects `subscribeWorkouts`/`searchWorkouts` queries that don't filter on `coachId` or `public`. Added optional `coachId` filter to both, wired `app/practice/library.tsx` to always pass the current coach's uid, and added 2 more composite indexes for the (isTemplate, coachId, ...) query shape. Library = "my templates"; browse = "public templates."
+- Test corpus: client 998 → **1023** / 100 → **102 suites**. Functions unchanged. Combined **1134 / 120**.
+- Validation: `npm test`, `cd functions && npm test`, `npm run typecheck`, `cd functions && npm run build`, `npm run lint` — all pass (lint 0 errors, 181 pre-existing warnings).
+- **Original 10-list is now fully closed.** 7 items done in Waves 1+2, 2 done in Wave 3, 1 stale-found-done during reviews.
+- Architectural follow-up flagged for a future sprint: replace the symlink in functions/src/utils/notificationRules/ with a more portable mechanism (copy + sync, monorepo workspaces, or path alias).
