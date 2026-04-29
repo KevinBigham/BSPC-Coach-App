@@ -1,5 +1,10 @@
 import { onDocumentWritten } from 'firebase-functions/v2/firestore';
 import * as admin from 'firebase-admin';
+import {
+  evaluateAttendanceStreakCount,
+  evaluateMissedPracticeGap,
+  ruleAppliesToSwimmer,
+} from '../utils/notificationRules/evaluation';
 
 if (!admin.apps.length) {
   admin.initializeApp();
@@ -32,51 +37,6 @@ interface NotificationRuleData {
 
 function uniquePracticeDates(values: string[]): string[] {
   return [...new Set(values.filter(Boolean))];
-}
-
-function evaluateAttendanceStreakCount(
-  practiceHistory: string[],
-  allPracticeDates: string[],
-): number {
-  if (allPracticeDates.length === 0 || practiceHistory.length === 0) {
-    return 0;
-  }
-
-  const attendedSet = new Set(practiceHistory);
-  let streak = 0;
-
-  for (const date of allPracticeDates) {
-    if (!attendedSet.has(date)) {
-      break;
-    }
-
-    streak += 1;
-  }
-
-  return streak;
-}
-
-function evaluateMissedPracticeGap(
-  lastAttendedDate: string | null,
-  currentDate: string,
-  daysSince: number,
-): boolean {
-  // No prior attendance means no baseline to measure a gap from — a swimmer's
-  // first attendance record cannot have "missed" a prior practice.
-  if (lastAttendedDate === null) {
-    return false;
-  }
-
-  if (daysSince <= 0) {
-    return false;
-  }
-
-  const last = new Date(lastAttendedDate);
-  const current = new Date(currentDate);
-  const diffMs = current.getTime() - last.getTime();
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-  return diffDays >= daysSince;
 }
 
 function buildNotificationId(ruleId: string, swimmerId: string, evalDate: string): string {
@@ -140,10 +100,12 @@ export async function evaluateRulesForAttendance(attendance: AttendanceEventData
     const rule = ruleDoc.data() as NotificationRuleData;
     const threshold = Math.max(rule.config?.threshold ?? 1, 1);
 
-    // A group-bound rule must only fire when the attendance record's group
-    // matches. A missing attendance.group is treated as a non-match so legacy
-    // or hand-edited records cannot leak through a group filter.
-    if (rule.config?.group && rule.config.group !== attendance.group) {
+    if (
+      !ruleAppliesToSwimmer(
+        { enabled: rule.enabled, config: rule.config },
+        { group: attendance.group },
+      )
+    ) {
       continue;
     }
 

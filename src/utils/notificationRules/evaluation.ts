@@ -1,0 +1,110 @@
+const MS_PER_DAY = 1000 * 60 * 60 * 24;
+
+export interface RuleEvaluationInput {
+  enabled: boolean;
+  config?: {
+    group?: string | null;
+  } | null;
+}
+
+export interface SwimmerEvaluationInput {
+  group?: string | null;
+}
+
+/**
+ * Returns whether a notification rule is eligible for a swimmer based only on
+ * rule enablement and optional group targeting. Missing rule group values are
+ * treated as unscoped rules; missing swimmer groups cannot match group-scoped
+ * rules.
+ */
+export function ruleAppliesToSwimmer(
+  rule: RuleEvaluationInput,
+  swimmer: SwimmerEvaluationInput,
+): boolean {
+  if (!rule.enabled) {
+    return false;
+  }
+
+  const ruleGroup = rule.config?.group;
+  if (ruleGroup === undefined || ruleGroup === null) {
+    return true;
+  }
+
+  return ruleGroup === swimmer.group;
+}
+
+/**
+ * Counts the swimmer's current attendance streak from descending YYYY-MM-DD
+ * practice date arrays. Counting stops at the first practice date absent from
+ * the swimmer's attendance history.
+ */
+export function evaluateAttendanceStreakCount(
+  practiceHistory: string[],
+  allPracticeDates: string[],
+): number {
+  if (allPracticeDates.length === 0 || practiceHistory.length === 0) {
+    return 0;
+  }
+
+  const attendedSet = new Set(practiceHistory);
+  let streak = 0;
+
+  for (const date of allPracticeDates) {
+    if (!attendedSet.has(date)) {
+      break;
+    }
+
+    streak += 1;
+  }
+
+  return streak;
+}
+
+/**
+ * Legacy client-facing name for attendance-streak counting. Both inputs are
+ * descending YYYY-MM-DD date arrays.
+ */
+export const evaluateAttendanceStreak = evaluateAttendanceStreakCount;
+
+/**
+ * Returns whether the gap between the prior attendance date and current
+ * practice date is at least `daysSince`. A missing prior date returns false
+ * because Cloud Functions notification firing has no baseline for a gap.
+ */
+export function evaluateMissedPracticeGap(
+  lastAttendedDate: string | null | undefined,
+  currentDate: string,
+  daysSince: number,
+): boolean {
+  if (lastAttendedDate == null) {
+    return false;
+  }
+
+  if (daysSince <= 0) {
+    return false;
+  }
+
+  const last = new Date(lastAttendedDate);
+  const current = new Date(currentDate);
+  const diffMs = current.getTime() - last.getTime();
+  const diffDays = Math.floor(diffMs / MS_PER_DAY);
+
+  return diffDays >= daysSince;
+}
+
+/**
+ * Legacy client helper for missed-practice display logic. Unlike notification
+ * firing, a swimmer with no prior attendance is considered missed so existing
+ * client behavior and critical-op tests remain stable.
+ */
+export function evaluateMissedPractice(
+  lastAttendedDate: string | null | undefined,
+  currentDate: string,
+  daysSince: number,
+): boolean {
+  if (lastAttendedDate == null) {
+    return true;
+  }
+
+  return evaluateMissedPracticeGap(lastAttendedDate, currentDate, daysSince);
+}

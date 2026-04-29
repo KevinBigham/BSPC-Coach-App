@@ -12,8 +12,15 @@ import {
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import type { NotificationRule } from '../types/firestore.types';
+import {
+  evaluateAttendanceStreak,
+  evaluateMissedPractice,
+  ruleAppliesToSwimmer,
+} from '../utils/notificationRules/evaluation';
 
 type NotificationRuleWithId = NotificationRule & { id: string };
+
+export { evaluateAttendanceStreak, evaluateMissedPractice, ruleAppliesToSwimmer };
 
 export function subscribeNotificationRules(
   coachId: string,
@@ -52,67 +59,4 @@ export async function updateNotificationRule(
 
 export async function deleteNotificationRule(ruleId: string): Promise<void> {
   await deleteDoc(doc(db, 'notification_rules', ruleId));
-}
-
-/**
- * True when the rule should fire for the given swimmer. A rule with no
- * `config.group` matches every swimmer; a group-bound rule matches only when
- * the swimmer's group equals `config.group`. Disabled rules never apply.
- */
-export function ruleAppliesToSwimmer(
-  rule: Pick<NotificationRule, 'enabled' | 'config'>,
-  swimmer: { group: NotificationRule['config']['group'] },
-): boolean {
-  if (!rule.enabled) {
-    return false;
-  }
-  if (rule.config.group === undefined) {
-    return true;
-  }
-  return rule.config.group === swimmer.group;
-}
-
-/** Both inputs are "YYYY-MM-DD" arrays in descending order. */
-export function evaluateAttendanceStreak(
-  practiceHistory: string[],
-  allPracticeDates: string[],
-): number {
-  if (allPracticeDates.length === 0 || practiceHistory.length === 0) {
-    return 0;
-  }
-
-  const attendedSet = new Set(practiceHistory);
-  let streak = 0;
-
-  for (const date of allPracticeDates) {
-    if (attendedSet.has(date)) {
-      streak++;
-    } else {
-      break;
-    }
-  }
-
-  return streak;
-}
-
-/** True when the swimmer has been absent for >= daysSince days. Dates are "YYYY-MM-DD"; lastAttended null = never. */
-export function evaluateMissedPractice(
-  lastAttendedDate: string | null,
-  currentDate: string,
-  daysSince: number,
-): boolean {
-  if (lastAttendedDate === null) {
-    return true;
-  }
-
-  if (daysSince <= 0) {
-    return false;
-  }
-
-  const last = new Date(lastAttendedDate);
-  const current = new Date(currentDate);
-  const diffMs = current.getTime() - last.getTime();
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-  return diffDays >= daysSince;
 }
