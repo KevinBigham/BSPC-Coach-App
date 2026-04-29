@@ -61,3 +61,17 @@
 - Validation: `npm test`, `npm --prefix functions test`, `npm run typecheck`, `npm run lint` — all pass (lint reports 0 errors, 183 pre-existing warnings).
 - No schema, time-precision, deployment, or UI behavior changes.
 - Stale loose-ends flipped on review: `attendance.batchCheckIn` recovery (closed by `549d664` last sprint) and LCM / SCM standards (closed by `d9da52e` last sprint). The prior status entry's loose-ends list pre-dated those commits.
+
+## 2026-04-29 — Sprint-NEXT-GodScreen-Wave2
+
+- Branch `codex/sprint-next-godscreen-wave2` stacked on `fdf0d54`. Two commits:
+  - `b4fb304` — `refactor(swimmer): extract useSwimmerData hook`
+  - `8ca77d0` — `refactor(practice): extract usePracticeData hook`
+- **P1** Pulled the swimmer profile data layer (5 Firestore subscriptions + 2 derivations + loading) behind `useSwimmerData(swimmerId)` at `src/hooks/useSwimmerData.ts`. New test suite at `src/hooks/__tests__/useSwimmerData.test.ts` covers each subscription, the loading transition, and unsubscribe-on-unmount. Screen reduced 1812 → 1748.
+- **P2** Pulled the practice screen data layer (practice-plan + group-note subscriptions) behind `usePracticeData()` at `src/hooks/usePracticeData.ts`. New test suite covers both subscriptions and lifecycle. Zustand practice store stays on the screen — it owns builder draft/undo lifecycle, not subscribed list data. Screen reduced 996 → 973.
+- Behavior preserved byte-for-byte: same queries, same `limit(50)` cap, same loading transition timing.
+- Honest sizing note: the screens did not reach the handoff's 600-800 / 450-600 line targets because the screens are dominated by **nested sub-components + StyleSheets**, not data-layer code. The data layers were ~70 / ~25 lines and Codex extracted all of it. Further reduction requires sub-component extraction, deferred to a future sprint.
+- Test corpus: client 986 → **998** / 98 → **100 suites**. Functions unchanged. Combined **1109 / 118**.
+- Validation: `npm test`, `npm run typecheck`, `npm run lint` — all pass (lint 0 errors, 183 pre-existing warnings).
+- No schema, time-precision, deployment, or UI behavior changes.
+- Confirmed already complete during review: deep-link handlers (`app/_layout.tsx:120-140` + `src/utils/deepLinking.ts` + its 96-line test). Original audit note flagging this as "future work" was stale.

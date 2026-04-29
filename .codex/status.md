@@ -108,3 +108,26 @@
   - P4 `logger.error` calls now surface expected console output from tests that intentionally exercise error paths — purely cosmetic, no test failures.
   - P3 fails fast if a draft references a swimmer no longer in the roster (e.g., a stale draft after a swimmer was removed). The UI guard turns that into a coach-friendly toast; the service-layer error message uses technical language. Not a blocker.
 - `functions/package.json` has no `lint` script (pre-existing). Functions lint is currently de facto delegated to typecheck + the build step.
+
+## 2026-04-29 — Sprint-NEXT-GodScreen-Wave2 (`codex/sprint-next-godscreen-wave2`)
+
+- Baseline: `fdf0d54` (wave-1 stack tip). Pre-sprint corpus: 986 / 98 client + 111 / 18 functions = 1097 / 116 combined.
+- Two parallel screen refactors mirroring the Wave-1 `useDashboardData` pattern:
+  - **P1** (`b4fb304`) — `app/swimmer/[id].tsx` 1812 → 1748. Extracted 5 subscriptions (swimmer doc, notes, times, attendance, goals) + 2 derivations (`prCount`, `todayAttendance`) into `src/hooks/useSwimmerData.ts` (117 lines). Test suite at `src/hooks/__tests__/useSwimmerData.test.ts` (313 lines, 8 cases). Behavior preserved: same queries, same `limit(50)`, loading flips false on swimmer-doc resolve.
+  - **P2** (`8ca77d0`) — `app/(tabs)/practice.tsx` 996 → 973. Extracted both subscriptions (practice plans, group notes) into `src/hooks/usePracticeData.ts` (45 lines). Test suite at `src/hooks/__tests__/usePracticeData.test.ts` (124 lines, 4 cases). Zustand `usePracticeStore` correctly stayed on the screen with an inline comment ("builder draft/undo lifecycle, not subscribed list data").
+- Test corpus deltas:
+  - Client: 986 / 98 → **998 / 100**.
+  - Functions: 111 / 18 unchanged.
+  - Combined: 1097 / 116 → **1109 / 118**.
+- Validation:
+  - `npm test -- --runInBand`: 998 / 100 in ~5s.
+  - `npm run typecheck`: passed.
+  - `npm run lint`: 0 errors, 183 pre-existing warnings.
+- Honest note on screen line counts: the Wave-2 handoff acceptance criteria of 600-800 / 450-600 lines were overoptimistic. The data layers were ~70 / ~25 lines respectively, and Codex extracted all of it. The remaining bulk is **nested sub-components + StyleSheets**, which the explicit "don't refactor nested sub-components" scope rule excluded. Structural goal (testable data layer, isolated subscriber orchestration) was fully met.
+- Original 10-list status after this sprint: **7 done, 2 actionable, 1 stale-found-done**. The stale-found-done item is deep-link handlers — confirmed already complete in `app/_layout.tsx:120-140` + `src/utils/deepLinking.ts` + its 96-line test file at `src/utils/__tests__/deepLinking.test.ts`. Original audit note was wrong.
+- Loose-ends still open:
+  - DRY notification-rule split (`src/services/notificationRules.ts` 118 lines vs `functions/src/triggers/evaluateNotificationRules.ts` 207 lines).
+  - Workout sharing MVP (`public` flag, Firestore rule, discovery query, browse screen, publish toggle).
+  - Detox / Maestro E2E coverage (`e2e/maestro/` exists with stub flows).
+  - Service-layer logger audit on long-tail services (Wave-1 P4 covered the high-traffic set).
+  - Nested sub-component extraction in `app/swimmer/[id].tsx` and `app/(tabs)/practice.tsx` if deeper screen reduction becomes desired.
