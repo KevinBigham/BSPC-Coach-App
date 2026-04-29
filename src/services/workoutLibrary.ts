@@ -31,6 +31,13 @@ export interface WorkoutFilters {
   minYardage?: number;
   maxYardage?: number;
   tags?: string[];
+  /**
+   * Restrict to plans owned by this coach. REQUIRED at production call
+   * sites to satisfy the practice_plans Firestore rule:
+   *   allow read: resource.data.public == true || resource.data.coachId == request.auth.uid
+   * For public discovery, use subscribePublicWorkouts instead.
+   */
+  coachId?: string;
 }
 
 export function subscribeWorkouts(
@@ -38,6 +45,9 @@ export function subscribeWorkouts(
   callback: (workouts: (PracticePlan & { id: string })[]) => void,
 ): Unsubscribe {
   const constraints = [where('isTemplate', '==', true)];
+  if (filters.coachId) {
+    constraints.push(where('coachId', '==', filters.coachId));
+  }
   if (filters.group) {
     constraints.push(where('group', '==', filters.group));
   }
@@ -123,15 +133,20 @@ export async function rateWorkout(
   });
 }
 
-/** Fetches all templates then filters client-side — Firestore has no full-text search. */
+/**
+ * Fetches templates then filters client-side — Firestore has no full-text search.
+ * Pass `coachId` to scope to the caller's own templates (REQUIRED in production
+ * to satisfy the practice_plans Firestore rule).
+ */
 export async function searchWorkouts(
   searchText: string,
+  coachId?: string,
 ): Promise<(PracticePlan & { id: string })[]> {
-  const q = query(
-    collection(db, 'practice_plans'),
-    where('isTemplate', '==', true),
-    orderBy('createdAt', 'desc'),
-  );
+  const constraints = [where('isTemplate', '==', true)];
+  if (coachId) {
+    constraints.push(where('coachId', '==', coachId));
+  }
+  const q = query(collection(db, 'practice_plans'), ...constraints, orderBy('createdAt', 'desc'));
   const snap = await getDocs(q);
   const lower = searchText.toLowerCase();
 

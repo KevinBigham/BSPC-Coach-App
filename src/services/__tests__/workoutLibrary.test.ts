@@ -119,6 +119,12 @@ describe('searchWorkouts', () => {
     const results = await searchWorkouts('zzzzz');
     expect(results).toHaveLength(0);
   });
+
+  it('adds coachId filter when supplied — required in production for the practice_plans rule', async () => {
+    firestore.getDocs.mockResolvedValue({ docs: [] });
+    await searchWorkouts('foo', 'coach-456');
+    expect(firestore.where).toHaveBeenCalledWith('coachId', '==', 'coach-456');
+  });
 });
 
 describe('subscribeWorkouts', () => {
@@ -133,6 +139,12 @@ describe('subscribeWorkouts', () => {
     const cb = jest.fn();
     subscribeWorkouts({ group: 'Gold' as Group }, cb);
     expect(firestore.where).toHaveBeenCalledWith('group', '==', 'Gold');
+  });
+
+  it('adds coachId filter when specified — required in production for the practice_plans rule', () => {
+    const cb = jest.fn();
+    subscribeWorkouts({ coachId: 'coach-123' }, cb);
+    expect(firestore.where).toHaveBeenCalledWith('coachId', '==', 'coach-123');
   });
 });
 

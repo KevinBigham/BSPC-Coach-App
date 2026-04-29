@@ -12,18 +12,19 @@ import { Stack, router } from 'expo-router';
 import {
   subscribeWorkouts,
   searchWorkouts,
-  WORKOUT_FOCUSES,
-  type WorkoutFocus,
   type WorkoutFilters,
 } from '../../src/services/workoutLibrary';
 import { calculateTotalYardage } from '../../src/services/practicePlans';
 import { usePracticeStore } from '../../src/stores/practiceStore';
+import { useAuth } from '../../src/contexts/AuthContext';
 import type { PracticePlan } from '../../src/types/firestore.types';
 import { colors, spacing, fontSize, borderRadius, fontFamily } from '../../src/config/theme';
 import { GROUPS, type Group } from '../../src/config/constants';
 import { withScreenErrorBoundary } from '../../src/components/ScreenErrorBoundary';
 
 function WorkoutLibraryScreen() {
+  const { coach } = useAuth();
+  const coachId = coach?.uid;
   const [workouts, setWorkouts] = useState<(PracticePlan & { id: string })[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchText, setSearchText] = useState('');
@@ -31,8 +32,14 @@ function WorkoutLibraryScreen() {
   const store = usePracticeStore();
 
   useEffect(() => {
+    if (!coachId) {
+      setWorkouts([]);
+      setLoading(false);
+      return undefined;
+    }
+
     setLoading(true);
-    const filters: WorkoutFilters = {};
+    const filters: WorkoutFilters = { coachId };
     if (filterGroup) filters.group = filterGroup;
 
     const unsub = subscribeWorkouts(filters, (data) => {
@@ -40,12 +47,12 @@ function WorkoutLibraryScreen() {
       setLoading(false);
     });
     return unsub;
-  }, [filterGroup]);
+  }, [filterGroup, coachId]);
 
   const handleSearch = async () => {
-    if (!searchText.trim()) return;
+    if (!searchText.trim() || !coachId) return;
     setLoading(true);
-    const results = await searchWorkouts(searchText.trim());
+    const results = await searchWorkouts(searchText.trim(), coachId);
     setWorkouts(results);
     setLoading(false);
   };

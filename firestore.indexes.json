@@ -83,6 +83,25 @@
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "isTemplate", "order": "ASCENDING" },
+        { "fieldPath": "coachId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "practice_plans",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "isTemplate", "order": "ASCENDING" },
+        { "fieldPath": "coachId", "order": "ASCENDING" },
+        { "fieldPath": "group", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "practice_plans",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "isTemplate", "order": "ASCENDING" },
         { "fieldPath": "public", "order": "ASCENDING" },
         { "fieldPath": "updatedAt", "order": "DESCENDING" }
       ]
