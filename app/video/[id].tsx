@@ -73,6 +73,9 @@ function VideoDetailScreen() {
     setProcessing((prev) => new Set(prev).add(draft.id));
     try {
       const swimmer = swimmers.find((s) => s.id === draft.swimmerId);
+      if (!swimmer) {
+        throw new Error(`Missing roster context for ${draft.swimmerName}`);
+      }
       await approveVideoDraft(id, draft, coach.uid, coach.displayName || 'Coach', swimmer);
       showToast('Observation posted to swimmer profile', 'success');
     } catch (err) {

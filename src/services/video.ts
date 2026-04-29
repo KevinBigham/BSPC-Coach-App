@@ -75,15 +75,18 @@ export async function createVideoSession(
   duration: number,
   practiceDate: string,
   taggedSwimmerIds: string[],
-  group?: Group,
-  swimmers?: Array<Swimmer & { id: string }>,
+  group: Group | undefined,
+  swimmers: Array<Swimmer & { id: string }>,
 ): Promise<string> {
-  // COPPA gate: when the caller supplies the roster, refuse to persist a
-  // session whose tagged swimmers fail the media-consent check. UI is still
-  // authoritative; this is the service-layer backstop.
-  if (swimmers) {
-    assertCanTagSwimmers(taggedSwimmerIds, swimmers);
+  // COPPA gate: roster context is mandatory at this service boundary.
+  for (const swimmerId of taggedSwimmerIds) {
+    if (!swimmers.some((swimmer) => swimmer.id === swimmerId)) {
+      throw new Error(
+        `Cannot create video session: missing roster context for swimmer ${swimmerId}`,
+      );
+    }
   }
+  assertCanTagSwimmers(taggedSwimmerIds, swimmers);
 
   const docRef = await addDoc(collection(db, 'video_sessions'), {
     coachId,

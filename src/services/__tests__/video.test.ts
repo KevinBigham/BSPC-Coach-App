@@ -41,6 +41,7 @@ import {
   getVideoStatusLabel,
   getVideoStatusColor,
 } from '../video';
+import type { Swimmer } from '../../types/firestore.types';
 
 const firestore = require('firebase/firestore');
 const storageModule = require('firebase/storage');
@@ -48,6 +49,55 @@ const storageModule = require('firebase/storage');
 beforeEach(() => {
   jest.clearAllMocks();
 });
+
+const consentedSwimmers: Array<Swimmer & { id: string }> = [
+  {
+    id: 's1',
+    firstName: 'Alice',
+    lastName: 'A',
+    displayName: 'Alice A',
+    dateOfBirth: new Date('2012-01-01T00:00:00Z'),
+    gender: 'F',
+    group: 'Gold',
+    active: true,
+    strengths: [],
+    weaknesses: [],
+    techniqueFocusAreas: [],
+    goals: [],
+    parentContacts: [],
+    meetSchedule: [],
+    mediaConsent: { granted: true, date: new Date('2026-04-01T00:00:00Z') },
+    createdAt: new Date('2026-01-01T00:00:00Z'),
+    updatedAt: new Date('2026-01-01T00:00:00Z'),
+    createdBy: 'coach-1',
+  },
+  {
+    id: 's2',
+    firstName: 'Bob',
+    lastName: 'B',
+    displayName: 'Bob B',
+    dateOfBirth: new Date('2012-01-01T00:00:00Z'),
+    gender: 'M',
+    group: 'Gold',
+    active: true,
+    strengths: [],
+    weaknesses: [],
+    techniqueFocusAreas: [],
+    goals: [],
+    parentContacts: [],
+    meetSchedule: [],
+    mediaConsent: { granted: true, date: new Date('2026-04-01T00:00:00Z') },
+    createdAt: new Date('2026-01-01T00:00:00Z'),
+    updatedAt: new Date('2026-01-01T00:00:00Z'),
+    createdBy: 'coach-1',
+  },
+];
+
+const assertCreateVideoSessionRequiresRosterContext = () => {
+  // @ts-expect-error createVideoSession requires a swimmers roster context argument.
+  void createVideoSession('c1', 'Coach K', 120, '2026-04-01', ['s1'], 'Gold');
+};
+void assertCreateVideoSessionRequiresRosterContext;
 
 describe('subscribeVideoSessions', () => {
   it('calls onSnapshot with correct query for a coach', () => {
@@ -86,7 +136,15 @@ describe('subscribeVideoDrafts', () => {
 
 describe('createVideoSession', () => {
   it('creates a session doc and returns its id', async () => {
-    const id = await createVideoSession('c1', 'Coach K', 120, '2026-04-01', ['s1', 's2'], 'Gold');
+    const id = await createVideoSession(
+      'c1',
+      'Coach K',
+      120,
+      '2026-04-01',
+      ['s1', 's2'],
+      'Gold',
+      consentedSwimmers,
+    );
     expect(id).toBe('new-session-id');
     expect(firestore.addDoc).toHaveBeenCalledWith(
       expect.anything(),
@@ -104,9 +162,18 @@ describe('createVideoSession', () => {
   });
 
   it('defaults group to null when not provided', async () => {
-    await createVideoSession('c1', 'Coach K', 60, '2026-04-02', []);
+    await createVideoSession('c1', 'Coach K', 60, '2026-04-02', [], undefined, []);
     const call = firestore.addDoc.mock.calls[0][1];
     expect(call.group).toBeNull();
+  });
+
+  it('rejects when a tagged swimmer is missing from the roster context', async () => {
+    await expect(
+      createVideoSession('c1', 'Coach K', 120, '2026-04-01', ['s1', 's-missing'], 'Gold', [
+        consentedSwimmers[0],
+      ]),
+    ).rejects.toThrow(/roster context/i);
+    expect(firestore.addDoc).not.toHaveBeenCalled();
   });
 });
 

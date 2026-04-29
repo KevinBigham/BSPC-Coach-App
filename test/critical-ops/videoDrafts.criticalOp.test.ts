@@ -29,10 +29,14 @@ beforeEach(() => {
 
 describe('videoDrafts.approveVideoDraft (critical op)', () => {
   it('happy path: flips draft to approved and writes a video_ai swimmer note', async () => {
-    const swimmer = buildSwimmer({ index: 1, group: 'Gold' });
+    const swimmer = buildSwimmer({
+      index: 1,
+      group: 'Gold',
+      overrides: { mediaConsent: buildMediaConsent({ granted: true }) },
+    });
     const draft = buildVideoDraft({ swimmer, index: 1 });
 
-    await approveVideoDraft('sess-VID-001', draft as never, 'coach-001', 'Coach One');
+    await approveVideoDraft('sess-VID-001', draft as never, 'coach-001', 'Coach One', swimmer);
 
     expect(firestore.updateDoc).toHaveBeenCalledWith(
       expect.objectContaining({ path: 'video_sessions/sess-VID-001/drafts/draft-VID-001' }),
@@ -49,7 +53,11 @@ describe('videoDrafts.approveVideoDraft (critical op)', () => {
   });
 
   it('edge: note content joins observation, diagnosis, and drill with line breaks', async () => {
-    const swimmer = buildSwimmer({ index: 2, group: 'Gold' });
+    const swimmer = buildSwimmer({
+      index: 2,
+      group: 'Gold',
+      overrides: { mediaConsent: buildMediaConsent({ granted: true }) },
+    });
     const draft = buildVideoDraft({
       swimmer,
       index: 2,
@@ -58,7 +66,7 @@ describe('videoDrafts.approveVideoDraft (critical op)', () => {
       drillRecommendation: 'Sculling 4x25',
     });
 
-    await approveVideoDraft('sess-VID-001', draft as never, 'coach-001', 'Coach One');
+    await approveVideoDraft('sess-VID-001', draft as never, 'coach-001', 'Coach One', swimmer);
 
     const noteData = firestore.addDoc.mock.calls[0][1];
     expect(noteData.content).toContain('Late catch');
@@ -67,7 +75,11 @@ describe('videoDrafts.approveVideoDraft (critical op)', () => {
   });
 
   it('edge: omits empty diagnosis/drill lines from the joined note', async () => {
-    const swimmer = buildSwimmer({ index: 3, group: 'Gold' });
+    const swimmer = buildSwimmer({
+      index: 3,
+      group: 'Gold',
+      overrides: { mediaConsent: buildMediaConsent({ granted: true }) },
+    });
     const draft = buildVideoDraft({
       swimmer,
       index: 3,
@@ -76,7 +88,7 @@ describe('videoDrafts.approveVideoDraft (critical op)', () => {
       drillRecommendation: '',
     });
 
-    await approveVideoDraft('sess-VID-001', draft as never, 'coach-001', 'Coach One');
+    await approveVideoDraft('sess-VID-001', draft as never, 'coach-001', 'Coach One', swimmer);
 
     const noteData = firestore.addDoc.mock.calls[0][1];
     expect(noteData.content).toBe('Strong kick');

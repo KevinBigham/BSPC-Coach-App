@@ -20,6 +20,7 @@ jest.mock('firebase/firestore', () => ({
 }));
 
 import { approveVideoDraft, rejectVideoDraft, type VideoDraft } from '../videoDrafts';
+import type { Swimmer } from '../../types/firestore.types';
 
 const firestore = require('firebase/firestore');
 
@@ -41,9 +42,40 @@ const makeDraft = (overrides?: Partial<VideoDraft>): VideoDraft => ({
   ...overrides,
 });
 
+const consentedSwimmer: Swimmer = {
+  firstName: 'Jane',
+  lastName: 'Doe',
+  displayName: 'Jane Doe',
+  dateOfBirth: new Date('2012-01-01T00:00:00Z'),
+  gender: 'F',
+  group: 'Gold',
+  active: true,
+  strengths: [],
+  weaknesses: [],
+  techniqueFocusAreas: [],
+  goals: [],
+  parentContacts: [],
+  meetSchedule: [],
+  mediaConsent: { granted: true, date: new Date('2026-04-01T00:00:00Z') },
+  createdAt: new Date('2026-01-01T00:00:00Z'),
+  updatedAt: new Date('2026-01-01T00:00:00Z'),
+  createdBy: 'coach-1',
+};
+
+const blockedSwimmer: Swimmer = {
+  ...consentedSwimmer,
+  mediaConsent: { granted: false, date: new Date('2026-04-01T00:00:00Z') },
+};
+
+const assertApproveVideoDraftRequiresRosterContext = () => {
+  // @ts-expect-error approveVideoDraft requires a swimmer roster context argument.
+  void approveVideoDraft('session-1', makeDraft(), 'coach-1', 'Coach Kevin');
+};
+void assertApproveVideoDraftRequiresRosterContext;
+
 describe('approveVideoDraft', () => {
   it('marks the draft as approved in Firestore', async () => {
-    await approveVideoDraft('session-1', makeDraft(), 'coach-1', 'Coach Kevin');
+    await approveVideoDraft('session-1', makeDraft(), 'coach-1', 'Coach Kevin', consentedSwimmer);
     expect(firestore.updateDoc).toHaveBeenCalledWith(
       expect.objectContaining({ path: 'video_sessions/session-1/drafts/draft-1' }),
       expect.objectContaining({ approved: true, reviewedBy: 'coach-1' }),
@@ -52,7 +84,7 @@ describe('approveVideoDraft', () => {
 
   it('creates a swimmer note from the draft content', async () => {
     const draft = makeDraft();
-    await approveVideoDraft('session-1', draft, 'coach-1', 'Coach Kevin');
+    await approveVideoDraft('session-1', draft, 'coach-1', 'Coach Kevin', consentedSwimmer);
     expect(firestore.addDoc).toHaveBeenCalledWith(
       expect.objectContaining({ path: 'swimmers/sw-1/notes' }),
       expect.objectContaining({
@@ -65,7 +97,7 @@ describe('approveVideoDraft', () => {
 
   it('note content includes observation, diagnosis, and drill', async () => {
     const draft = makeDraft();
-    await approveVideoDraft('session-1', draft, 'coach-1', 'Coach Kevin');
+    await approveVideoDraft('session-1', draft, 'coach-1', 'Coach Kevin', consentedSwimmer);
     const noteData = firestore.addDoc.mock.calls[0][1];
     expect(noteData.content).toContain('Elbow drops on recovery');
     expect(noteData.content).toContain('Diagnosis: Shoulder fatigue');
@@ -74,10 +106,18 @@ describe('approveVideoDraft', () => {
 
   it('omits empty diagnosis/drill lines', async () => {
     const draft = makeDraft({ diagnosis: '', drillRecommendation: '' });
-    await approveVideoDraft('session-1', draft, 'coach-1', 'Coach Kevin');
+    await approveVideoDraft('session-1', draft, 'coach-1', 'Coach Kevin', consentedSwimmer);
     const noteData = firestore.addDoc.mock.calls[0][1];
     expect(noteData.content).not.toContain('Diagnosis:');
     expect(noteData.content).not.toContain('Drill:');
+  });
+
+  it('rejects when roster context is present but media consent is missing', async () => {
+    await expect(
+      approveVideoDraft('session-1', makeDraft(), 'coach-1', 'Coach Kevin', blockedSwimmer),
+    ).rejects.toThrow(/media consent|cannot tag/i);
+    expect(firestore.updateDoc).not.toHaveBeenCalled();
+    expect(firestore.addDoc).not.toHaveBeenCalled();
   });
 });
 

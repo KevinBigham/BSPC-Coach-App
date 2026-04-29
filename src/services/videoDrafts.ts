@@ -25,14 +25,10 @@ export async function approveVideoDraft(
   draft: VideoDraft,
   coachUid: string,
   coachName: string,
-  swimmer?: Swimmer,
+  swimmer: Swimmer,
 ): Promise<void> {
-  // COPPA gate: when the caller supplies the swimmer doc, refuse to commit
-  // a video-AI note if consent is missing/revoked/expired or
-  // do-not-photograph is set. UI is still authoritative.
-  if (swimmer) {
-    assertCanTagSwimmer(swimmer);
-  }
+  // COPPA gate: roster context is mandatory at this service boundary.
+  assertCanTagSwimmer(swimmer);
 
   await updateDoc(doc(db, 'video_sessions', sessionId, 'drafts', draft.id), {
     approved: true,

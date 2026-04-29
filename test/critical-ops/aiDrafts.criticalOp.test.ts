@@ -45,11 +45,23 @@ beforeEach(() => {
 
 describe('aiDrafts.approveDraft (critical op)', () => {
   it('happy path: flips draft to approved and writes a swimmer note', async () => {
-    const swimmer = buildSwimmer({ index: 1, group: 'Gold' });
+    const swimmer = buildSwimmer({
+      index: 1,
+      group: 'Gold',
+      overrides: { mediaConsent: buildMediaConsent({ granted: true }) },
+    });
     const draft = buildAIDraft({ swimmer, index: 1 });
     const { id, createdAt: _c, ...payload } = draft;
 
-    await approveDraft('sess-AUD-001', id, payload as never, 'coach-001');
+    await approveDraft(
+      'sess-AUD-001',
+      id,
+      payload as never,
+      'coach-001',
+      undefined,
+      undefined,
+      swimmer,
+    );
 
     expect(firestore.updateDoc).toHaveBeenCalledWith(
       expect.objectContaining({ path: 'audio_sessions/sess-AUD-001/drafts/draft-AI-001' }),
@@ -67,13 +79,23 @@ describe('aiDrafts.approveDraft (critical op)', () => {
   });
 
   it('edge: edited content and tags override the draft values', async () => {
-    const swimmer = buildSwimmer({ index: 2, group: 'Gold' });
+    const swimmer = buildSwimmer({
+      index: 2,
+      group: 'Gold',
+      overrides: { mediaConsent: buildMediaConsent({ granted: true }) },
+    });
     const draft = buildAIDraft({ swimmer, index: 2 });
     const { id, createdAt: _c, ...payload } = draft;
 
-    await approveDraft('sess-AUD-001', id, payload as never, 'coach-001', 'Edited observation', [
-      'speed',
-    ]);
+    await approveDraft(
+      'sess-AUD-001',
+      id,
+      payload as never,
+      'coach-001',
+      'Edited observation',
+      ['speed'],
+      swimmer,
+    );
 
     const noteData = firestore.addDoc.mock.calls[0][1];
     expect(noteData.content).toBe('Edited observation');
@@ -190,13 +212,20 @@ describe('aiDrafts.approveAllDrafts (critical op)', () => {
     };
     firestore.writeBatch.mockReturnValue(mockBatch);
 
-    const swimmers = [1, 2, 3, 4].map((i) => buildSwimmer({ index: i, group: 'Gold' }));
+    const swimmers = [1, 2, 3, 4].map((i) =>
+      buildSwimmer({
+        index: i,
+        group: 'Gold',
+        overrides: { mediaConsent: buildMediaConsent({ granted: true }) },
+      }),
+    );
     const drafts = swimmers.map((swimmer, i) => {
       const d = buildAIDraft({ swimmer, index: i + 1 });
       return { ...d, sessionId: 'sess-AUD-001' };
     });
+    const swimmersById = new Map(swimmers.map((swimmer) => [swimmer.id, swimmer]));
 
-    const count = await approveAllDrafts(drafts as never, 'coach-001', 'Coach One');
+    const count = await approveAllDrafts(drafts as never, 'coach-001', 'Coach One', swimmersById);
 
     expect(count).toBe(4);
     expect(mockBatch.update).toHaveBeenCalledTimes(4);
@@ -214,14 +243,19 @@ describe('aiDrafts.approveAllDrafts (critical op)', () => {
     firestore.writeBatch.mockReturnValue(mockBatch);
 
     const swimmers = Array.from({ length: 401 }, (_, i) =>
-      buildSwimmer({ index: i + 1, group: 'Diamond' }),
+      buildSwimmer({
+        index: i + 1,
+        group: 'Diamond',
+        overrides: { mediaConsent: buildMediaConsent({ granted: true }) },
+      }),
     );
     const drafts = swimmers.map((swimmer, i) => {
       const d = buildAIDraft({ swimmer, index: i + 1 });
       return { ...d, sessionId: 'sess-AUD-001' };
     });
+    const swimmersById = new Map(swimmers.map((swimmer) => [swimmer.id, swimmer]));
 
-    const count = await approveAllDrafts(drafts as never, 'coach-001', 'Coach One');
+    const count = await approveAllDrafts(drafts as never, 'coach-001', 'Coach One', swimmersById);
 
     expect(count).toBe(401);
     expect(mockBatch.commit).toHaveBeenCalledTimes(2);

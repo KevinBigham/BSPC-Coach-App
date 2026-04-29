@@ -75,15 +75,15 @@ describe('video.createVideoSession (critical op)', () => {
     expect(payload.group).toBe('Gold');
   });
 
-  it('edge: backwards compat — no roster supplied means no consent assertion', async () => {
-    // When roster is omitted, the service writes through unchanged. UI is the gate.
+  it('edge: empty tag list accepts an explicit empty roster', async () => {
     const id = await createVideoSession(
       'coach-001',
       'Coach One',
       30,
       '2026-04-28',
-      ['swim-GO-001'],
-      'Gold',
+      [],
+      undefined,
+      [],
     );
     expect(id).toBe('sess-VID-fixture');
     expect(firestore.addDoc).toHaveBeenCalled();

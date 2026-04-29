@@ -63,6 +63,9 @@ function AIReviewScreen() {
       const content = editingDraft === draft.id ? editContent : undefined;
       const tags = editingDraft === draft.id ? editTags : undefined;
       const swimmer = swimmersById.get(draft.swimmerId);
+      if (!swimmer) {
+        throw new Error(`Missing roster context for ${draft.swimmerName}`);
+      }
 
       await approveDraft(draft.sessionId, draft.id, draft, coach.uid, content, tags, swimmer);
       await checkAndCompleteSession(draft.sessionId);
