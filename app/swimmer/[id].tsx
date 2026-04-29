@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -15,21 +15,17 @@ import { useLocalSearchParams, Stack, router } from 'expo-router';
 import { ArrowLeft, Plus } from 'lucide-react-native';
 import {
   doc,
-  onSnapshot,
   collection,
   query,
-  orderBy,
   addDoc,
   deleteDoc,
   getDocs,
   where,
   serverTimestamp,
-  limit,
 } from 'firebase/firestore';
 import { db } from '../../src/config/firebase';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { useToast } from '../../src/contexts/ToastContext';
-import { subscribeSwimmerAttendance } from '../../src/services/attendance';
 import {
   colors,
   spacing,
@@ -41,7 +37,6 @@ import {
 import { NOTE_TAGS, EVENTS, COURSES, type NoteTag, type Course } from '../../src/config/constants';
 import { exportTimesCSV, shareCSV } from '../../src/services/export';
 import { exportSwimmerReportDocx } from '../../src/services/docxExport';
-import { subscribeGoals } from '../../src/services/goals';
 import { addNote } from '../../src/services/notes';
 import { getAchievedStandard, calculateAge, getAgeGroup } from '../../src/data/timeStandards';
 import StandardBadge from '../../src/components/StandardBadge';
@@ -53,7 +48,6 @@ import SparkLine from '../../src/components/charts/SparkLine';
 import VoiceNoteRecorder from '../../src/components/voice-note-recorder';
 import type {
   Swimmer,
-  SwimmerNote,
   SwimTime,
   AttendanceRecord,
   SwimmerGoal,
@@ -61,12 +55,10 @@ import type {
 } from '../../src/types/firestore.types';
 import { withScreenErrorBoundary } from '../../src/components/ScreenErrorBoundary';
 import { toDateSafe, type FirestoreTimestampLike } from '../../src/utils/date';
-import { getTodayString } from '../../src/utils/time';
+import { useSwimmerData, type SwimmerProfileNote } from '../../src/hooks/useSwimmerData';
 
 type Tab = 'overview' | 'voice' | 'notes' | 'times' | 'attendance' | 'timeline';
-type ProfileNote = Omit<SwimmerNote, 'source'> & {
-  source: SwimmerNote['source'] | 'voice_inline';
-};
+type ProfileNote = SwimmerProfileNote;
 
 const STATUS_COLORS: Record<string, string> = {
   normal: colors.success,
@@ -80,65 +72,14 @@ function SwimmerProfileScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { coach, isAdmin } = useAuth();
   const { showToast } = useToast();
-  const [swimmer, setSwimmer] = useState<Swimmer | null>(null);
-  const [notes, setNotes] = useState<(ProfileNote & { id: string })[]>([]);
-  const [times, setTimes] = useState<(SwimTime & { id: string })[]>([]);
-  const [attendance, setAttendance] = useState<(AttendanceRecord & { id: string })[]>([]);
+  const { swimmer, notes, times, attendance, goals, loading, prCount, todayAttendance } =
+    useSwimmerData(id);
   const [activeTab, setActiveTab] = useState<Tab>('overview');
-  const [loading, setLoading] = useState(true);
 
   const [noteText, setNoteText] = useState('');
   const [selectedTags, setSelectedTags] = useState<NoteTag[]>([]);
   const [savingNote, setSavingNote] = useState(false);
   const [showNoteComposer, setShowNoteComposer] = useState(false);
-  const [goals, setGoals] = useState<(SwimmerGoal & { id: string })[]>([]);
-
-  useEffect(() => {
-    if (!id) return;
-    const unsubscribe = onSnapshot(doc(db, 'swimmers', id), (snap) => {
-      if (snap.exists()) {
-        setSwimmer({ id: snap.id, ...snap.data() } as Swimmer);
-      }
-      setLoading(false);
-    });
-    return unsubscribe;
-  }, [id]);
-
-  useEffect(() => {
-    if (!id) return;
-    const q = query(
-      collection(db, 'swimmers', id, 'notes'),
-      orderBy('createdAt', 'desc'),
-      limit(50),
-    );
-    return onSnapshot(q, (snapshot) => {
-      setNotes(
-        snapshot.docs.map((d) => ({ id: d.id, ...d.data() }) as ProfileNote & { id: string }),
-      );
-    });
-  }, [id]);
-
-  useEffect(() => {
-    if (!id) return;
-    const q = query(
-      collection(db, 'swimmers', id, 'times'),
-      orderBy('createdAt', 'desc'),
-      limit(50),
-    );
-    return onSnapshot(q, (snapshot) => {
-      setTimes(snapshot.docs.map((d) => ({ id: d.id, ...d.data() }) as SwimTime & { id: string }));
-    });
-  }, [id]);
-
-  useEffect(() => {
-    if (!id) return;
-    return subscribeSwimmerAttendance(id, setAttendance, 90);
-  }, [id]);
-
-  useEffect(() => {
-    if (!id) return;
-    return subscribeGoals(id, (g) => setGoals(g as (SwimmerGoal & { id: string })[]));
-  }, [id]);
 
   const toggleTag = (tag: NoteTag) => {
     setSelectedTags((prev) =>
@@ -202,11 +143,6 @@ function SwimmerProfileScreen() {
 
   const dateOfBirth = toDateSafe(swimmer?.dateOfBirth as FirestoreTimestampLike);
   const age = dateOfBirth ? calculateAge(dateOfBirth) : null;
-  const prCount = useMemo(() => times.filter((time) => time.isPR).length, [times]);
-  const todayAttendance = useMemo(() => {
-    const today = getTodayString();
-    return attendance.find((record) => record.practiceDate === today) || null;
-  }, [attendance]);
 
   const headerAttendanceLabel = todayAttendance
     ? todayAttendance.status && todayAttendance.status !== 'normal'
