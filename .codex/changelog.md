@@ -45,3 +45,19 @@
 - Test corpus: client 913 → **960** / 92 → **97 suites**. Functions unchanged at 66 / 12. Combined **1026 / 109**.
 - Validation: `npx tsc --noEmit`, `npm run lint:errors`, `npx jest --runInBand test/critical-ops`, `npm test -- --runInBand`, `npm --prefix functions test -- --runInBand` — all pass.
 - No schema, time-precision, deployment, or UI behavior changes.
+
+## 2026-04-29 — Sprint-NEXT-Surgical-Wave1
+
+- Branch `codex/sprint-next-surgical-wave1` stacked on `dc0e1f0`. Four commits:
+  - `105c8dc` — `test(functions): cover onAttendanceWritten/onNotesWritten/onTimesWritten/onVideoSessionWritten dispatch`
+  - `f0b1f5a` — `test(hooks): lock in useDashboardData subscriptions + derivations`
+  - `8df48ef` — `feat(coppa): make roster pass mandatory across draft + video services`
+  - `40cd02d` — `chore(observability): wire logger.error across service catch blocks`
+- **P1** Closed the test-coverage gap for the four aggregation triggers that power the dashboard. Each trigger now has a sibling test exercising every conditional dispatch path with the canonical `firebase-admin` mock pattern.
+- **P2** Locked in the `useDashboardData` hook extracted from the dashboard last sprint. 9-case `renderHook` suite covering all five subscriptions, the conditional unread-count fetch, derivations, and the unsubscribe lifecycle.
+- **P3** **Bug #4 fully closed.** The COPPA media-consent gate is no longer opt-in. Four service signatures (`approveDraft`, `approveAllDrafts`, `approveVideoDraft`, `createVideoSession`) now require the roster context — the bypass is closed at the type level. UI call sites in `app/ai-review.tsx` and `app/video/[id].tsx` throw a coach-friendly `Missing roster context for ${swimmerName}` error before reaching the service. Service-layer guards reject missing-roster lookups so non-UI callers cannot bypass.
+- **P4** Service-layer catch blocks in 7 high-traffic services now call `logger.error('<service>:<method>:fail', { error, ...context })` before rethrow. `profilePhoto.deleteProfilePhoto` keeps its intentional swallow with an explanatory comment. No throw / swallow behavior changed — observability only.
+- Test corpus: client 973 → **986** / 97 → **98 suites**; functions 95 → **111** / 14 → **18 suites**. Combined **1097 / 116**.
+- Validation: `npm test`, `npm --prefix functions test`, `npm run typecheck`, `npm run lint` — all pass (lint reports 0 errors, 183 pre-existing warnings).
+- No schema, time-precision, deployment, or UI behavior changes.
+- Stale loose-ends flipped on review: `attendance.batchCheckIn` recovery (closed by `549d664` last sprint) and LCM / SCM standards (closed by `d9da52e` last sprint). The prior status entry's loose-ends list pre-dated those commits.

@@ -77,3 +77,34 @@
   - Detox / Maestro E2E coverage.
   - LCM / SCM time standards still empty in `src/data/timeStandards.ts`.
   - The COPPA gate is opt-in at each call site (UI must pass the roster). A future sprint can audit each call site to make passing the roster mandatory.
+
+## 2026-04-29 — Sprint-NEXT-Surgical-Wave1 (`codex/sprint-next-surgical-wave1`)
+
+- Baseline: `dc0e1f0` on `main`, working tree clean. Pre-sprint corpus: 973 / 97 client + 95 / 14 functions.
+- Codex landed four parallel surgical phases:
+  - **P1** (`105c8dc`) — Sibling tests for the four previously-untested aggregation triggers: `onAttendanceWritten`, `onNotesWritten`, `onTimesWritten`, `onVideoSessionWritten`. Mocks the recompute dispatch surface; covers each conditional path. +420 lines test, +4 suites.
+  - **P2** (`f0b1f5a`) — `renderHook` suite for `useDashboardData` covering 9 cases: store-derived totals, dedup of attendance, 7-day spark window, audio + video draft sum, next-meet, recent-PR mapping, conditional unread fetch, subscriber unsubscribe lifecycle. +373 lines test.
+  - **P3** (`8df48ef`) — **Bug #4 fully closed.** Flipped the optional `?` off four roster params: `aiDrafts.approveDraft.swimmer`, `aiDrafts.approveAllDrafts.swimmersById`, `videoDrafts.approveVideoDraft.swimmer`, `video.createVideoSession.swimmers`. UI guards in `app/ai-review.tsx` and `app/video/[id].tsx` throw a coach-friendly `Missing roster context for ${swimmerName}` error before the service is called. Service-layer guards in `aiDrafts.approveAllDrafts` and `video.createVideoSession` throw on missing roster lookups so non-UI callers cannot bypass the gate.
+  - **P4** (`40cd02d`) — Service-layer error logging audit. Added `logger.error('<service>:<method>:fail', { ...context })` to catch blocks in `attendance`, `csvImport`, `hy3Import`, `meetResultsImport`, `meets`, `sdifImport`, `swimmerVoiceNotes`. The `profilePhoto.deleteProfilePhoto` swallow is preserved with an inline comment explaining why (missing storage object still needs the field cleared). Throw / swallow behavior unchanged — observability only.
+- Test corpus deltas:
+  - Client: 973 / 97 → **986 / 98**.
+  - Functions: 95 / 14 → **111 / 18**.
+  - Combined: 1068 / 111 → **1097 / 116**.
+- Validation commands run on this branch:
+  - `npm test -- --runInBand`: 986 / 98 in ~12s.
+  - `npm --prefix functions test -- --runInBand`: 111 / 18 in ~5s.
+  - `npm run typecheck`: passed.
+  - `npm run lint`: 0 errors, 183 warnings (pre-existing).
+- Loose-ends from prior section, now **closed**:
+  - `attendance.batchCheckIn` per-chunk error recovery — already closed by `549d664` (last sprint, prior note was stale).
+  - LCM / SCM time standards empty — already closed by `d9da52e` (last sprint, prior note was stale).
+  - COPPA gate opt-in — closed by P3 above; the roster pass is now mandatory at the type level.
+- Loose-ends still open:
+  - DRY the notification-rule split between client helpers and the inline Cloud Functions reimplementation (a shared package).
+  - Detox / Maestro E2E coverage — `e2e/maestro/` exists with stub flows.
+  - Service-layer error logging covers the high-traffic services in P4 above. Lower-traffic services with `catch` blocks may still lack `logger.error`. Audit on demand.
+  - God-screen refactors deferred to Wave 2: `app/swimmer/[id].tsx` (1,812 lines), `app/(tabs)/practice.tsx` (996 lines).
+- Risks Codex flagged:
+  - P4 `logger.error` calls now surface expected console output from tests that intentionally exercise error paths — purely cosmetic, no test failures.
+  - P3 fails fast if a draft references a swimmer no longer in the roster (e.g., a stale draft after a swimmer was removed). The UI guard turns that into a coach-friendly toast; the service-layer error message uses technical language. Not a blocker.
+- `functions/package.json` has no `lint` script (pre-existing). Functions lint is currently de facto delegated to typecheck + the build step.
