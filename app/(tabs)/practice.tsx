@@ -269,6 +269,12 @@ function PracticeScreen() {
             <Text style={styles.libraryBtnText}>LIBRARY</Text>
           </TouchableOpacity>
           <TouchableOpacity
+            style={styles.libraryBtn}
+            onPress={() => router.push('/practice/browse')}
+          >
+            <Text style={styles.libraryBtnText}>PUBLIC PLANS</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
             style={styles.aiBtn}
             onPress={() => router.push('/practice/ai-generate')}
           >

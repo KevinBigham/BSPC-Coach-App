@@ -302,11 +302,14 @@ export interface PracticePlan {
   description?: string;
   group?: Group;
   isTemplate: boolean;
+  public?: boolean;
   templateSourceId?: string;
   date?: string;
   coachId: string;
   coachName: string;
   totalDuration: number;
+  tags?: string[];
+  ratings?: Record<string, number>;
   sets: PracticePlanSet[];
   createdAt: FirebaseTimestamp;
   updatedAt: FirebaseTimestamp;

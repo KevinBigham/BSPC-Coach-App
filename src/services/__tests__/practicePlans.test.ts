@@ -83,6 +83,14 @@ describe('subscribePracticePlans', () => {
     expect(firestore.where).toHaveBeenCalledWith('isTemplate', '==', true);
   });
 
+  it('filters by owner coachId when option provided', () => {
+    firestore.onSnapshot.mockReturnValue(jest.fn());
+
+    subscribePracticePlans(jest.fn(), { coachId: 'coach-1' });
+
+    expect(firestore.where).toHaveBeenCalledWith('coachId', '==', 'coach-1');
+  });
+
   it('applies limit when option provided', () => {
     firestore.onSnapshot.mockReturnValue(jest.fn());
 

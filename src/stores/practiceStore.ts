@@ -8,6 +8,7 @@ interface PracticeEditState {
   description: string;
   group: Group | null;
   isTemplate: boolean;
+  public: boolean;
   date: string | null;
 
   // Sets
@@ -22,6 +23,7 @@ interface PracticeEditState {
   setDescription: (description: string) => void;
   setGroup: (group: Group | null) => void;
   setIsTemplate: (isTemplate: boolean) => void;
+  setPublic: (isPublic: boolean) => void;
   setDate: (date: string | null) => void;
 
   // Actions — sets
@@ -76,6 +78,7 @@ export const usePracticeStore = create<PracticeEditState>((set, get) => ({
   description: '',
   group: null,
   isTemplate: false,
+  public: false,
   date: null,
   sets: [],
   _history: [[]],
@@ -84,7 +87,8 @@ export const usePracticeStore = create<PracticeEditState>((set, get) => ({
   setTitle: (title) => set({ title }),
   setDescription: (description) => set({ description }),
   setGroup: (group) => set({ group }),
-  setIsTemplate: (isTemplate) => set({ isTemplate }),
+  setIsTemplate: (isTemplate) => set({ isTemplate, public: isTemplate ? get().public : false }),
+  setPublic: (isPublic) => set({ public: isPublic }),
   setDate: (date) => set({ date }),
 
   addSet: (category) =>
@@ -202,6 +206,7 @@ export const usePracticeStore = create<PracticeEditState>((set, get) => ({
       description: plan.description || '',
       group: plan.group || null,
       isTemplate: plan.isTemplate,
+      public: plan.public === true,
       date: plan.date || null,
       sets,
       _history: [JSON.parse(JSON.stringify(sets))],
@@ -215,6 +220,7 @@ export const usePracticeStore = create<PracticeEditState>((set, get) => ({
       description: '',
       group: null,
       isTemplate: false,
+      public: false,
       date: null,
       sets: [],
       _history: [[]],
@@ -229,6 +235,7 @@ export const usePracticeStore = create<PracticeEditState>((set, get) => ({
       description: state.description || undefined,
       group: state.group || undefined,
       isTemplate: state.isTemplate,
+      public: state.isTemplate ? state.public : false,
       date: state.date || undefined,
       coachId,
       coachName,

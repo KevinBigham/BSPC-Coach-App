@@ -5,6 +5,7 @@
  */
 
 import { useEffect, useState } from 'react';
+import { useAuth } from '../contexts/AuthContext';
 import { subscribeGroupNotes, type GroupNote } from '../services/groupNotes';
 import { subscribePracticePlans } from '../services/practicePlans';
 import type { PracticePlan } from '../types/firestore.types';
@@ -18,21 +19,28 @@ export interface PracticeData {
 }
 
 export function usePracticeData(): PracticeData {
+  const { coach } = useAuth();
+  const coachId = coach?.uid;
   const [plans, setPlans] = useState<PlanWithId[]>([]);
   const [groupNotes, setGroupNotes] = useState<(GroupNote & { id: string })[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(
-    () =>
-      subscribePracticePlans(
-        (data) => {
-          setPlans(data);
-          setLoading(false);
-        },
-        { max: 50 },
-      ),
-    [],
-  );
+  useEffect(() => {
+    if (!coachId) {
+      setPlans([]);
+      setLoading(false);
+      return undefined;
+    }
+
+    setLoading(true);
+    return subscribePracticePlans(
+      (data) => {
+        setPlans(data);
+        setLoading(false);
+      },
+      { coachId, max: 50 },
+    );
+  }, [coachId]);
 
   useEffect(
     () =>

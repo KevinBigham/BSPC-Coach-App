@@ -32,17 +32,18 @@ function isDashboardPracticePlanPdf(value: unknown): value is DashboardPracticeP
 
 export function subscribePracticePlans(
   callback: (plans: PlanWithId[]) => void,
-  options?: { isTemplate?: boolean; group?: string; max?: number },
+  options?: { isTemplate?: boolean; group?: string; max?: number; coachId?: string },
 ): Unsubscribe {
-  let q = query(collection(db, 'practice_plans'), orderBy('createdAt', 'desc'));
+  const constraints = [];
 
   if (options?.isTemplate !== undefined) {
-    q = query(
-      collection(db, 'practice_plans'),
-      where('isTemplate', '==', options.isTemplate),
-      orderBy('createdAt', 'desc'),
-    );
+    constraints.push(where('isTemplate', '==', options.isTemplate));
   }
+  if (options?.coachId) {
+    constraints.push(where('coachId', '==', options.coachId));
+  }
+
+  let q = query(collection(db, 'practice_plans'), ...constraints, orderBy('createdAt', 'desc'));
 
   if (options?.max) {
     q = query(q, limit(options.max));

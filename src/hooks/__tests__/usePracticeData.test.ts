@@ -4,6 +4,13 @@ import type { PracticePlan } from '../../types/firestore.types';
 import { usePracticeData } from '../usePracticeData';
 
 const mockSubscribePracticePlans = jest.fn();
+const mockUseAuth = jest.fn((): { coach: { uid: string } | null } => ({
+  coach: { uid: 'coach-1' },
+}));
+
+jest.mock('../../contexts/AuthContext', () => ({
+  useAuth: () => mockUseAuth(),
+}));
 
 jest.mock('../../services/practicePlans', () => ({
   subscribePracticePlans: (...args: Parameters<typeof mockSubscribePracticePlans>) =>
@@ -59,6 +66,7 @@ function makeGroupNote(id: string, content: string): GroupNoteWithId {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockUseAuth.mockReturnValue({ coach: { uid: 'coach-1' } });
   mockSubscribePracticePlans.mockImplementation((callback: PracticePlansCallback) => {
     practicePlansCallback = callback;
     return unsubPracticePlans;
@@ -75,7 +83,10 @@ describe('usePracticeData', () => {
     const plans = [makePlan('plan-1', 'Sprint Practice'), makePlan('plan-2', 'Kick Set', true)];
 
     expect(result.current.loading).toBe(true);
-    expect(mockSubscribePracticePlans).toHaveBeenCalledWith(expect.any(Function), { max: 50 });
+    expect(mockSubscribePracticePlans).toHaveBeenCalledWith(expect.any(Function), {
+      coachId: 'coach-1',
+      max: 50,
+    });
 
     act(() => {
       practicePlansCallback(plans);
@@ -120,5 +131,13 @@ describe('usePracticeData', () => {
 
     expect(unsubPracticePlans).toHaveBeenCalledTimes(1);
     expect(unsubGroupNotes).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not subscribe to private practice plans without a coach id', () => {
+    mockUseAuth.mockReturnValue({ coach: null });
+
+    renderHook(() => usePracticeData());
+
+    expect(mockSubscribePracticePlans).not.toHaveBeenCalled();
   });
 });

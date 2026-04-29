@@ -7,6 +7,7 @@ import {
   updateDoc,
   doc,
   getDocs,
+  serverTimestamp,
   type Unsubscribe,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
@@ -29,6 +30,7 @@ export interface WorkoutFilters {
   group?: Group;
   minYardage?: number;
   maxYardage?: number;
+  tags?: string[];
 }
 
 export function subscribeWorkouts(
@@ -59,6 +61,48 @@ export function subscribeWorkouts(
     }
 
     callback(workouts);
+  });
+}
+
+export function subscribePublicWorkouts(
+  callback: (workouts: (PracticePlan & { id: string })[]) => void,
+  filters: WorkoutFilters = {},
+): Unsubscribe {
+  const constraints = [where('isTemplate', '==', true), where('public', '==', true)];
+
+  if (filters.group) {
+    constraints.push(where('group', '==', filters.group));
+  }
+  if (filters.tags && filters.tags.length > 0) {
+    constraints.push(where('tags', 'array-contains-any', filters.tags));
+  }
+
+  const q = query(collection(db, 'practice_plans'), ...constraints, orderBy('updatedAt', 'desc'));
+
+  return onSnapshot(q, (snap) => {
+    let workouts = snap.docs.map((d) => ({
+      id: d.id,
+      ...d.data(),
+    })) as (PracticePlan & { id: string })[];
+
+    if (filters.minYardage) {
+      const min = filters.minYardage;
+      workouts = workouts.filter((w) => calculateYardage(w) >= min);
+    }
+    if (filters.maxYardage) {
+      const max = filters.maxYardage;
+      workouts = workouts.filter((w) => calculateYardage(w) <= max);
+    }
+
+    callback(workouts);
+  });
+}
+
+export async function setPlanPublicStatus(planId: string, isPublic: boolean): Promise<void> {
+  // Firestore rules enforce owner-only writes for this field.
+  await updateDoc(doc(db, 'practice_plans', planId), {
+    public: isPublic,
+    updatedAt: serverTimestamp(),
   });
 }
 

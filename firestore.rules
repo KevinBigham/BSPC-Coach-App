@@ -72,7 +72,13 @@ service cloud.firestore {
 
     // Practice plans
     match /practice_plans/{planId} {
-      allow read, write: if isCoach();
+      allow read: if isCoach() &&
+        (resource.data.public == true || resource.data.coachId == request.auth.uid);
+      allow create: if isCoach() && request.resource.data.coachId == request.auth.uid;
+      allow update: if isCoach()
+        && resource.data.coachId == request.auth.uid
+        && request.resource.data.coachId == resource.data.coachId;
+      allow delete: if isCoach() && resource.data.coachId == request.auth.uid;
     }
 
     // Messages — coaches only

@@ -9,6 +9,7 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  Switch,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '../../src/contexts/AuthContext';
@@ -16,6 +17,7 @@ import { colors, spacing, fontSize, borderRadius, fontFamily } from '../../src/c
 import { GROUPS, SET_CATEGORIES, type SetCategory } from '../../src/config/constants';
 import { usePracticeStore } from '../../src/stores/practiceStore';
 import { addPracticePlan, updatePracticePlan } from '../../src/services/practicePlans';
+import { setPlanPublicStatus } from '../../src/services/workoutLibrary';
 import SetBlock from '../../src/components/SetBlock';
 import { exportPracticePlanDocx } from '../../src/services/docxExport';
 import { notifySuccess } from '../../src/utils/haptics';
@@ -29,6 +31,7 @@ function PracticeBuilderScreen() {
 
   const store = usePracticeStore();
   const totalYardage = store.totalYardage();
+  const planId = typeof params.planId === 'string' ? params.planId : undefined;
 
   const handleSave = async () => {
     if (!coach || !store.title.trim()) {
@@ -38,8 +41,8 @@ function PracticeBuilderScreen() {
     setSaving(true);
     try {
       const planData = store.toPlan(coach.uid, coach.displayName || 'Coach');
-      if (params.planId) {
-        await updatePracticePlan(params.planId, planData);
+      if (planId) {
+        await updatePracticePlan(planId, planData);
       } else {
         await addPracticePlan(planData, coach.uid);
       }
@@ -50,6 +53,40 @@ function PracticeBuilderScreen() {
       Alert.alert('Error', err instanceof Error ? err.message : String(err));
     }
     setSaving(false);
+  };
+
+  const persistPublicStatus = async (isPublic: boolean) => {
+    const previousValue = store.public;
+    store.setPublic(isPublic);
+
+    if (!planId) {
+      return;
+    }
+
+    try {
+      await setPlanPublicStatus(planId, isPublic);
+      notifySuccess();
+    } catch (err: unknown) {
+      store.setPublic(previousValue);
+      Alert.alert('Publish Failed', err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  const handlePublicToggle = (isPublic: boolean) => {
+    if (!isPublic) {
+      void persistPublicStatus(false);
+      return;
+    }
+
+    Alert.alert('Publish Template', 'Public templates can be seen by all coaches.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Publish',
+        onPress: () => {
+          void persistPublicStatus(true);
+        },
+      },
+    ]);
   };
 
   const handleAddSet = (category: SetCategory) => {
@@ -171,6 +208,24 @@ function PracticeBuilderScreen() {
             </TouchableOpacity>
           )}
         </View>
+
+        {store.isTemplate && (
+          <View style={styles.publicRow}>
+            <View style={styles.publicCopy}>
+              <Text style={styles.publicLabel}>Public — share this template with all coaches</Text>
+              {!planId && (
+                <Text style={styles.publicHint}>Applies when this template is saved</Text>
+              )}
+            </View>
+            <Switch
+              value={store.public}
+              onValueChange={handlePublicToggle}
+              trackColor={{ false: colors.bgBase, true: colors.purple }}
+              thumbColor={store.public ? colors.gold : colors.textSecondary}
+              ios_backgroundColor={colors.bgBase}
+            />
+          </View>
+        )}
 
         {/* Sets */}
         {store.sets.map((set, i) => (
@@ -357,6 +412,30 @@ const styles = StyleSheet.create({
     fontSize: fontSize.xs,
     color: colors.accent,
     letterSpacing: 1,
+  },
+  publicRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+    backgroundColor: colors.bgDeep,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    marginBottom: spacing.lg,
+  },
+  publicCopy: { flex: 1 },
+  publicLabel: {
+    fontFamily: fontFamily.bodySemi,
+    fontSize: fontSize.sm,
+    color: colors.text,
+  },
+  publicHint: {
+    fontFamily: fontFamily.body,
+    fontSize: fontSize.xs,
+    color: colors.textSecondary,
+    marginTop: 2,
   },
   // Add Set
   addSetBtn: {

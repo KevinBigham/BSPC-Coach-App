@@ -1,7 +1,7 @@
 jest.mock('../../config/firebase', () => require('../../__mocks__/firebase'));
 
 import { usePracticeStore } from '../practiceStore';
-import type { PracticePlan, PracticePlanSet } from '../../types/firestore.types';
+import type { PracticePlan } from '../../types/firestore.types';
 import type { SetCategory } from '../../config/constants';
 
 describe('practiceStore', () => {
@@ -15,6 +15,7 @@ describe('practiceStore', () => {
     expect(state.description).toBe('');
     expect(state.group).toBeNull();
     expect(state.isTemplate).toBe(false);
+    expect(state.public).toBe(false);
     expect(state.date).toBeNull();
     expect(state.sets).toEqual([]);
     expect(state._history).toEqual([[]]);
@@ -38,6 +39,15 @@ describe('practiceStore', () => {
     usePracticeStore.getState().setDate('2026-04-04');
     expect(usePracticeStore.getState().group).toBe('Gold');
     expect(usePracticeStore.getState().date).toBe('2026-04-04');
+  });
+
+  it('clears public sharing when a plan is no longer a template', () => {
+    usePracticeStore.getState().setIsTemplate(true);
+    usePracticeStore.getState().setPublic(true);
+
+    usePracticeStore.getState().setIsTemplate(false);
+
+    expect(usePracticeStore.getState().public).toBe(false);
   });
 
   // --- Set actions ---
@@ -214,6 +224,7 @@ describe('practiceStore', () => {
       description: 'A test',
       group: 'Gold',
       isTemplate: true,
+      public: true,
       date: '2026-04-04',
       coachId: 'c1',
       coachName: 'Coach K',
@@ -237,6 +248,7 @@ describe('practiceStore', () => {
     expect(state.description).toBe('A test');
     expect(state.group).toBe('Gold');
     expect(state.isTemplate).toBe(true);
+    expect(state.public).toBe(true);
     expect(state.date).toBe('2026-04-04');
     expect(state.sets).toHaveLength(1);
     expect(state._historyIndex).toBe(0);
@@ -261,6 +273,8 @@ describe('practiceStore', () => {
   it('toPlan produces a PracticePlan-like object', () => {
     usePracticeStore.getState().setTitle('Morning Workout');
     usePracticeStore.getState().setGroup('Gold');
+    usePracticeStore.getState().setIsTemplate(true);
+    usePracticeStore.getState().setPublic(true);
     usePracticeStore.getState().addSet('Warm-Up' as SetCategory);
 
     const plan = usePracticeStore.getState().toPlan('coach1', 'Coach K');
@@ -268,7 +282,19 @@ describe('practiceStore', () => {
     expect(plan.coachId).toBe('coach1');
     expect(plan.coachName).toBe('Coach K');
     expect(plan.group).toBe('Gold');
+    expect(plan.public).toBe(true);
     expect(plan.sets).toHaveLength(1);
+  });
+
+  it('toPlan writes public false for non-template plans', () => {
+    usePracticeStore.getState().setIsTemplate(true);
+    usePracticeStore.getState().setPublic(true);
+    usePracticeStore.getState().setIsTemplate(false);
+
+    const plan = usePracticeStore.getState().toPlan('c1', 'Coach');
+
+    expect(plan.isTemplate).toBe(false);
+    expect(plan.public).toBe(false);
   });
 
   it('toPlan uses "Untitled Practice" when title is empty', () => {
