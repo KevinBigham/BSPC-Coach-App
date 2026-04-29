@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import {
   View,
   Text,
@@ -22,51 +22,28 @@ import {
 import { GROUPS, NOTE_TAGS, type Group, type NoteTag } from '../../src/config/constants';
 import { getTodayString } from '../../src/utils/time';
 import { formatRelativeTime, toDateSafe, type FirestoreTimestampLike } from '../../src/utils/date';
+import { addGroupNote, deleteGroupNote } from '../../src/services/groupNotes';
 import {
-  subscribeGroupNotes,
-  addGroupNote,
-  deleteGroupNote,
-  type GroupNote,
-} from '../../src/services/groupNotes';
-import {
-  subscribePracticePlans,
   deletePracticePlan,
   duplicateAsTemplate,
   calculateTotalYardage,
 } from '../../src/services/practicePlans';
 import { usePracticeStore } from '../../src/stores/practiceStore';
 import { tapLight, notifySuccess } from '../../src/utils/haptics';
-import type { PracticePlan } from '../../src/types/firestore.types';
+import { usePracticeData, type PlanWithId } from '../../src/hooks/usePracticeData';
 import { withScreenErrorBoundary } from '../../src/components/ScreenErrorBoundary';
-
-type PlanWithId = PracticePlan & { id: string };
 
 function PracticeScreen() {
   const { coach } = useAuth();
-  const [plans, setPlans] = useState<PlanWithId[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { plans, groupNotes, loading } = usePracticeData();
   const [selectedPlan, setSelectedPlan] = useState<PlanWithId | null>(null);
+  // Zustand stays on the screen: it owns builder draft/undo lifecycle, not subscribed list data.
   const store = usePracticeStore();
 
-  const [groupNotes, setGroupNotes] = useState<(GroupNote & { id: string })[]>([]);
   const [gnGroup, setGnGroup] = useState<Group>(GROUPS[0]);
   const [gnText, setGnText] = useState('');
   const [gnTags, setGnTags] = useState<NoteTag[]>([]);
   const [gnSaving, setGnSaving] = useState(false);
-
-  useEffect(() => {
-    return subscribePracticePlans(
-      (data) => {
-        setPlans(data);
-        setLoading(false);
-      },
-      { max: 50 },
-    );
-  }, []);
-
-  useEffect(() => {
-    return subscribeGroupNotes(null, setGroupNotes);
-  }, []);
 
   const handleAddGroupNote = async () => {
     if (!gnText.trim() || !coach) return;
