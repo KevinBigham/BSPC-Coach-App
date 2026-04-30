@@ -115,6 +115,7 @@ export function parseSDIF(content: string): SDIFParseResult {
         });
       }
     } catch (err) {
+      // Intentionally swallowed: record the bad line and continue parsing the remaining file.
       logger.warn('sdifImport:parseSDIF:lineParseFail', {
         error: String(err),
         line: i + 1,

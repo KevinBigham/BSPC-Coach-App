@@ -159,6 +159,7 @@ export function parseHY3(content: string): SDIFParseResult {
         });
       }
     } catch (err) {
+      // Intentionally swallowed: record the bad line and continue parsing the remaining file.
       logger.warn('hy3Import:parseHY3:lineParseFail', {
         error: String(err),
         line: i + 1,

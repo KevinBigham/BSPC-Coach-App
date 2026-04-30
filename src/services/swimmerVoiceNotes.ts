@@ -42,6 +42,7 @@ async function readQueue(): Promise<QueuedSwimmerVoiceNoteUpload[]> {
     const raw = await AsyncStorage.getItem(QUEUE_KEY);
     return raw ? (JSON.parse(raw) as QueuedSwimmerVoiceNoteUpload[]) : [];
   } catch (err) {
+    // Intentionally swallowed: malformed local queue data should not block voice-note flows.
     logger.warn('swimmerVoiceNotes:readQueue:fail', { error: String(err) });
     return [];
   }
@@ -191,6 +192,7 @@ export async function flushQueuedSwimmerVoiceNotes(
       await processItem(item);
       processed++;
     } catch (err) {
+      // Intentionally swallowed: failed items are counted and retained for retry below.
       logger.warn('swimmerVoiceNotes:flushQueuedSwimmerVoiceNotes:itemFail', {
         error: String(err),
         noteId: item.noteId,

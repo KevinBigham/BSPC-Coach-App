@@ -157,6 +157,7 @@ export async function importMatchedResults(
         try {
           await batch.commit();
         } catch (err: unknown) {
+          // Intentionally swallowed: keep importing other swimmers and report this swimmer's batch error.
           logger.error('meetResultsImport:importMatchedResults:batchCommitFail', {
             error: String(err),
             swimmerId,
@@ -188,6 +189,7 @@ export async function importMatchedResults(
             }
           }
         } catch (err: unknown) {
+          // Intentionally swallowed: meet-entry sync failures should not discard imported times.
           logger.error('meetResultsImport:importMatchedResults:meetEntryUpdateFail', {
             error: String(err),
             meetId,

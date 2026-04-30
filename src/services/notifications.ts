@@ -113,6 +113,7 @@ export async function subscribeToGroupTopics(token: string, groups: Group[]): Pr
     try {
       await callable({ action: 'subscribe', topic, token });
     } catch (err) {
+      // Intentionally swallowed: one topic failure should not block the remaining subscriptions.
       logger.warn(`Failed to subscribe to topic ${topic}`, err as Record<string, unknown>);
     }
   }
@@ -127,6 +128,7 @@ export async function unsubscribeFromAllTopics(token: string, groups: Group[]): 
     try {
       await callable({ action: 'unsubscribe', topic, token });
     } catch (err) {
+      // Intentionally swallowed: one topic failure should not block the remaining unsubscriptions.
       logger.warn(`Failed to unsubscribe from topic ${topic}`, err as Record<string, unknown>);
     }
   }

@@ -209,6 +209,7 @@ export async function importSwimmers(rows: ParsedRow[], coachUid: string): Promi
       try {
         await batch.commit();
       } catch (err: unknown) {
+        // Intentionally swallowed: record the batch error and finish the import job summary.
         logger.error('csvImport:importSwimmers:batchCommitFail', {
           error: String(err),
           created,
