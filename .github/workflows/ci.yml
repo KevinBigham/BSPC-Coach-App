@@ -30,6 +30,9 @@ jobs:
         working-directory: parent-portal
         run: npm ci
 
+      - name: Verify shared functions copy
+        run: npm run sync:functions-shared:verify
+
       - name: Run quality gates
         run: npm run quality
 

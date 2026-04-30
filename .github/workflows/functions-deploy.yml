@@ -29,6 +29,9 @@ jobs:
         working-directory: functions
         run: npm ci
 
+      - name: Verify shared functions copy
+        run: npm run sync:functions-shared:verify
+
       - name: Test functions
         working-directory: functions
         run: npm test

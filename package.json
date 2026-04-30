@@ -19,6 +19,8 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
+    "sync:functions-shared": "node scripts/sync-functions-shared.js",
+    "sync:functions-shared:verify": "node scripts/sync-functions-shared.js --verify",
     "quality": "npm run typecheck && npm run lint:errors && npm test -- --runInBand && npm --prefix functions test -- --runInBand && npm --prefix functions run build && npm --prefix parent-portal run typecheck && npm --prefix parent-portal run lint && npm --prefix parent-portal run build && npm run madge:circular && npm run quality:strict-types && npm run quality:randomness && npm run quality:process",
     "quality:dead-code": "knip",
     "quality:strict-types": "bash scripts/check-strict-types.sh",

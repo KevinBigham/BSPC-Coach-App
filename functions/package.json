@@ -1,7 +1,10 @@
 {
   "name": "bspc-coach-functions",
   "scripts": {
+    "prebuild": "node ../scripts/sync-functions-shared.js --verify",
     "build": "tsc",
+    "predeploy": "node ../scripts/sync-functions-shared.js --verify",
+    "sync:functions-shared": "node ../scripts/sync-functions-shared.js",
     "test": "jest --no-coverage",
     "serve": "firebase emulators:start --only functions",
     "deploy": "firebase deploy --only functions"
