@@ -1,0 +1,87 @@
+{
+  "$schema_version": "2026-04-28",
+  "$comment": "Slice 3 of 3 in the Feature-Prune sprint. NOT a removal — this is a UX enhancement to make group the primary axis of attendance roll-call, since Kevin takes attendance group-by-group during practice.",
+  "sprint_id": "BSPC-Sprint-Feature-Prune-3-Attendance-Group-First",
+  "project": "BSPC Coach App",
+  "effort_level": "low",
+  "context": {
+    "director": "Kevin Bigham",
+    "baseline_sha": "follow slice 2 head",
+    "baseline_branch": "main",
+    "test_corpus": "post-slice-2 totals (TBD by slice 2)",
+    "why": "Kevin runs practice by training group (e.g. Senior, Senior National, Senior Prep, etc.). When he opens the Attendance tab during practice, he should see swimmers organized by group as the default view — not a flat alphabetical list with chips on top. Group filter chips already exist (#34 in inventory) — this slice elevates group to the primary organizational axis.",
+    "current_state": "app/(tabs)/attendance.tsx renders a flat list with 'Group filter chips' at the top. Selecting a chip narrows the list to that group. There is no 'all groups segmented' view today."
+  },
+  "edit_radius": [
+    "app/(tabs)/attendance.tsx (primary)",
+    "src/components/* (only if a new GroupSection component makes sense for clarity — Codex's call)",
+    "src/hooks/* (audit any attendance hooks for sort/group helpers)",
+    "src/services/attendance.ts (only if a new query helper is needed — likely not; existing roster query already returns group)",
+    "src/services/__tests__/attendance.test.ts (only if behavior changed)",
+    "Snapshot tests if any exist for the attendance screen"
+  ],
+  "read_first": [
+    "AGENTS.md",
+    ".codex/handoffs/feature-prune-1-surgical.json (predecessor)",
+    ".codex/handoffs/feature-prune-2-meet-live.json (predecessor)",
+    ".codex/FULL_APP_OVERVIEW.md (section E)",
+    "app/(tabs)/attendance.tsx (full file)",
+    "src/services/attendance.ts",
+    "src/services/swimmers.ts (for the group field shape)"
+  ],
+  "deliverables": [
+    "Default attendance view is segmented by group: each group renders as a section header (with group name + 'X of Y checked in' counter) followed by that group's swimmers. Section order matches a stable ordering — alphabetical group name, OR a swimGroupOrder field if one exists. Surface the choice in the commit body.",
+    "'All' view (no group filter active) shows ALL groups segmented — not a flat list. Tapping a group chip narrows to just that group's section (collapses others or shows only the selected one).",
+    "Per-group bulk action: a 'Check in all' button at the group section header that batch-checks-in everyone in that group (reuses existing batch-check-in pipeline, chunked at 400).",
+    "Per-swimmer roll-call modal (existing) unchanged — just lives inside group sections now.",
+    "Today's scoreboard header (#33) stays — but consider adding per-group breakdown rows underneath. If non-trivial, leave a follow-up note.",
+    "One commit. Conventional commit format: feat(attendance): group-first roll-call layout."
+  ],
+  "acceptance_criteria": [
+    "Working tree clean after commit.",
+    "All existing tests pass.",
+    "npm run typecheck clean.",
+    "npm run lint:errors → 0 errors.",
+    "(cd functions && npm run build) clean — no functions changes expected.",
+    "Manual smoke: launch app → Attendance tab → see groups as section headers with counts. Tap a group chip → see only that group's section. Tap 'Check in all' on a group header → all swimmers in that group flip to checked-in. Existing roll-call modal still works.",
+    "Performance: scrolling through 5+ groups stays at 60fps on iPhone 14 simulator. If a SectionList vs FlatList question arises, prefer SectionList (idiomatic for grouped lists).",
+    "Empty groups (zero swimmers) are hidden, not rendered as empty headers."
+  ],
+  "validation_commands": [
+    "npm run typecheck",
+    "npm run lint:errors",
+    "npm run quality",
+    "npm run quality:dead-code",
+    "npm test -- --runInBand",
+    "(cd functions && npm test -- --runInBand)",
+    "npm run sync:functions-shared:verify"
+  ],
+  "out_of_scope": [
+    "Adding a new 'group' admin screen / CRUD for groups — out of scope; use the groups that exist on swimmer docs today.",
+    "Reordering groups via drag-and-drop — out of scope.",
+    "Per-group attendance analytics — that's section L territory, not E.",
+    "Touching simulation, save/load, schema, RNG.",
+    "Changing the underlying attendance Firestore schema."
+  ],
+  "stop_conditions": [
+    "Swimmer documents have inconsistent group field naming (some 'group', some 'trainingGroup', etc.) — halt and surface the inconsistency for Kevin to decide canonicalization.",
+    "Existing batch-check-in helper doesn't support 'all swimmers in group X' input shape — halt and propose a small extension.",
+    "Performance regression on screens with 50+ swimmers — halt and report.",
+    "An existing baseline test changes behavior — apply baseline_update_protocol."
+  ],
+  "baseline_update_protocol": [
+    "Run the existing corpus first.",
+    "If output changed, produce a human-readable diff (file, test name, old assertion, new assertion, reason).",
+    "Classify: intended (UX-change-induced) vs. unintended.",
+    "Update expected outputs only when the change is intended and documented.",
+    "Note new corpus totals in regression_summary."
+  ],
+  "final_response_required_format": {
+    "plan": "Brief plan executed.",
+    "files_changed": "Every file touched.",
+    "verification": "Exact commands run and pass/fail.",
+    "regression_summary": "Test corpus deltas + any new tests added.",
+    "risks": "Performance / edge cases / group-naming inconsistency findings.",
+    "handoff": "Sprint complete. Kevin should manually smoke-test on his phone before next sprint."
+  }
+}

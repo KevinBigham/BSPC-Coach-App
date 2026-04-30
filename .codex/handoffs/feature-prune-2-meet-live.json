@@ -1,0 +1,113 @@
+{
+  "$schema_version": "2026-04-28",
+  "$comment": "Slice 2 of 3 in the Feature-Prune sprint. Removes meet creation, entries, relay-builder (G50/52/53) and the entire Live Meet Ops section (H56-58). Bigger blast radius than slice 1 — collapses meet detail from 4-tab to 2-tab.",
+  "sprint_id": "BSPC-Sprint-Feature-Prune-2-Meet-Live",
+  "project": "BSPC Coach App",
+  "effort_level": "high",
+  "context": {
+    "director": "Kevin Bigham",
+    "baseline_sha": "follow slice 1 head",
+    "baseline_branch": "main",
+    "test_corpus": "post-slice-1 totals (TBD by slice 1)",
+    "why": "Kevin's team enters meets hosted by USA Swimming clubs / high schools — the host runs timing/scoring/relays. He doesn't need to create meets in this app, manage entries (the host does seedings), build relays (host does relay management), run live scoring (host has timing system), or capture stopwatch lane splits (host has touchpads). Post-meet results come from SDIF/HY3 import, which stays. Meet detail collapses to Overview + Psych Sheet preview only.",
+    "depends_on": "Slice 1 (feature-prune-1-surgical) merged or shipped — not strictly required, but cleaner to land in order."
+  },
+  "edit_radius": [
+    "PHASE 1 (Live Meet Ops — entire section H removal):",
+    "  app/meet/[id]/live.tsx (DELETE — H56)",
+    "  app/meet/[id]/timer.tsx (DELETE — H57)",
+    "  app/meet/[id]/results.tsx (DELETE — H58)",
+    "  app/_layout.tsx (drop the 3 Stack.Screen entries for these routes)",
+    "  src/stores/liveMeetStore.ts (DELETE)",
+    "  src/stores/__tests__/liveMeetStore.test.ts (DELETE)",
+    "  src/services/liveMeet.ts (DELETE)",
+    "  src/services/__tests__/liveMeet.test.ts (DELETE)",
+    "  app/meet/[id].tsx (drop any 'Go Live' / 'Start Timer' / 'View Results' buttons that linked to the deleted routes)",
+    "  Cloud Functions: search functions/src for liveMeet/scoring listeners — likely none, but verify",
+    "PHASE 2 (Meet creation / entries / relays — G50/52/53):",
+    "  app/meet/new.tsx (DELETE — G50)",
+    "  app/meet/entries.tsx (DELETE — G52)",
+    "  app/meet/relay-builder.tsx (DELETE — G53)",
+    "  app/(tabs)/meets.tsx (drop the '+ New Meet' button / FAB)",
+    "  app/_layout.tsx (drop the 3 Stack.Screen entries)",
+    "  src/services/meets.ts — drop subscribeEntries (line 118), subscribeRelays (line 195), and any addEntry/createRelay/optimizeRelayOrder helpers (audit fully). KEEP: meets list query, meet doc CRUD, generatePsychSheet (used by Overview).",
+    "  src/services/__tests__/meets.test.ts (drop tests for deleted functions, keep the rest)",
+    "  src/hooks/useMeetDetails.ts (drop entries/relays subscriptions, lines ~46+)",
+    "  src/hooks/__tests__/useMeetDetails.test.ts (update accordingly)",
+    "PHASE 3 (Collapse meet detail 4-tab → 2-tab):",
+    "  app/meet/[id].tsx — change Tab type from 'overview'|'entries'|'relays'|'psych_sheet' to 'overview'|'psych_sheet'. Remove entries+relays state (lines 39-40), remove subscribe calls (lines 51-57), remove the Entries Tab block (line 251+) and Relays Tab block (line 296+), remove tab labels for them (line 89+).",
+    "  Remove imports for EntryWithId, RelayWithId, subscribeEntries, subscribeRelays, generatePsychSheet should KEEP (still used).",
+    "  PsychSheet component itself stays — it just receives entries=[] now? Verify what generatePsychSheet does with no entries; if it depends on entries from Firestore, this whole removal needs more care. Read PsychSheet component first."
+  ],
+  "read_first": [
+    "AGENTS.md",
+    ".codex/handoffs/feature-prune-1-surgical.json (predecessor — for context)",
+    ".codex/FULL_APP_OVERVIEW.md (sections G, H to confirm scope)",
+    "app/meet/[id].tsx (full file)",
+    "src/services/meets.ts",
+    "src/components/PsychSheet.tsx",
+    "src/hooks/useMeetDetails.ts",
+    "src/stores/liveMeetStore.ts",
+    "app/meet/[id]/live.tsx",
+    "app/meet/[id]/timer.tsx",
+    "app/meet/[id]/results.tsx"
+  ],
+  "deliverables": [
+    "PHASE 1: All 3 live-ops routes deleted; liveMeetStore + liveMeet service + their tests deleted. App still launches. Meet detail screen no longer shows 'Go Live' / 'Timer' buttons.",
+    "PHASE 2: 3 meet creation/management routes deleted; meets.ts trimmed to list+doc+psychSheet helpers; subscribeEntries / subscribeRelays / relay-optimization helpers gone. (tabs)/meets.tsx no longer has '+ New' affordance. Meets are now read-only — entered/created via SDIF/HY3 import only (#55 stays in slice 3 territory or beyond — confirm the import path doesn't need any creation helpers).",
+    "PHASE 3: app/meet/[id].tsx is now a 2-tab screen (Overview + Psych Sheet). All entries/relays state and subscriptions gone. PsychSheet still renders if entries are produced from another source (e.g. SDIF import populating Times collection — verify this works; if PsychSheet truly needs an entries collection, document the gap).",
+    "Each phase = one commit. Phase order: P1 → P2 → P3."
+  ],
+  "acceptance_criteria": [
+    "Working tree clean after each commit.",
+    "All remaining tests pass. Test corpus drops by exactly the suites we deleted: liveMeetStore.test.ts (1 suite), liveMeet.test.ts (1 suite), portions of meets.test.ts and useMeetDetails.test.ts.",
+    "npm run typecheck clean.",
+    "npm run lint:errors → 0 errors.",
+    "npm run quality:dead-code → no new dead exports.",
+    "(cd functions && npm run build) clean.",
+    "Manual smoke: launch app, navigate Meets tab → tap a meet → see Overview + Psych Sheet only. No '+ New' button on Meets tab.",
+    "Deep-link config (if it referenced /meet/[id]/live or /meet/new) updated.",
+    "SDIF/HY3 result import (#55) still works — open app/meet-import.tsx and confirm it doesn't depend on subscribeEntries or any deleted helper.",
+    "Psych Sheet still renders on the meet detail page. If it requires data from a now-deleted collection, this is a STOP condition — surface it."
+  ],
+  "validation_commands": [
+    "npm run typecheck",
+    "npm run lint:errors",
+    "npm run quality",
+    "npm run quality:dead-code",
+    "npm test -- --runInBand",
+    "(cd functions && npm test -- --runInBand)",
+    "(cd functions && npm run build)",
+    "npm run sync:functions-shared:verify"
+  ],
+  "out_of_scope": [
+    "Section E attendance group-first enhancement (slice 3).",
+    "Removing the SDIF/HY3 import path (#55) — Kevin keeps it.",
+    "Removing meet detail entirely — only collapsing tabs.",
+    "Migrating existing Firestore meet/entry/relay documents — leave them; just stop reading.",
+    "Removing the Cloud Function for results aggregation if one exists for SDIF imports — investigate, but only delete if it's exclusively live-ops.",
+    "Touching simulation, save/load, schema, RNG."
+  ],
+  "stop_conditions": [
+    "PsychSheet component requires the entries collection that we're orphaning — halt; this slice's design assumed psych sheet renders from Times or some other source.",
+    "SDIF/HY3 import depends on subscribeEntries or any deleted helper — halt; would break #55.",
+    "Cloud Function or Firestore rule blocks meet doc CRUD without entries subcollection writes — halt.",
+    "Removing meet/new also kills the only path for creating a meet doc and there's no alternative ingestion (e.g., SDIF import doesn't auto-create meets) — halt and ask. Kevin may need a slim 'add meet' modal as replacement.",
+    "An existing baseline test changes behavior unexpectedly — apply baseline_update_protocol."
+  ],
+  "baseline_update_protocol": [
+    "Run the existing corpus first.",
+    "If output changed, produce a human-readable diff (file, test name, old assertion, new assertion, reason).",
+    "Classify: intended (deletion-induced) vs. unintended.",
+    "Update expected outputs only when the change is intended and documented.",
+    "Note new corpus totals in regression_summary."
+  ],
+  "final_response_required_format": {
+    "plan": "Brief plan executed (P1-P3 summary).",
+    "files_changed": "Every file touched/deleted, grouped by phase.",
+    "verification": "Exact commands run and pass/fail per phase.",
+    "regression_summary": "Test corpus deltas + which suites were deleted.",
+    "risks": "Anything Codex flagged as 'works but feels load-bearing'.",
+    "handoff": "Confirm slice 3 (attendance group-first) is unblocked. Surface any meet-creation gap that needs a follow-up (e.g., 'meets can no longer be created without SDIF import — Kevin should confirm this is intended')."
+  }
+}

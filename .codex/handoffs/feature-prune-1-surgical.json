@@ -1,0 +1,114 @@
+{
+  "$schema_version": "2026-04-28",
+  "$comment": "Slice 1 of 3 in the Feature-Prune sprint. Surgical removals of small-blast-radius features Kevin doesn't use. No UI restructuring. Ship phase by phase.",
+  "sprint_id": "BSPC-Sprint-Feature-Prune-1-Surgical",
+  "project": "BSPC Coach App",
+  "effort_level": "medium",
+  "context": {
+    "director": "Kevin Bigham",
+    "baseline_sha": "ab73b4b",
+    "baseline_branch": "main",
+    "test_corpus": "1135 / 120 (1023 client + 111 functions + 1 invariant added in Arch-Cleanup)",
+    "why": "Kevin reviewed a 132-feature inventory and named these as not-used / not-wanted. Cut completely per his 'Not needed = cut completely' rule. This slice is the small-radius set; meet/live-ops removal is in slice 2; attendance group-first enhancement is slice 3."
+  },
+  "edit_radius": [
+    "PHASE 1 (Dashboard prune + spark 7→30 day):",
+    "  src/hooks/useDashboardData.ts",
+    "  src/hooks/__tests__/useDashboardData.test.ts",
+    "  app/(tabs)/index.tsx",
+    "  src/services/aggregations.ts (only if it pre-aggregates a 7-day window)",
+    "PHASE 2 (Medical info removal):",
+    "  app/swimmer/medical.tsx (DELETE)",
+    "  app/swimmer/[id].tsx (drop medicalBtn lines ~251-254 + styles ~1258,1266)",
+    "  app/_layout.tsx (drop swimmer/medical route registration if present)",
+    "  src/types/firestore.types.ts (drop medical fields from Swimmer type)",
+    "  src/services/swimmers.ts (or wherever the type is read/written)",
+    "  src/services/__tests__/* (any test fixtures setting medical fields)",
+    "  test/fixtures/coach/builders.ts (drop medical builder fields if present)",
+    "  functions/src/__tests__/parentPortal.test.ts (drop medical refs)",
+    "PHASE 3 (Practice-plan deep-link viewer removal):",
+    "  app/practice-plan/[id].tsx (DELETE)",
+    "  app/_layout.tsx (drop practice-plan/[id] Stack.Screen + any deep-link config)",
+    "  Anywhere that does router.push('/practice-plan/...') or Linking config (grep first)",
+    "PHASE 4 (AI practice generator removal — full stack):",
+    "  app/practice/ai-generate.tsx (DELETE)",
+    "  app/(tabs)/practice.tsx line 279 — drop AI button entry",
+    "  app/practice/library.tsx line 118 — drop aiBtn TouchableOpacity + styles",
+    "  app/_layout.tsx line 570 — drop Stack.Screen for practice/ai-generate",
+    "  src/services/aiPractice.ts (DELETE)",
+    "  src/services/__tests__/aiPractice.test.ts (DELETE)",
+    "  functions/src/callable/generatePractice.ts (DELETE)",
+    "  functions/src/__tests__/generatePractice.test.ts (DELETE)",
+    "  functions/src/index.ts line 6 — drop the export",
+    "  src/services/docExport.ts — VERIFY only that generatePracticePlanDoc has no aiPractice dependency; do not delete (still used for docx export of plain plans)"
+  ],
+  "read_first": [
+    "AGENTS.md",
+    ".codex/handoff.json",
+    ".codex/status.md (last 2 dated sections)",
+    ".codex/FULL_APP_OVERVIEW.md (sections B, C, D, F to confirm scope)",
+    "docs/process/sim-engine-quality-gates.md (only if any phase touches simulation/RNG — none expected)",
+    "src/hooks/useDashboardData.ts",
+    "src/types/firestore.types.ts",
+    "functions/src/index.ts"
+  ],
+  "deliverables": [
+    "PHASE 1: Recent PRs feed gone from dashboard data hook + JSX. sparkData window expanded from 7 to 30 days. Layout adjusted so 30 dots are readable on a phone (consider thinner bars / hidden labels except for first/today/midpoints — Codex's call). Tests updated.",
+    "PHASE 2: Medical button gone from swimmer profile. /swimmer/medical route deleted. Medical fields gone from Swimmer type. Existing Firestore documents are NOT modified — old medical fields stay on disk untouched (no migration, no delete writes); the type just stops reading/writing them. Tests pass without medical fixtures.",
+    "PHASE 3: app/practice-plan/[id].tsx deleted. No remaining router.push to that route. Deep-link config (if it referenced practice-plan) cleaned up. App still launches and tests pass.",
+    "PHASE 4: AI practice generator route + UI entries + client service + Cloud Function + tests all deleted. functions/src/index.ts no longer exports generatePractice. functions build still clean. Practice tab no longer shows an AI button. functions tests still 110/17 (was 111/18, minus the deleted generatePractice suite).",
+    "Each phase = one commit. Conventional commit format. Phase order is P1 → P2 → P3 → P4 (smallest blast radius first)."
+  ],
+  "acceptance_criteria": [
+    "Working tree clean after each commit.",
+    "All existing tests still pass after each phase. New corpus targets — P1: 1135/120, P2: 1135/120 (test count may shift if medical-specific tests deleted; surface in regression_summary), P3: same, P4: client suites unchanged minus aiPractice.test.ts; functions suites = 17 (was 18) and tests = 110 (was 111) assuming generatePractice.test.ts had 1 suite.",
+    "npm run typecheck clean.",
+    "npm run lint:errors → 0 errors. Pre-existing 181 warnings may decrease as dead code is removed; do not introduce new warnings.",
+    "(cd functions && npm run build) clean — sync:functions-shared:verify still passes (notification-rules untouched).",
+    "No dead exports — npm run quality:dead-code shows nothing introduced by this slice.",
+    "Spark chart still renders with 30 data points; layout doesn't break on common widths (verify on iPhone 14 simulator size or check with snapshot if one exists).",
+    "Deep-link tests (if any) updated — search test/ for practice-plan refs."
+  ],
+  "validation_commands": [
+    "npm run typecheck",
+    "npm run lint:errors",
+    "npm run quality",
+    "npm run quality:dead-code",
+    "npx jest --runInBand src/hooks/__tests__/useDashboardData.test.ts",
+    "npm test -- --runInBand",
+    "(cd functions && npm test -- --runInBand)",
+    "(cd functions && npm run build)",
+    "npm run sync:functions-shared:verify"
+  ],
+  "out_of_scope": [
+    "Section E attendance group-first enhancement (slice 3).",
+    "Meet creation / entries / relays / live-ops removal (slice 2).",
+    "Migrating existing Firestore docs to drop medical fields — leave them on disk; the app just stops reading them.",
+    "Touching the AI knowledge base (src/utils/aiKnowledge or similar) — it may still be used by audio observation extraction. Confirm before touching; in scope only if exclusively used by generatePractice.",
+    "Refactoring docExport.ts beyond removing AI-only paths.",
+    "Touching simulation, save/load, schema, RNG — none of these phases require it. If a deletion forces a schema change, halt per stop_conditions."
+  ],
+  "stop_conditions": [
+    "A deletion would require a Firestore schema migration — halt and document.",
+    "An existing baseline test fails after edits — apply baseline_update_protocol.",
+    "AI knowledge base (data/ai-knowledge or src/utils/aiKnowledge) turns out to have non-AI-practice consumers — keep it; only drop generatePractice-specific code.",
+    "docExport.generatePracticePlanDoc has hidden coupling to aiPractice — halt; partial-delete is unsafe.",
+    "Spark expansion from 7 to 30 days needs a new aggregation collection / Cloud Function — halt; original spec was UI-window-only.",
+    "Removing the medical screen breaks parent-portal callable function tests in a way that can't be fixed by dropping the field — halt."
+  ],
+  "baseline_update_protocol": [
+    "Run the existing corpus first to establish baseline.",
+    "If output changed, produce a human-readable diff (file, test name, old assertion, new assertion, reason).",
+    "Classify the change: intended (deletion-induced) vs. unintended.",
+    "Update expected outputs only when the change is intended and documented in this slice.",
+    "Note the new corpus totals in final_response_required_format.regression_summary."
+  ],
+  "final_response_required_format": {
+    "plan": "Brief plan executed (P1-P4 summary).",
+    "files_changed": "Every file touched, grouped by phase.",
+    "verification": "Exact commands run and pass/fail per phase.",
+    "regression_summary": "Test corpus deltas: client (was 1023/102) → ?, functions (was 111/18) → ?, combined → ?",
+    "risks": "Anything Codex couldn't fully verify (dead-code coverage, deep-link config edge cases, etc.).",
+    "handoff": "Confirm slice 2 (meet refactor) and slice 3 (attendance group-first) are unblocked, or surface any newly-discovered coupling."
+  }
+}
