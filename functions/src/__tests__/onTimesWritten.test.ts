@@ -9,7 +9,6 @@ const { db, mockDocRef } = createMockFirestore();
 const fieldValue = createMockFieldValue();
 
 const mockRecomputeDashboardActivityAggregation = jest.fn().mockResolvedValue(undefined);
-const mockRecomputeDashboardRecentPRsAggregation = jest.fn().mockResolvedValue(undefined);
 
 jest.mock('firebase-admin', () => ({
   apps: [{}],
@@ -22,7 +21,6 @@ jest.mock('firebase-admin', () => ({
 
 jest.mock('../triggers/dashboardAggregations', () => ({
   recomputeDashboardActivityAggregation: mockRecomputeDashboardActivityAggregation,
-  recomputeDashboardRecentPRsAggregation: mockRecomputeDashboardRecentPRsAggregation,
 }));
 
 import { onTimesWritten } from '../triggers/onTimesWritten';
@@ -75,7 +73,7 @@ describe('onTimesWritten', () => {
     });
   });
 
-  it('dispatches swimmer, activity, and recent-PR recomputes when a PR time is created', async () => {
+  it('dispatches swimmer PR and activity recomputes when a PR time is created', async () => {
     const handler = handlerOf(onTimesWritten) as (event: unknown) => Promise<void>;
 
     await handler(makeEvent(undefined, { isPR: true }));
@@ -91,46 +89,32 @@ describe('onTimesWritten', () => {
       { merge: true },
     );
     expect(mockRecomputeDashboardActivityAggregation).toHaveBeenCalledTimes(1);
-    expect(mockRecomputeDashboardRecentPRsAggregation).toHaveBeenCalledTimes(1);
   });
 
-  it('dispatches swimmer and activity recomputes but not recent PRs when a non-PR time is created', async () => {
+  it('dispatches swimmer PR and activity recomputes for a non-PR time as well', async () => {
     const handler = handlerOf(onTimesWritten) as (event: unknown) => Promise<void>;
 
     await handler(makeEvent(undefined, { isPR: false }));
 
     expect(db.doc).toHaveBeenCalledWith('aggregations/swimmer_swimmer-1');
     expect(mockRecomputeDashboardActivityAggregation).toHaveBeenCalledTimes(1);
-    expect(mockRecomputeDashboardRecentPRsAggregation).not.toHaveBeenCalled();
   });
 
-  it('dispatches recent PR recompute when an updated row was or is a PR', async () => {
+  it('dispatches swimmer PR and activity recomputes when a row is updated', async () => {
     const handler = handlerOf(onTimesWritten) as (event: unknown) => Promise<void>;
 
     await handler(makeEvent({ isPR: false }, { isPR: true }));
 
     expect(db.doc).toHaveBeenCalledWith('aggregations/swimmer_swimmer-1');
     expect(mockRecomputeDashboardActivityAggregation).toHaveBeenCalledTimes(1);
-    expect(mockRecomputeDashboardRecentPRsAggregation).toHaveBeenCalledTimes(1);
   });
 
-  it('does not dispatch recent PR recompute when updated before and after are non-PR rows', async () => {
-    const handler = handlerOf(onTimesWritten) as (event: unknown) => Promise<void>;
-
-    await handler(makeEvent({ isPR: false }, { isPR: false }));
-
-    expect(db.doc).toHaveBeenCalledWith('aggregations/swimmer_swimmer-1');
-    expect(mockRecomputeDashboardActivityAggregation).toHaveBeenCalledTimes(1);
-    expect(mockRecomputeDashboardRecentPRsAggregation).not.toHaveBeenCalled();
-  });
-
-  it('dispatches recent PR recompute when a deleted row was a PR', async () => {
+  it('dispatches swimmer PR and activity recomputes when a row is deleted', async () => {
     const handler = handlerOf(onTimesWritten) as (event: unknown) => Promise<void>;
 
     await handler(makeEvent({ isPR: true }, undefined));
 
     expect(db.doc).toHaveBeenCalledWith('aggregations/swimmer_swimmer-1');
     expect(mockRecomputeDashboardActivityAggregation).toHaveBeenCalledTimes(1);
-    expect(mockRecomputeDashboardRecentPRsAggregation).toHaveBeenCalledTimes(1);
   });
 });

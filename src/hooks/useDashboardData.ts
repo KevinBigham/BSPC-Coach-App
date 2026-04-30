@@ -17,7 +17,6 @@ import { useAttendanceStore } from '../stores/attendanceStore';
 import {
   subscribeDashboardActivityAggregation,
   subscribeDashboardAttendanceAggregation,
-  subscribeDashboardRecentPRsAggregation,
 } from '../services/aggregations';
 import { subscribeUpcomingMeets } from '../services/meets';
 import { getUnreadCount } from '../services/notifications';
@@ -25,28 +24,19 @@ import { getTodayString } from '../utils/time';
 import type { DashboardActivityItem } from '../types/firestore.types';
 import type { Meet } from '../types/meet.types';
 
-const DAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
-
-/** Shape the dashboard renders for the recent-PRs row. */
-export interface DashboardRecentPRView {
-  id: string;
-  event: string;
-  course: string;
-  timeDisplay: string;
-  swimmerName?: string;
-}
+/** Number of trailing days the dashboard spark chart visualizes. */
+const SPARK_DAY_COUNT = 30;
 
 export interface DashboardData {
   totalSwimmers: number;
   swimmerCounts: Record<string, number>;
   todayAttendance: number;
   recentActivity: DashboardActivityItem[];
-  recentPRs: DashboardRecentPRView[];
   weekAttendance: Record<string, number>;
   pendingDrafts: number;
   unreadCount: number;
   nextMeet: (Meet & { id: string }) | null;
-  sparkData: Array<{ date: string; count: number; dayLabel: string }>;
+  sparkData: Array<{ date: string; count: number }>;
   today: string;
 }
 
@@ -55,7 +45,6 @@ export function useDashboardData(coachUid: string | undefined): DashboardData {
   const todayRecords = useAttendanceStore((s) => s.todayRecords);
 
   const [recentActivity, setRecentActivity] = useState<DashboardActivityItem[]>([]);
-  const [recentPRs, setRecentPRs] = useState<DashboardRecentPRView[]>([]);
   const [weekAttendance, setWeekAttendance] = useState<Record<string, number>>({});
   const [pendingDrafts, setPendingDrafts] = useState(0);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -65,22 +54,6 @@ export function useDashboardData(coachUid: string | undefined): DashboardData {
 
   useEffect(
     () => subscribeUpcomingMeets((meets) => setNextMeet(meets.length > 0 ? meets[0] : null)),
-    [],
-  );
-
-  useEffect(
-    () =>
-      subscribeDashboardRecentPRsAggregation((aggregation) => {
-        setRecentPRs(
-          (aggregation?.items ?? []).map((item) => ({
-            id: item.id,
-            event: item.event,
-            course: item.course,
-            timeDisplay: item.timeDisplay,
-            swimmerName: item.swimmerName,
-          })),
-        );
-      }),
     [],
   );
 
@@ -149,15 +122,14 @@ export function useDashboardData(coachUid: string | undefined): DashboardData {
   );
 
   const sparkData = useMemo(() => {
-    const data: { date: string; count: number; dayLabel: string }[] = [];
-    for (let i = 6; i >= 0; i--) {
+    const data: { date: string; count: number }[] = [];
+    for (let i = SPARK_DAY_COUNT - 1; i >= 0; i--) {
       const d = new Date();
       d.setDate(d.getDate() - i);
       const dateStr = d.toISOString().split('T')[0];
       data.push({
         date: dateStr,
         count: weekAttendance[dateStr] || 0,
-        dayLabel: DAY_LABELS[d.getDay()],
       });
     }
     return data;
@@ -168,7 +140,6 @@ export function useDashboardData(coachUid: string | undefined): DashboardData {
     swimmerCounts,
     todayAttendance,
     recentActivity,
-    recentPRs,
     weekAttendance,
     pendingDrafts,
     unreadCount,

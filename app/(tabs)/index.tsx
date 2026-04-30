@@ -37,13 +37,11 @@ function DashboardScreen() {
     swimmerCounts,
     todayAttendance,
     recentActivity,
-    recentPRs,
     weekAttendance,
     pendingDrafts,
     unreadCount,
     nextMeet,
     sparkData,
-    today,
   } = useDashboardData(coach?.uid);
 
   const onRefresh = () => {
@@ -125,24 +123,6 @@ function DashboardScreen() {
           );
         })()}
 
-      {/* Recent PRs */}
-      {recentPRs.length > 0 && (
-        <View style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>RECENT PRs</Text>
-          {recentPRs.map((pr) => (
-            <View key={pr.id} style={styles.prRow}>
-              <Text style={styles.prBadge}>PR</Text>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.prEvent}>
-                  {pr.event} ({pr.course})
-                </Text>
-              </View>
-              <Text style={styles.prTime}>{pr.timeDisplay}</Text>
-            </View>
-          ))}
-        </View>
-      )}
-
       {/* Quick Stats */}
       {coach?.uid && <PracticePdfUploader coachId={coach.uid} />}
 
@@ -198,9 +178,9 @@ function DashboardScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* 7-Day Attendance Spark Chart */}
+      {/* 30-Day Attendance Spark Chart */}
       <View style={styles.sectionCard}>
-        <Text style={styles.sectionTitle}>7-DAY ATTENDANCE</Text>
+        <Text style={styles.sectionTitle}>30-DAY ATTENDANCE</Text>
         <View style={styles.sparkLineWrap}>
           <SparkLine
             data={sparkData.map((day) => day.count)}
@@ -208,16 +188,6 @@ function DashboardScreen() {
             height={60}
             color={colors.accent}
           />
-        </View>
-        <View style={styles.sparkLabelRow}>
-          {sparkData.map((day) => (
-            <Text
-              key={day.date}
-              style={[styles.sparkLabel, day.date === today && styles.sparkLabelToday]}
-            >
-              {day.dayLabel}
-            </Text>
-          ))}
         </View>
       </View>
 
@@ -513,47 +483,9 @@ const styles = StyleSheet.create({
     color: colors.gold,
   },
 
-  // PR Feed
-  prRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.borderLight,
-    gap: spacing.md,
-  },
-  prBadge: {
-    fontFamily: fontFamily.pixel,
-    fontSize: 7,
-    letterSpacing: 1,
-    color: colors.gold,
-    backgroundColor: 'rgba(255,215,0,0.1)',
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-    borderRadius: borderRadius.xs,
-    borderWidth: 1,
-    borderColor: colors.gold,
-    overflow: 'hidden',
-  },
-  prEvent: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.sm, color: colors.text },
-  prTime: { fontFamily: fontFamily.stat, fontSize: fontSize.md, color: colors.gold },
-
   // Spark Chart
   sparkLineWrap: {
     alignItems: 'center',
-    marginBottom: spacing.sm,
-  },
-  sparkLabelRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  sparkLabel: {
-    fontFamily: fontFamily.bodySemi,
-    fontSize: fontSize.xs,
-    color: colors.textSecondary,
-  },
-  sparkLabelToday: {
-    color: colors.gold,
   },
 
   // Sections

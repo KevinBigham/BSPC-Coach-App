@@ -12,7 +12,6 @@ import type {
   AttendanceAggregation,
   DashboardActivityAggregation,
   DashboardAttendanceAggregation,
-  DashboardRecentPRsAggregation,
   SwimmerAggregation,
 } from '../types/firestore.types';
 
@@ -65,19 +64,6 @@ export function subscribeDashboardActivityAggregation(
     doc(db, 'aggregations', 'dashboard_activity'),
     (snap) => {
       callback(snap.exists() ? (snap.data() as DashboardActivityAggregation) : null);
-    },
-    () => callback(null),
-  );
-}
-
-/** Subscribe to the dashboard recent-PRs aggregation (top 5 newest PRs across the team). */
-export function subscribeDashboardRecentPRsAggregation(
-  callback: (agg: DashboardRecentPRsAggregation | null) => void,
-): () => void {
-  return onSnapshot(
-    doc(db, 'aggregations', 'dashboard_recent_prs'),
-    (snap) => {
-      callback(snap.exists() ? (snap.data() as DashboardRecentPRsAggregation) : null);
     },
     () => callback(null),
   );

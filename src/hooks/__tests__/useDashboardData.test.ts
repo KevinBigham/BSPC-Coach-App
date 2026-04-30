@@ -3,7 +3,6 @@ import type {
   AttendanceRecord,
   DashboardActivityAggregation,
   DashboardAttendanceAggregation,
-  DashboardRecentPRsAggregation,
   Swimmer,
 } from '../../types/firestore.types';
 import type { Meet } from '../../types/meet.types';
@@ -36,7 +35,6 @@ jest.mock('firebase/firestore', () => ({
 
 const mockSubscribeDashboardActivityAggregation = jest.fn();
 const mockSubscribeDashboardAttendanceAggregation = jest.fn();
-const mockSubscribeDashboardRecentPRsAggregation = jest.fn();
 
 jest.mock('../../services/aggregations', () => ({
   subscribeDashboardActivityAggregation: (
@@ -45,9 +43,6 @@ jest.mock('../../services/aggregations', () => ({
   subscribeDashboardAttendanceAggregation: (
     ...args: Parameters<typeof mockSubscribeDashboardAttendanceAggregation>
   ) => mockSubscribeDashboardAttendanceAggregation(...args),
-  subscribeDashboardRecentPRsAggregation: (
-    ...args: Parameters<typeof mockSubscribeDashboardRecentPRsAggregation>
-  ) => mockSubscribeDashboardRecentPRsAggregation(...args),
 }));
 
 const mockSubscribeUpcomingMeets = jest.fn();
@@ -71,14 +66,12 @@ jest.mock('../../utils/time', () => ({
 
 type ActivityCallback = (aggregation: DashboardActivityAggregation | null) => void;
 type AttendanceCallback = (aggregation: DashboardAttendanceAggregation | null) => void;
-type RecentPRsCallback = (aggregation: DashboardRecentPRsAggregation | null) => void;
 type MeetsCallback = (meets: Array<Meet & { id: string }>) => void;
 type SnapshotCallback = (snap: { size: number }) => void;
 type UnreadCallback = (count: number) => void;
 
 const unsubActivity = jest.fn();
 const unsubAttendance = jest.fn();
-const unsubRecentPRs = jest.fn();
 const unsubMeets = jest.fn();
 const unsubAudio = jest.fn();
 const unsubVideo = jest.fn();
@@ -86,7 +79,6 @@ const unreadUnsubs: jest.Mock[] = [];
 
 let activityCallback: ActivityCallback;
 let attendanceCallback: AttendanceCallback;
-let recentPRsCallback: RecentPRsCallback;
 let meetsCallback: MeetsCallback;
 let audioSnapshotCallback: SnapshotCallback;
 let videoSnapshotCallback: SnapshotCallback;
@@ -167,10 +159,6 @@ beforeEach(() => {
     attendanceCallback = callback;
     return unsubAttendance;
   });
-  mockSubscribeDashboardRecentPRsAggregation.mockImplementation((callback: RecentPRsCallback) => {
-    recentPRsCallback = callback;
-    return unsubRecentPRs;
-  });
   mockSubscribeUpcomingMeets.mockImplementation((callback: MeetsCallback) => {
     meetsCallback = callback;
     return unsubMeets;
@@ -219,13 +207,13 @@ describe('useDashboardData', () => {
     expect(result.current.today).toBe('2026-04-08');
   });
 
-  it('builds seven sparkline days oldest to newest from dashboard attendance counts', () => {
+  it('builds 30 sparkline days oldest to newest from dashboard attendance counts', () => {
     const { result } = renderHook(() => useDashboardData(undefined));
 
     act(() => {
       attendanceCallback({
         countsByDate: {
-          '2026-04-02': 4,
+          '2026-03-12': 4, // 27 days ago — covered by the 30-day window
           '2026-04-04': 6,
           '2026-04-08': 9,
         },
@@ -233,15 +221,11 @@ describe('useDashboardData', () => {
       });
     });
 
-    expect(result.current.sparkData).toEqual([
-      { date: '2026-04-02', count: 4, dayLabel: 'T' },
-      { date: '2026-04-03', count: 0, dayLabel: 'F' },
-      { date: '2026-04-04', count: 6, dayLabel: 'S' },
-      { date: '2026-04-05', count: 0, dayLabel: 'S' },
-      { date: '2026-04-06', count: 0, dayLabel: 'M' },
-      { date: '2026-04-07', count: 0, dayLabel: 'T' },
-      { date: '2026-04-08', count: 9, dayLabel: 'W' },
-    ]);
+    expect(result.current.sparkData).toHaveLength(30);
+    expect(result.current.sparkData[0]).toEqual({ date: '2026-03-10', count: 0 });
+    expect(result.current.sparkData[2]).toEqual({ date: '2026-03-12', count: 4 });
+    expect(result.current.sparkData[25]).toEqual({ date: '2026-04-04', count: 6 });
+    expect(result.current.sparkData[29]).toEqual({ date: '2026-04-08', count: 9 });
   });
 
   it('keeps pending draft count as audio and video review snapshots update independently', () => {
@@ -267,38 +251,6 @@ describe('useDashboardData', () => {
     expect(result.current.nextMeet).toBeNull();
   });
 
-  it('maps recent PR aggregation rows into the dashboard view shape', () => {
-    const { result } = renderHook(() => useDashboardData(undefined));
-
-    act(() => {
-      recentPRsCallback({
-        items: [
-          {
-            id: 'time-1',
-            swimmerId: 'swimmer-1',
-            swimmerName: 'Ava Lane',
-            event: '50 Free',
-            course: 'SCY',
-            timeDisplay: '24.99',
-            meetName: 'Spring Splash',
-            createdAt: new Date('2026-04-08T12:00:00Z'),
-          },
-        ],
-        updatedAt: new Date('2026-04-08T12:00:00Z'),
-      });
-    });
-
-    expect(result.current.recentPRs).toEqual([
-      {
-        id: 'time-1',
-        event: '50 Free',
-        course: 'SCY',
-        timeDisplay: '24.99',
-        swimmerName: 'Ava Lane',
-      },
-    ]);
-  });
-
   it('updates recent activity and resets aggregation-backed arrays when null snapshots arrive', () => {
     const { result } = renderHook(() => useDashboardData(undefined));
 
@@ -316,14 +268,12 @@ describe('useDashboardData', () => {
         updatedAt: new Date('2026-04-08T12:00:00Z'),
       });
       attendanceCallback(null);
-      recentPRsCallback(null);
     });
 
     expect(result.current.recentActivity).toEqual([
       expect.objectContaining({ id: 'activity-1', type: 'note' }),
     ]);
     expect(result.current.weekAttendance).toEqual({});
-    expect(result.current.recentPRs).toEqual([]);
   });
 
   it('does not subscribe unread counts when coach uid is undefined', () => {
@@ -363,7 +313,6 @@ describe('useDashboardData', () => {
     unmount();
 
     expect(unsubMeets).toHaveBeenCalledTimes(1);
-    expect(unsubRecentPRs).toHaveBeenCalledTimes(1);
     expect(unsubAttendance).toHaveBeenCalledTimes(1);
     expect(unsubActivity).toHaveBeenCalledTimes(1);
     expect(unsubAudio).toHaveBeenCalledTimes(1);

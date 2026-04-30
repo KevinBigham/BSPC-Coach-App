@@ -13,7 +13,6 @@ const recomputeSwimmerPRs = jest.fn().mockResolvedValue(undefined);
 const recomputeNotesAggregation = jest.fn().mockResolvedValue(undefined);
 const recomputeDashboardAttendanceAggregation = jest.fn().mockResolvedValue(undefined);
 const recomputeDashboardActivityAggregation = jest.fn().mockResolvedValue(undefined);
-const recomputeDashboardRecentPRsAggregation = jest.fn().mockResolvedValue(undefined);
 
 jest.mock('firebase-admin', () => ({
   apps: [{}],
@@ -41,7 +40,6 @@ jest.mock('../triggers/onNotesWritten', () => ({
 jest.mock('../triggers/dashboardAggregations', () => ({
   recomputeDashboardAttendanceAggregation,
   recomputeDashboardActivityAggregation,
-  recomputeDashboardRecentPRsAggregation,
 }));
 
 import { rebuildAggregations } from '../scheduled/rebuildAggregations';
@@ -91,6 +89,5 @@ describe('rebuildAggregations', () => {
     expect(recomputeNotesAggregation).toHaveBeenCalledTimes(2);
     expect(recomputeDashboardAttendanceAggregation).toHaveBeenCalledTimes(1);
     expect(recomputeDashboardActivityAggregation).toHaveBeenCalledTimes(1);
-    expect(recomputeDashboardRecentPRsAggregation).toHaveBeenCalledTimes(1);
   });
 });

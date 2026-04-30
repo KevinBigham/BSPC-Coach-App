@@ -1,32 +1,21 @@
 import { onDocumentWritten } from 'firebase-functions/v2/firestore';
 import * as admin from 'firebase-admin';
-import {
-  recomputeDashboardActivityAggregation,
-  recomputeDashboardRecentPRsAggregation,
-} from './dashboardAggregations';
+import { recomputeDashboardActivityAggregation } from './dashboardAggregations';
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
 
 /**
- * Recompute swimmer PRs aggregation whenever a time record is created, updated, or deleted.
- *
- * The dashboard recent-PRs aggregation only needs to refresh when the write
- * actually touches a PR row — a non-PR insert never changes that view.
+ * Recompute swimmer PR + activity aggregations whenever a time record is created,
+ * updated, or deleted.
  */
 export const onTimesWritten = onDocumentWritten(
   'swimmers/{swimmerId}/times/{timeId}',
   async (event) => {
     const swimmerId = event.params.swimmerId;
-    const before = event.data?.before?.data();
-    const after = event.data?.after?.data();
-    const touchesPR = Boolean(before?.isPR) || Boolean(after?.isPR);
 
     await recomputeSwimmerPRs(swimmerId);
     await recomputeDashboardActivityAggregation();
-    if (touchesPR) {
-      await recomputeDashboardRecentPRsAggregation();
-    }
   },
 );
 
