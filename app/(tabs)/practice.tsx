@@ -274,12 +274,6 @@ function PracticeScreen() {
           >
             <Text style={styles.libraryBtnText}>PUBLIC PLANS</Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.aiBtn}
-            onPress={() => router.push('/practice/ai-generate')}
-          >
-            <Text style={styles.aiBtnText}>AI GENERATE</Text>
-          </TouchableOpacity>
         </View>
 
         {/* Quick Stats */}
@@ -592,22 +586,6 @@ const styles = StyleSheet.create({
     color: colors.text,
     letterSpacing: 1,
   },
-  aiBtn: {
-    flex: 1,
-    padding: spacing.md,
-    borderRadius: borderRadius.md,
-    borderWidth: 1,
-    borderColor: colors.gold,
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,215,0,0.06)',
-  },
-  aiBtnText: {
-    fontFamily: fontFamily.bodySemi,
-    fontSize: fontSize.sm,
-    color: colors.gold,
-    letterSpacing: 1,
-  },
-
   // Stats
   statsRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg },
   statBox: {

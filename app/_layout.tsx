@@ -557,16 +557,6 @@ function RootNavigator() {
           }}
         />
         <Stack.Screen
-          name="practice/ai-generate"
-          options={{
-            headerShown: true,
-            title: 'AI GENERATE',
-            headerStyle: { backgroundColor: colors.bgElevated },
-            headerTintColor: colors.accent,
-            headerTitleStyle: { fontFamily: fontFamily.heading, fontSize: 22, color: colors.text },
-          }}
-        />
-        <Stack.Screen
           name="season/index"
           options={{
             headerShown: true,

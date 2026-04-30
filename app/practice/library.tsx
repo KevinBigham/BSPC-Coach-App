@@ -114,13 +114,6 @@ function WorkoutLibraryScreen() {
           ))}
         </ScrollView>
 
-        {/* AI Generate Button */}
-        <TouchableOpacity style={styles.aiBtn} onPress={() => router.push('/practice/ai-generate')}>
-          <Text style={styles.aiBtnLabel}>AI POWERED</Text>
-          <Text style={styles.aiBtnText}>GENERATE PRACTICE</Text>
-          <Text style={styles.aiBtnDesc}>Let AI build a practice plan based on your needs</Text>
-        </TouchableOpacity>
-
         {/* Results */}
         {loading ? (
           <ActivityIndicator size="large" color={colors.accent} style={{ marginTop: 40 }} />
@@ -196,34 +189,6 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   chipTextActive: { color: colors.accent },
-  aiBtn: {
-    backgroundColor: colors.bgDeep,
-    borderWidth: 1,
-    borderColor: colors.gold,
-    borderRadius: borderRadius.lg,
-    padding: spacing.lg,
-    marginBottom: spacing.xl,
-  },
-  aiBtnLabel: {
-    fontFamily: fontFamily.pixel,
-    fontSize: 8,
-    letterSpacing: 1,
-    color: colors.gold,
-    marginBottom: spacing.xs,
-  },
-  aiBtnText: {
-    fontFamily: fontFamily.heading,
-    fontSize: fontSize.xl,
-    fontWeight: '700',
-    letterSpacing: 2,
-    color: colors.text,
-    marginBottom: spacing.xs,
-  },
-  aiBtnDesc: {
-    fontFamily: fontFamily.body,
-    fontSize: fontSize.sm,
-    color: colors.textSecondary,
-  },
   sectionTitle: {
     fontFamily: fontFamily.heading,
     fontSize: fontSize.lg,

@@ -3,7 +3,6 @@ export { onVideoUploaded } from './triggers/onVideoUploaded';
 export { onDraftReviewed } from './triggers/onDraftReviewed';
 export { onNotificationCreated } from './triggers/onNotification';
 export { dailyDigest } from './scheduled/dailyDigest';
-export { generatePractice } from './callable/generatePractice';
 export { redeemInvite } from './callable/redeemInvite';
 export { getParentPortalDashboard, getParentSwimmerPortalData } from './callable/parentPortal';
 export { manageTopicSubscription } from './callable/manageTopics';
