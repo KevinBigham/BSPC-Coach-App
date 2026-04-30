@@ -1,3 +1,10 @@
+/**
+ * Missed-practice rules intentionally split missing-history semantics.
+ * Client display uses evaluateMissedPractice and treats no history as missed.
+ * Cloud Functions notification firing uses evaluateMissedPracticeGap and treats
+ * no history as no-fire, because notifying every newly-added swimmer would spam
+ * coaches and parents.
+ */
 const MS_PER_DAY = 1000 * 60 * 60 * 24;
 
 export interface RuleEvaluationInput {
@@ -69,7 +76,9 @@ export const evaluateAttendanceStreak = evaluateAttendanceStreakCount;
 /**
  * Returns whether the gap between the prior attendance date and current
  * practice date is at least `daysSince`. A missing prior date returns false
- * because Cloud Functions notification firing has no baseline for a gap.
+ * because Cloud Functions notification firing has no baseline for a gap. See
+ * evaluateMissedPractice for client display semantics, which intentionally
+ * differ for missing-history swimmers.
  */
 export function evaluateMissedPracticeGap(
   lastAttendedDate: string | null | undefined,
@@ -95,7 +104,9 @@ export function evaluateMissedPracticeGap(
 /**
  * Legacy client helper for missed-practice display logic. Unlike notification
  * firing, a swimmer with no prior attendance is considered missed so existing
- * client behavior and critical-op tests remain stable.
+ * client behavior and critical-op tests remain stable. See
+ * evaluateMissedPracticeGap for notification-firing semantics, which
+ * intentionally differ for missing-history swimmers.
  */
 export function evaluateMissedPractice(
   lastAttendedDate: string | null | undefined,

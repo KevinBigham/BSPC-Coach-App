@@ -87,3 +87,11 @@ describe('missed practice evaluation', () => {
     expect(evaluateMissedPractice(undefined, '2026-04-10', 3)).toBe(true);
   });
 });
+
+describe('missed-practice asymmetry (INTENTIONAL)', () => {
+  it('keeps no-history client display and notification firing semantics different', () => {
+    // Future changes must consciously decide whether to break this invariant.
+    expect(evaluateMissedPractice(null, '2026-04-10', 3)).toBe(true);
+    expect(evaluateMissedPracticeGap(null, '2026-04-10', 3)).toBe(false);
+  });
+});
