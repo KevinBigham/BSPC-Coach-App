@@ -3,7 +3,6 @@ import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert } from 'rea
 import { useLocalSearchParams, router } from 'expo-router';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../../src/config/firebase';
-import { useAuth } from '../../src/contexts/AuthContext';
 import {
   colors,
   spacing,
@@ -14,30 +13,24 @@ import {
 } from '../../src/config/theme';
 import {
   subscribeEntries,
-  subscribeRelays,
   deleteMeet,
   updateMeet,
   generatePsychSheet,
   getMeetStatusColor,
   getMeetStatusLabel,
 } from '../../src/services/meets';
-import { formatTime } from '../../src/data/timeStandards';
-import { formatRelayLeg } from '../../src/utils/relay';
 import PsychSheet from '../../src/components/PsychSheet';
-import type { Meet, MeetEntry, Relay } from '../../src/types/meet.types';
+import type { Meet, MeetEntry } from '../../src/types/meet.types';
 import { withScreenErrorBoundary } from '../../src/components/ScreenErrorBoundary';
 
 type MeetWithId = Meet & { id: string };
 type EntryWithId = MeetEntry & { id: string };
-type RelayWithId = Relay & { id: string };
-type Tab = 'overview' | 'entries' | 'relays' | 'psych_sheet';
+type Tab = 'overview' | 'psych_sheet';
 
 function MeetDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { coach } = useAuth();
   const [meet, setMeet] = useState<MeetWithId | null>(null);
   const [entries, setEntries] = useState<EntryWithId[]>([]);
-  const [relays, setRelays] = useState<RelayWithId[]>([]);
   const [tab, setTab] = useState<Tab>('overview');
 
   useEffect(() => {
@@ -47,19 +40,16 @@ function MeetDetailScreen() {
     });
   }, [id]);
 
+  // Read-only legacy entries — drives the Psych Sheet tab. New entries cannot
+  // be authored in the app since the manage-entries flow was removed.
   useEffect(() => {
     if (!id) return;
     return subscribeEntries(id, setEntries);
   }, [id]);
 
-  useEffect(() => {
-    if (!id) return;
-    return subscribeRelays(id, setRelays);
-  }, [id]);
-
   const handleDelete = () => {
     if (!id) return;
-    Alert.alert('Delete Meet', 'Are you sure? All entries and relays will be lost.', [
+    Alert.alert('Delete Meet', 'Are you sure? Legacy entries on this meet will be lost.', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete',
@@ -88,20 +78,8 @@ function MeetDetailScreen() {
 
   const tabs: { key: Tab; label: string }[] = [
     { key: 'overview', label: 'OVERVIEW' },
-    { key: 'entries', label: `ENTRIES (${entries.length})` },
-    { key: 'relays', label: `RELAYS (${relays.length})` },
     { key: 'psych_sheet', label: 'PSYCH SHEET' },
   ];
-
-  const entriesByEvent: Record<string, EntryWithId[]> = {};
-  for (const entry of entries) {
-    const key = entry.eventName;
-    if (!entriesByEvent[key]) entriesByEvent[key] = [];
-    entriesByEvent[key].push(entry);
-  }
-  for (const key of Object.keys(entriesByEvent)) {
-    entriesByEvent[key].sort((a, b) => (a.seedTime || Infinity) - (b.seedTime || Infinity));
-  }
 
   return (
     <View style={styles.container}>
@@ -157,10 +135,6 @@ function MeetDetailScreen() {
                 <Text style={styles.statNum}>{uniqueEvents}</Text>
                 <Text style={styles.statLabel}>EVENTS</Text>
               </View>
-              <View style={styles.statBox}>
-                <Text style={styles.statNum}>{relays.length}</Text>
-                <Text style={styles.statLabel}>RELAYS</Text>
-              </View>
             </View>
 
             {meet.groups.length > 0 && (
@@ -188,24 +162,6 @@ function MeetDetailScreen() {
                 <Text style={styles.notes}>{meet.notes}</Text>
               </View>
             )}
-
-            {/* Action Buttons */}
-            <View style={styles.actionsRow}>
-              <TouchableOpacity
-                style={styles.actionBtn}
-                onPress={() => router.push({ pathname: '/meet/entries', params: { meetId: id } })}
-              >
-                <Text style={styles.actionBtnText}>MANAGE ENTRIES</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.actionBtn}
-                onPress={() =>
-                  router.push({ pathname: '/meet/relay-builder', params: { meetId: id } })
-                }
-              >
-                <Text style={styles.actionBtnText}>BUILD RELAYS</Text>
-              </TouchableOpacity>
-            </View>
 
             {/* Status Controls */}
             {meet.status === 'upcoming' && (
@@ -235,93 +191,6 @@ function MeetDetailScreen() {
             <TouchableOpacity style={styles.deleteBtn} onPress={handleDelete}>
               <Text style={styles.deleteBtnText}>DELETE MEET</Text>
             </TouchableOpacity>
-          </>
-        )}
-
-        {/* Entries Tab */}
-        {tab === 'entries' && (
-          <>
-            <TouchableOpacity
-              style={styles.manageBtn}
-              onPress={() => router.push({ pathname: '/meet/entries', params: { meetId: id } })}
-            >
-              <Text style={styles.manageBtnText}>+ ADD / REMOVE ENTRIES</Text>
-            </TouchableOpacity>
-
-            {Object.entries(entriesByEvent).map(([eventName, eventEntries]) => (
-              <View key={eventName} style={styles.eventBlock}>
-                <View style={styles.eventHeader}>
-                  <Text style={styles.eventName}>{eventName}</Text>
-                  <Text style={styles.eventCount}>{eventEntries.length}</Text>
-                </View>
-                {eventEntries.map((entry) => (
-                  <View key={entry.id} style={styles.entryRow}>
-                    <Text style={styles.entryName}>{entry.swimmerName}</Text>
-                    <Text
-                      style={[
-                        styles.entryGroup,
-                        { color: groupColors[entry.group] || colors.textSecondary },
-                      ]}
-                    >
-                      {entry.group}
-                    </Text>
-                    <Text style={styles.entrySeed}>
-                      {entry.seedTimeDisplay ||
-                        (entry.seedTime ? formatTime(entry.seedTime) : 'NT')}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-            ))}
-
-            {entries.length === 0 && (
-              <View style={styles.empty}>
-                <Text style={styles.emptyTitle}>NO ENTRIES</Text>
-                <Text style={styles.emptyText}>Add swimmers to events</Text>
-              </View>
-            )}
-          </>
-        )}
-
-        {/* Relays Tab */}
-        {tab === 'relays' && (
-          <>
-            <TouchableOpacity
-              style={styles.manageBtn}
-              onPress={() =>
-                router.push({ pathname: '/meet/relay-builder', params: { meetId: id } })
-              }
-            >
-              <Text style={styles.manageBtnText}>+ BUILD RELAY</Text>
-            </TouchableOpacity>
-
-            {relays.map((relay) => (
-              <View key={relay.id} style={styles.relayCard}>
-                <View style={styles.relayHeader}>
-                  <Text style={styles.relayEvent}>{relay.eventName}</Text>
-                  <Text style={styles.relayTeam}>{relay.teamName}</Text>
-                </View>
-                {relay.legs.map((leg) => (
-                  <Text key={leg.order} style={styles.relayLeg}>
-                    {formatRelayLeg(leg)}
-                  </Text>
-                ))}
-                <View style={styles.relayFooter}>
-                  <Text style={styles.relayEstLabel}>EST. TIME</Text>
-                  <Text style={styles.relayEstTime}>
-                    {relay.estimatedTimeDisplay ||
-                      (relay.estimatedTime ? formatTime(relay.estimatedTime) : 'N/A')}
-                  </Text>
-                </View>
-              </View>
-            ))}
-
-            {relays.length === 0 && (
-              <View style={styles.empty}>
-                <Text style={styles.emptyTitle}>NO RELAYS</Text>
-                <Text style={styles.emptyText}>Build relay teams</Text>
-              </View>
-            )}
           </>
         )}
 
@@ -453,22 +322,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
   notes: { fontFamily: fontFamily.body, fontSize: fontSize.md, color: colors.text, lineHeight: 22 },
-  // Actions
-  actionsRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg },
-  actionBtn: {
-    flex: 1,
-    padding: spacing.md,
-    borderRadius: borderRadius.sm,
-    borderWidth: 2,
-    borderColor: colors.purple,
-    alignItems: 'center',
-  },
-  actionBtnText: {
-    fontFamily: fontFamily.bodySemi,
-    fontSize: fontSize.sm,
-    color: colors.accent,
-    letterSpacing: 1,
-  },
+  // Status / Import / Delete
   startBtn: {
     backgroundColor: colors.purple,
     padding: spacing.lg,
@@ -504,123 +358,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   deleteBtnText: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.md, color: colors.error },
-  // Entries Tab
-  manageBtn: {
-    padding: spacing.lg,
-    borderRadius: borderRadius.md,
-    borderWidth: 2,
-    borderColor: colors.purple,
-    borderStyle: 'dashed',
-    alignItems: 'center',
-    marginBottom: spacing.lg,
-  },
-  manageBtnText: {
-    fontFamily: fontFamily.bodySemi,
-    fontSize: fontSize.md,
-    color: colors.accent,
-    letterSpacing: 1,
-  },
-  eventBlock: {
-    backgroundColor: colors.bgDeep,
-    borderRadius: borderRadius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    marginBottom: spacing.md,
-    overflow: 'hidden',
-  },
-  eventHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: spacing.md,
-    backgroundColor: colors.bgSurface,
-  },
-  eventName: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.md, color: colors.text },
-  eventCount: {
-    fontFamily: fontFamily.statMono,
-    fontSize: fontSize.xs,
-    color: colors.textSecondary,
-  },
-  entryRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.borderLight,
-  },
-  entryName: {
-    fontFamily: fontFamily.bodySemi,
-    fontSize: fontSize.sm,
-    color: colors.text,
-    flex: 1,
-  },
-  entryGroup: {
-    fontFamily: fontFamily.pixel,
-    fontSize: fontSize.pixel,
-    width: 60,
-    textAlign: 'center',
-  },
-  entrySeed: {
-    fontFamily: fontFamily.statMono,
-    fontSize: fontSize.sm,
-    color: colors.accent,
-    width: 65,
-    textAlign: 'right',
-  },
-  // Relays Tab
-  relayCard: {
-    backgroundColor: colors.bgDeep,
-    borderRadius: borderRadius.md,
-    padding: spacing.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    marginBottom: spacing.md,
-  },
-  relayHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.sm,
-  },
-  relayEvent: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.md, color: colors.text },
-  relayTeam: {
-    fontFamily: fontFamily.pixel,
-    fontSize: fontSize.pixel,
-    color: colors.gold,
-    letterSpacing: 1,
-  },
-  relayLeg: {
-    fontFamily: fontFamily.body,
-    fontSize: fontSize.sm,
-    color: colors.textSecondary,
-    paddingVertical: 2,
-  },
-  relayFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: spacing.sm,
-    paddingTop: spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: colors.borderLight,
-  },
-  relayEstLabel: {
-    fontFamily: fontFamily.pixel,
-    fontSize: fontSize.pixel,
-    color: colors.gold,
-    letterSpacing: 1,
-  },
-  relayEstTime: { fontFamily: fontFamily.stat, fontSize: fontSize.xl, color: colors.accent },
-  // Empty
-  empty: { alignItems: 'center', paddingVertical: spacing.xxxl },
-  emptyTitle: {
-    fontFamily: fontFamily.heading,
-    fontSize: fontSize.xl,
-    color: colors.text,
-    marginBottom: spacing.sm,
-  },
-  emptyText: { fontFamily: fontFamily.body, fontSize: fontSize.sm, color: colors.textSecondary },
 });
 
 export default withScreenErrorBoundary(MeetDetailScreen, 'MeetDetailScreen');

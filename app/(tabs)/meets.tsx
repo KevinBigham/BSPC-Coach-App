@@ -113,20 +113,13 @@ function MeetsTabScreen() {
               <View style={styles.emptyState}>
                 <Text style={styles.emptyTitle}>NO MEETS</Text>
                 <Text style={styles.emptyText}>
-                  {filter === 'all'
-                    ? 'Create your first meet'
-                    : `No ${filter.replace('_', ' ')} meets`}
+                  {filter === 'all' ? 'No meets yet' : `No ${filter.replace('_', ' ')} meets`}
                 </Text>
               </View>
             )}
           </>
         )}
       </ScrollView>
-
-      {/* FAB */}
-      <TouchableOpacity style={styles.fab} onPress={() => router.push('/meet/new')}>
-        <Text style={styles.fabText}>+</Text>
-      </TouchableOpacity>
     </View>
   );
 }
@@ -217,23 +210,6 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginTop: spacing.sm,
   },
-  fab: {
-    position: 'absolute',
-    bottom: 24,
-    right: 24,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: colors.purple,
-    alignItems: 'center',
-    justifyContent: 'center',
-    elevation: 6,
-    shadowColor: colors.purple,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-  },
-  fabText: { fontFamily: fontFamily.heading, fontSize: 28, color: colors.text },
 });
 
 export default withScreenErrorBoundary(MeetsTabScreen, 'MeetsTabScreen');

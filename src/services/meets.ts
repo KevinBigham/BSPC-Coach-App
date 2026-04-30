@@ -5,71 +5,17 @@ import {
   orderBy,
   limit,
   onSnapshot,
-  addDoc,
   updateDoc,
   deleteDoc,
   doc,
   serverTimestamp,
-  writeBatch,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
-import type { Meet, MeetEntry, Relay, PsychSheetEntry } from '../types/meet.types';
+import type { Meet, MeetEntry, PsychSheetEntry } from '../types/meet.types';
 import { formatTime } from '../data/timeStandards';
-import { BatchPartialFailureError } from '../utils/batchError';
-import { logger } from '../utils/logger';
 
 type MeetWithId = Meet & { id: string };
 type EntryWithId = MeetEntry & { id: string };
-type RelayWithId = Relay & { id: string };
-
-// ── Validation (pure helpers, no Firestore IO) ──
-
-/**
- * Throws if a meet entry has no swimmerId or references a swimmer that is not
- * in the supplied roster. Callers pass the set of swimmer ids known to exist
- * (typically the active roster from the swimmers store).
- */
-export function validateMeetEntry(
-  entry: Pick<MeetEntry, 'swimmerId'>,
-  validSwimmerIds: Iterable<string>,
-): void {
-  if (!entry.swimmerId) {
-    throw new Error('Meet entry is missing swimmerId.');
-  }
-  const set = validSwimmerIds instanceof Set ? validSwimmerIds : new Set(validSwimmerIds);
-  if (!set.has(entry.swimmerId)) {
-    throw new Error(`Swimmer ${entry.swimmerId} is not on the roster.`);
-  }
-}
-
-/**
- * Throws if a relay has the wrong leg count, a leg order outside 1..4,
- * duplicate leg orders, or the same swimmer in more than one leg.
- */
-export function validateRelay(relay: Pick<Relay, 'legs'> & { eventName?: string }): void {
-  const { legs } = relay;
-  if (!Array.isArray(legs) || legs.length !== 4) {
-    throw new Error('Relay must have exactly 4 legs.');
-  }
-  const orders = new Set<number>();
-  const swimmers = new Set<string>();
-  for (const leg of legs) {
-    if (!Number.isInteger(leg.order) || leg.order < 1 || leg.order > 4) {
-      throw new Error(`Relay leg order must be 1..4 (got ${leg.order}).`);
-    }
-    if (orders.has(leg.order)) {
-      throw new Error(`Relay has duplicate leg order ${leg.order}.`);
-    }
-    orders.add(leg.order);
-    if (!leg.swimmerId) {
-      throw new Error('Relay leg is missing swimmerId.');
-    }
-    if (swimmers.has(leg.swimmerId)) {
-      throw new Error(`Relay assigns swimmer ${leg.swimmerId} twice.`);
-    }
-    swimmers.add(leg.swimmerId);
-  }
-}
 
 // ── Meets ──
 
@@ -93,15 +39,6 @@ export function subscribeUpcomingMeets(callback: (meets: MeetWithId[]) => void) 
   });
 }
 
-export async function addMeet(data: Omit<Meet, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
-  const ref = await addDoc(collection(db, 'meets'), {
-    ...data,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  });
-  return ref.id;
-}
-
 export async function updateMeet(id: string, data: Partial<Meet>): Promise<void> {
   await updateDoc(doc(db, 'meets', id), {
     ...data,
@@ -113,114 +50,17 @@ export async function deleteMeet(id: string): Promise<void> {
   await deleteDoc(doc(db, 'meets', id));
 }
 
-// ── Entries ──
+// ── Entries (read-only) ──
+//
+// Entry authoring (add/update/remove + batch + relay CRUD) was removed in the
+// feature-prune sprint. The subscription below is kept read-only so the meet
+// detail Psych Sheet tab can still render legacy meets/{id}/entries documents.
 
 export function subscribeEntries(meetId: string, callback: (entries: EntryWithId[]) => void) {
   const q = query(collection(db, 'meets', meetId, 'entries'), orderBy('eventNumber', 'asc'));
   return onSnapshot(q, (snapshot) => {
     callback(snapshot.docs.map((d) => ({ id: d.id, ...d.data() }) as EntryWithId));
   });
-}
-
-export async function addEntry(
-  meetId: string,
-  entry: Omit<MeetEntry, 'id' | 'createdAt'>,
-  validSwimmerIds?: Iterable<string>,
-): Promise<string> {
-  if (validSwimmerIds !== undefined) {
-    validateMeetEntry(entry, validSwimmerIds);
-  }
-  const ref = await addDoc(collection(db, 'meets', meetId, 'entries'), {
-    ...entry,
-    createdAt: serverTimestamp(),
-  });
-  return ref.id;
-}
-
-export async function addEntriesBatch(
-  meetId: string,
-  entries: Omit<MeetEntry, 'id' | 'createdAt'>[],
-  validSwimmerIds?: Iterable<string>,
-): Promise<void> {
-  if (validSwimmerIds !== undefined) {
-    const idSet = validSwimmerIds instanceof Set ? validSwimmerIds : new Set(validSwimmerIds);
-    for (const entry of entries) {
-      validateMeetEntry(entry, idSet);
-    }
-  }
-  const batchSize = 400;
-  let committedItemCount = 0;
-  for (let i = 0; i < entries.length; i += batchSize) {
-    const batch = writeBatch(db);
-    const chunk = entries.slice(i, i + batchSize);
-    for (const entry of chunk) {
-      const ref = doc(collection(db, 'meets', meetId, 'entries'));
-      batch.set(ref, { ...entry, createdAt: serverTimestamp() });
-    }
-    try {
-      await batch.commit();
-      committedItemCount += chunk.length;
-    } catch (cause) {
-      logger.error('meets:addEntriesBatch:fail', {
-        error: String(cause),
-        meetId,
-        failedChunkIndex: Math.floor(i / batchSize),
-        committedItemCount,
-        remainingItemCount: entries.length - committedItemCount,
-      });
-      throw new BatchPartialFailureError({
-        committedItemCount,
-        failedChunkIndex: Math.floor(i / batchSize),
-        remainingItemCount: entries.length - committedItemCount,
-        cause,
-      });
-    }
-  }
-}
-
-export async function removeEntry(meetId: string, entryId: string): Promise<void> {
-  await deleteDoc(doc(db, 'meets', meetId, 'entries', entryId));
-}
-
-export async function updateEntry(
-  meetId: string,
-  entryId: string,
-  data: Partial<MeetEntry>,
-): Promise<void> {
-  await updateDoc(doc(db, 'meets', meetId, 'entries', entryId), data);
-}
-
-// ── Relays ──
-
-export function subscribeRelays(meetId: string, callback: (relays: RelayWithId[]) => void) {
-  const q = query(collection(db, 'meets', meetId, 'relays'), orderBy('eventName', 'asc'));
-  return onSnapshot(q, (snapshot) => {
-    callback(snapshot.docs.map((d) => ({ id: d.id, ...d.data() }) as RelayWithId));
-  });
-}
-
-export async function addRelay(
-  meetId: string,
-  relay: Omit<Relay, 'id' | 'createdAt'>,
-): Promise<string> {
-  validateRelay(relay);
-  const ref = await addDoc(collection(db, 'meets', meetId, 'relays'), {
-    ...relay,
-    createdAt: serverTimestamp(),
-  });
-  return ref.id;
-}
-
-export async function updateRelay(
-  meetId: string,
-  relayId: string,
-  data: Partial<Relay>,
-): Promise<void> {
-  await updateDoc(doc(db, 'meets', meetId, 'relays', relayId), data);
-}
-
-export async function deleteRelay(meetId: string, relayId: string): Promise<void> {
-  await deleteDoc(doc(db, 'meets', meetId, 'relays', relayId));
 }
 
 // ── Psych Sheet ──

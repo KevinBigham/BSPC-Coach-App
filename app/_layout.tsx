@@ -398,29 +398,6 @@ function RootNavigator() {
           }}
         />
         <Stack.Screen
-          name="meet/new"
-          options={{
-            headerShown: true,
-            title: 'NEW MEET',
-            headerStyle: { backgroundColor: colors.bgElevated },
-            headerTintColor: colors.accent,
-            headerTitleStyle: { fontFamily: fontFamily.heading, fontSize: 22, color: colors.text },
-            presentation: 'modal',
-          }}
-        />
-        <Stack.Screen
-          name="meet/entries"
-          options={{
-            headerShown: false,
-          }}
-        />
-        <Stack.Screen
-          name="meet/relay-builder"
-          options={{
-            headerShown: false,
-          }}
-        />
-        <Stack.Screen
           name="swimmer/invite-parent"
           options={{
             headerShown: true,
