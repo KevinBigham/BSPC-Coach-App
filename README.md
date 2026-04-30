@@ -1,8 +1,39 @@
 # BSPC Coach App
 
+[![CI](https://github.com/KevinBigham/BSPC-Coach-App/actions/workflows/ci.yml/badge.svg)](https://github.com/KevinBigham/BSPC-Coach-App/actions/workflows/ci.yml)
+[![Deploy Cloud Functions](https://github.com/KevinBigham/BSPC-Coach-App/actions/workflows/functions-deploy.yml/badge.svg)](https://github.com/KevinBigham/BSPC-Coach-App/actions/workflows/functions-deploy.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Node 20](https://img.shields.io/badge/Node.js-20-43853d.svg)](package.json)
+[![TypeScript](https://img.shields.io/badge/TypeScript-Strict-3178c6.svg)](tsconfig.json)
+[![Tests](https://img.shields.io/badge/tests-1041_passing-success.svg)](#quality-checks)
+
 BSPC Coach App is an open-source Expo and Firebase toolkit for youth swim teams to manage attendance, schedules, meet context, swimmer notes, parent coordination, and coach communication.
 
 The project is built for the Blue Springs Power Cats and is intended to be useful to other youth swim programs that need safer, clearer day-to-day operations without stitching together spreadsheets, group chats, paper notes, and ad hoc meet reminders.
+
+## Verify In 60 Seconds
+
+For reviewers who want to confirm this is real and green:
+
+```bash
+git clone https://github.com/KevinBigham/BSPC-Coach-App.git
+cd BSPC-Coach-App
+
+npm ci --legacy-peer-deps
+npm --prefix functions ci
+npm --prefix parent-portal ci
+
+# Static and behavioral checks (no Firebase project required):
+npm run typecheck
+npm run lint:errors
+npm run quality:dead-code      # knip — dead code / unused exports
+npm run madge:circular         # circular dependency check
+npm test -- --runInBand        # 939 tests across 97 suites
+npm --prefix functions test -- --runInBand   # 102 tests across 17 suites
+npm --prefix functions run build
+```
+
+CI runs the entire `npm run quality` stack on every push to `main`. The badges above reflect the live state.
 
 ## Who It Serves
 
@@ -21,6 +52,18 @@ The project is built for the Blue Springs Power Cats and is intended to be usefu
 
 No usage metrics, adoption claims, star counts, or contributor counts are asserted here.
 
+## At A Glance
+
+| | |
+|---|---|
+| **Coach app screens** | 47 (Expo Router) |
+| **Service modules** | 32 |
+| **Cloud Functions** | 16 (triggers, callables, scheduled) |
+| **TypeScript LoC** | ~38.5k across coach app, parent portal, and functions |
+| **Tests** | 1,041 across 114 suites (client + functions) |
+| **Quality gates in CI** | typecheck · lint · jest (×2) · functions build · parent portal build · knip · madge · sync verify · strict-types · randomness · process |
+| **License** | MIT |
+
 ## What The App Does
 
 - Roster and swimmer profile management.
@@ -32,15 +75,51 @@ No usage metrics, adoption claims, star counts, or contributor counts are assert
 - Parent invites and role-aware parent portal data access.
 - Audio/video coaching workflows with COPPA and SafeSport media-consent guardrails.
 
+## Architecture
+
+```mermaid
+flowchart LR
+  subgraph Clients
+    A[Expo Coach App<br/>React Native + Expo Router]
+    B[Parent Portal<br/>Next.js 15]
+  end
+
+  subgraph Firebase[Firebase Backend]
+    Auth[Firebase Auth]
+    FS[(Firestore)]
+    ST[Cloud Storage]
+    CF[Cloud Functions v2<br/>16 functions]
+  end
+
+  A -->|read/write<br/>auth-gated| Auth
+  B -->|read-only<br/>parent role| Auth
+  Auth --> FS
+
+  A -->|audio/video<br/>uploads| ST
+  ST -.upload triggers.-> CF
+  FS -.write triggers.-> CF
+  B -->|callables| CF
+
+  CF -->|aggregations,<br/>notifications,<br/>digests| FS
+  CF -->|scheduled jobs| FS
+
+  classDef client fill:#1e3a5f,stroke:#4a90e2,color:#fff
+  classDef backend fill:#2d4a3e,stroke:#5cb85c,color:#fff
+  class A,B client
+  class Auth,FS,ST,CF backend
+```
+
+Cloud Functions break down into **8 Firestore/Storage triggers** (attendance, times, notes, video, audio, drafts, notifications, rule evaluation), **4 callables** (parent invites, parent portal data, topic subscriptions), and **3 scheduled jobs** (daily digest, calendar sync, aggregation rebuild).
+
 ## Tech Stack
 
-- Mobile: React Native, Expo SDK 54, Expo Router, TypeScript.
-- State and UI: Zustand, React Context, lucide-react-native, custom BSPC theme tokens.
-- Backend: Firebase Auth, Firestore, Storage, Cloud Functions v2.
-- Parent portal: Next.js, React, TypeScript, Firebase Web SDK.
-- Testing: Jest, jest-expo, React Native Testing Library, Firebase mocks.
-- CI and deploy: GitHub Actions, EAS Build, Firebase deploy workflow.
-- Observability: optional Sentry client integration.
+- **Mobile**: React Native 0.81, Expo SDK 54, Expo Router 6, TypeScript 5 strict.
+- **State and UI**: Zustand 5, React Context, lucide-react-native, custom BSPC theme tokens.
+- **Backend**: Firebase Auth, Firestore, Cloud Storage, Cloud Functions v2 (Node 20).
+- **Parent portal**: Next.js 15, React 19, TypeScript 5, Firebase Web SDK 12.
+- **Testing**: Jest 29, jest-expo, React Native Testing Library, Firebase mocks.
+- **CI and deploy**: GitHub Actions, EAS Build, Firebase deploy workflow.
+- **Observability**: optional Sentry integration.
 
 ## Repository Map
 
@@ -145,6 +224,27 @@ Native production builds are EAS-backed:
 npm run build:preview
 npm run build:prod
 ```
+
+## How This Project Is Built
+
+The repository is developed with an explicit multi-agent workflow:
+
+| Role | Agent | Output |
+|---|---|---|
+| Architect | ChatGPT | Sprint plans and structured handoff payloads |
+| Builder | OpenAI Codex | Branch-level code changes per handoff |
+| Reviewer / Ops | Claude Code | Cross-cutting review, CI/deploy fixes, status logs |
+| Director | Maintainer | Scope, priority, merge decisions |
+
+Handoffs are explicit: `.codex/handoff.json` carries the next instruction set; `.codex/status.md` and `.codex/changelog.md` are the engineering log read by every agent at session start.
+
+Quality is enforced by CI rather than by trust:
+
+- **Static**: `tsc --noEmit` strict, ESLint with errors-only gate, `knip` (dead exports), `madge` (circular deps), `sync:functions-shared:verify` (autogen mirror invariant).
+- **Behavioral**: 1,041 Jest tests, including a `test/critical-ops/` corpus that locks down behavior around attendance, parent invites, notification rules, time math, and media consent.
+- **Domain-specific**: `quality:strict-types` (no implicit `any` in domain modules), `quality:randomness` (no `Math.random` in deterministic logic), `quality:process` (sim-engine process integrity).
+
+Every push to `main` runs the full stack via [`ci.yml`](.github/workflows/ci.yml). See [CODEBASE_AUDIT.md](CODEBASE_AUDIT.md) for the architecture and process audit.
 
 ## Security And Privacy
 

@@ -144,3 +144,11 @@
 - Validation re-run after edits: secret-pattern scan, `git diff --check`, `sync:functions-shared:verify`, `typecheck`, `lint:errors`, `quality:dead-code`, jest client (97/939), jest functions (17/102), functions build, parent-portal typecheck/lint/build — all green.
 - License: MIT confirmed.
 - No runtime, schema, Firebase rules, deployment, dependency, or test-corpus changes.
+
+## 2026-04-30 — Reviewer-Visible Polish
+
+- Polished the README and metadata so the repo reads as a serious project at a glance for AI-credit reviewers (OpenAI, Anthropic) — all additions factual and source-traceable.
+- README: added CI/Deploy/License/Node/TS-strict/test-count badges, a "Verify In 60 Seconds" reviewer quickstart, an "At A Glance" stats table (47 screens, 32 services, 16 Cloud Functions, ~38.5k LoC TS, 1,041 tests / 114 suites), a Mermaid architecture diagram (renders natively on GitHub), and a "How This Project Is Built" section documenting the 4-agent ChatGPT-architect → Codex-builder → Claude-reviewer → maintainer-director workflow plus the CI quality gates.
+- Added `.github/pull_request_template.md` with scope checklist, privacy/safety check, tests-run block, and test plan.
+- Filled in `package.json`: description, license, author, homepage, repository, bugs, keywords. Kept `private: true`.
+- Validation: typecheck, lint:errors, quality:dead-code, parent-portal build all green. No test-corpus, runtime, schema, deployment, or dependency changes.

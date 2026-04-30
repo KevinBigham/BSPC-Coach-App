@@ -248,3 +248,17 @@
 - Audit advisories: parent-portal `npm audit fix` (no `--force`) would close postcss + protobufjs but leaves the Next high advisory open (the patch range from `15.5.14 → 15.5.15` does not escape the affected range `9.3.4-canary.0 - 16.3.0-canary.5`). Held the patch for a focused package-health PR. Root and Functions advisories trip the documented stop conditions (Expo SDK and `firebase-admin` major migrations) and remain documented only.
 - Validation in this pass: `git diff --check`, secret-pattern scan, `sync:functions-shared:verify`, `typecheck`, `lint:errors`, `quality:dead-code`, `npm test` (97/939), `npm --prefix functions test` (17/102), `npm --prefix functions run build`, `npm --prefix parent-portal run typecheck`, `npm --prefix parent-portal run lint`, `npm --prefix parent-portal run build` — all green.
 - No runtime, schema, Firebase rule, deployment, or test-corpus changes in this pass.
+
+## 2026-04-30 — Reviewer-Visible Polish Pass
+
+- Layered visible polish onto the readiness slice for AI-credit reviewers (OpenAI / Anthropic) without changing runtime, tests, or deps.
+- README additions, all factual:
+  - CI / Deploy / License / Node / TypeScript-strict / test-count badges at the top.
+  - "Verify In 60 Seconds" copy/paste quickstart so a reviewer can clone and run the green stack.
+  - "At A Glance" stats table: 47 screens · 32 services · 16 Cloud Functions · ~38.5k LoC TS · 1,041 tests across 114 suites.
+  - Mermaid architecture diagram showing coach app + parent portal → Firebase Auth/Firestore/Storage/Functions with trigger / callable / scheduled fan-out (renders natively on GitHub).
+  - "How This Project Is Built" section documenting the 4-agent workflow (ChatGPT architect → Codex builder → Claude reviewer → maintainer director) and the explicit quality gates run in CI on every push.
+- Added `.github/pull_request_template.md` with scope checklist, privacy/safety check, tests-run paste block, and test plan.
+- Filled in `package.json` metadata: `description`, `license`, `author`, `homepage`, `repository`, `bugs`, and `keywords`. Kept `private: true` (Expo app, never npm-published).
+- Validation: `typecheck`, `lint:errors`, `quality:dead-code`, parent-portal build — all green. No `git diff --check` issues. Test counts unchanged (1,041 / 114).
+- Numbers in README are sourced from real artifacts: Cloud Functions count from `functions/src/index.ts`, screen count from `find app -name '*.tsx'`, LoC from `wc -l` on TS files in `src/ app/ functions/src/ parent-portal/src/`. No fake metrics.

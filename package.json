@@ -1,7 +1,31 @@
 {
   "name": "bspc-coach",
   "version": "1.3.0",
+  "description": "Open-source Expo + Firebase coaching toolkit for youth swim teams: roster, attendance, practice planning, meets, parent portal, and COPPA/SafeSport-aware media workflows.",
   "main": "index.ts",
+  "license": "MIT",
+  "author": "Kevin Bigham",
+  "homepage": "https://github.com/KevinBigham/BSPC-Coach-App#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/KevinBigham/BSPC-Coach-App.git"
+  },
+  "bugs": {
+    "url": "https://github.com/KevinBigham/BSPC-Coach-App/issues"
+  },
+  "keywords": [
+    "expo",
+    "react-native",
+    "firebase",
+    "coaching",
+    "youth-sports",
+    "swim-team",
+    "attendance",
+    "typescript",
+    "nextjs",
+    "coppa",
+    "safesport"
+  ],
   "scripts": {
     "start": "expo start",
     "android": "expo start --android",
