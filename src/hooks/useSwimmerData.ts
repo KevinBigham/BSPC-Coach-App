@@ -25,7 +25,7 @@ export type SwimmerProfileNote = Omit<SwimmerNote, 'source'> & {
   source: SwimmerNote['source'] | 'voice_inline';
 };
 
-export interface SwimmerData {
+interface SwimmerData {
   swimmer: Swimmer | null;
   notes: (SwimmerProfileNote & { id: string })[];
   times: (SwimTime & { id: string })[];

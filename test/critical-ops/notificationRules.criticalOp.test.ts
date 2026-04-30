@@ -25,7 +25,7 @@ jest.mock('firebase/firestore', () => ({
 
 import {
   createNotificationRule,
-  evaluateAttendanceStreak,
+  evaluateAttendanceStreakCount,
   evaluateMissedPractice,
   ruleAppliesToSwimmer,
 } from '../../src/services/notificationRules';
@@ -71,22 +71,22 @@ describe('notificationRules.createNotificationRule (critical op)', () => {
   });
 });
 
-describe('notificationRules.evaluateAttendanceStreak (fixture-driven)', () => {
+describe('notificationRules.evaluateAttendanceStreakCount (fixture-driven)', () => {
   it('happy path: full streak across the supplied window equals the window length', () => {
     const dates = buildPracticeDates(5, '2026-04-28');
-    expect(evaluateAttendanceStreak(dates, dates)).toBe(5);
+    expect(evaluateAttendanceStreakCount(dates, dates)).toBe(5);
   });
 
   it('edge: missing the second-most-recent practice breaks the streak at 1', () => {
     const dates = buildPracticeDates(5, '2026-04-28');
     const attended = [dates[0], dates[2], dates[3]]; // missed dates[1]
-    expect(evaluateAttendanceStreak(attended, dates)).toBe(1);
+    expect(evaluateAttendanceStreakCount(attended, dates)).toBe(1);
   });
 
   it('failure mode: missing the most recent practice yields a streak of 0', () => {
     const dates = buildPracticeDates(5, '2026-04-28');
     const attended = dates.slice(1); // missed today
-    expect(evaluateAttendanceStreak(attended, dates)).toBe(0);
+    expect(evaluateAttendanceStreakCount(attended, dates)).toBe(0);
   });
 });
 

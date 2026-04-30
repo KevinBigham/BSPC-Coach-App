@@ -13,14 +13,14 @@ import {
 import { db } from '../config/firebase';
 import type { NotificationRule } from '../types/firestore.types';
 import {
-  evaluateAttendanceStreak,
+  evaluateAttendanceStreakCount,
   evaluateMissedPractice,
   ruleAppliesToSwimmer,
 } from '../utils/notificationRules/evaluation';
 
 type NotificationRuleWithId = NotificationRule & { id: string };
 
-export { evaluateAttendanceStreak, evaluateMissedPractice, ruleAppliesToSwimmer };
+export { evaluateAttendanceStreakCount, evaluateMissedPractice, ruleAppliesToSwimmer };
 
 export function subscribeNotificationRules(
   coachId: string,

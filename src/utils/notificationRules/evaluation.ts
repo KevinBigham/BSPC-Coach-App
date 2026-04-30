@@ -7,14 +7,14 @@
  */
 const MS_PER_DAY = 1000 * 60 * 60 * 24;
 
-export interface RuleEvaluationInput {
+interface RuleEvaluationInput {
   enabled: boolean;
   config?: {
     group?: string | null;
   } | null;
 }
 
-export interface SwimmerEvaluationInput {
+interface SwimmerEvaluationInput {
   group?: string | null;
 }
 
@@ -66,12 +66,6 @@ export function evaluateAttendanceStreakCount(
 
   return streak;
 }
-
-/**
- * Legacy client-facing name for attendance-streak counting. Both inputs are
- * descending YYYY-MM-DD date arrays.
- */
-export const evaluateAttendanceStreak = evaluateAttendanceStreakCount;
 
 /**
  * Returns whether the gap between the prior attendance date and current

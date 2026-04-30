@@ -12,7 +12,7 @@ import type { PracticePlan } from '../types/firestore.types';
 
 export type PlanWithId = PracticePlan & { id: string };
 
-export interface PracticeData {
+interface PracticeData {
   plans: PlanWithId[];
   groupNotes: (GroupNote & { id: string })[];
   loading: boolean;

@@ -1,5 +1,4 @@
 import {
-  evaluateAttendanceStreak,
   evaluateAttendanceStreakCount,
   evaluateMissedPractice,
   evaluateMissedPracticeGap,
@@ -57,12 +56,6 @@ describe('evaluateAttendanceStreakCount', () => {
 
     expect(streak).toBe(3);
     expect(streak >= 3).toBe(true);
-  });
-
-  it('keeps the legacy evaluateAttendanceStreak alias equivalent', () => {
-    expect(evaluateAttendanceStreak(['2026-04-10'], ['2026-04-10', '2026-04-09'])).toBe(
-      evaluateAttendanceStreakCount(['2026-04-10'], ['2026-04-10', '2026-04-09']),
-    );
   });
 });
 

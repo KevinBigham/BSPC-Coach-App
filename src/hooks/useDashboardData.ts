@@ -27,7 +27,7 @@ import type { Meet } from '../types/meet.types';
 /** Number of trailing days the dashboard spark chart visualizes. */
 const SPARK_DAY_COUNT = 30;
 
-export interface DashboardData {
+interface DashboardData {
   totalSwimmers: number;
   swimmerCounts: Record<string, number>;
   todayAttendance: number;

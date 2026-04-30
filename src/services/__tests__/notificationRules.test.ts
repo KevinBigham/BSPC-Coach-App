@@ -26,7 +26,7 @@ import {
   createNotificationRule,
   updateNotificationRule,
   deleteNotificationRule,
-  evaluateAttendanceStreak,
+  evaluateAttendanceStreakCount,
   evaluateMissedPractice,
 } from '../notificationRules';
 
@@ -167,52 +167,52 @@ describe('deleteNotificationRule', () => {
 });
 
 // ---------------------------------------------------------------------------
-// evaluateAttendanceStreak
+// evaluateAttendanceStreakCount
 // ---------------------------------------------------------------------------
 
-describe('evaluateAttendanceStreak', () => {
+describe('evaluateAttendanceStreakCount', () => {
   it('returns 0 for empty practice history', () => {
-    expect(evaluateAttendanceStreak([], ['2026-04-01'])).toBe(0);
+    expect(evaluateAttendanceStreakCount([], ['2026-04-01'])).toBe(0);
   });
 
   it('returns 0 for empty allPracticeDates', () => {
-    expect(evaluateAttendanceStreak(['2026-04-01'], [])).toBe(0);
+    expect(evaluateAttendanceStreakCount(['2026-04-01'], [])).toBe(0);
   });
 
   it('returns 0 when both arrays are empty', () => {
-    expect(evaluateAttendanceStreak([], [])).toBe(0);
+    expect(evaluateAttendanceStreakCount([], [])).toBe(0);
   });
 
   it('counts a streak of 1 when only the latest practice was attended', () => {
     const allDates = ['2026-04-04', '2026-04-03', '2026-04-02'];
     const attended = ['2026-04-04'];
-    expect(evaluateAttendanceStreak(attended, allDates)).toBe(1);
+    expect(evaluateAttendanceStreakCount(attended, allDates)).toBe(1);
   });
 
   it('counts a full streak when all practices attended', () => {
     const allDates = ['2026-04-04', '2026-04-03', '2026-04-02', '2026-04-01'];
     const attended = ['2026-04-04', '2026-04-03', '2026-04-02', '2026-04-01'];
-    expect(evaluateAttendanceStreak(attended, allDates)).toBe(4);
+    expect(evaluateAttendanceStreakCount(attended, allDates)).toBe(4);
   });
 
   it('breaks streak at first missed practice', () => {
     const allDates = ['2026-04-04', '2026-04-03', '2026-04-02', '2026-04-01'];
     const attended = ['2026-04-04', '2026-04-03', '2026-04-01']; // missed 04-02
-    expect(evaluateAttendanceStreak(attended, allDates)).toBe(2);
+    expect(evaluateAttendanceStreakCount(attended, allDates)).toBe(2);
   });
 
   it('returns 0 when most recent practice was missed', () => {
     const allDates = ['2026-04-04', '2026-04-03', '2026-04-02'];
     const attended = ['2026-04-03', '2026-04-02'];
-    expect(evaluateAttendanceStreak(attended, allDates)).toBe(0);
+    expect(evaluateAttendanceStreakCount(attended, allDates)).toBe(0);
   });
 
   it('handles a single practice day attended', () => {
-    expect(evaluateAttendanceStreak(['2026-04-01'], ['2026-04-01'])).toBe(1);
+    expect(evaluateAttendanceStreakCount(['2026-04-01'], ['2026-04-01'])).toBe(1);
   });
 
   it('handles a single practice day not attended', () => {
-    expect(evaluateAttendanceStreak([], ['2026-04-01'])).toBe(0);
+    expect(evaluateAttendanceStreakCount([], ['2026-04-01'])).toBe(0);
   });
 });
 

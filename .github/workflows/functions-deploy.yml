@@ -43,6 +43,9 @@ jobs:
       - name: Deploy to Firebase
         uses: w9jds/firebase-action@master
         with:
-          args: deploy --only functions --project bspc-coach
+          # --force auto-confirms deletion of orphan functions removed from source
+          # (e.g. when a callable is deleted in a sprint). Without it, the deploy
+          # aborts in non-interactive mode.
+          args: deploy --only functions --project bspc-coach --force
         env:
           FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
