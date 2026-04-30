@@ -1,15 +1,15 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
   FlatList,
+  SectionList,
   TouchableOpacity,
   TextInput,
   StyleSheet,
   Alert,
   Modal,
 } from 'react-native';
-import { db } from '../../src/config/firebase';
 import { useAuth } from '../../src/contexts/AuthContext';
 import {
   colors,
@@ -21,21 +21,23 @@ import {
 } from '../../src/config/theme';
 import { GROUPS, type Group } from '../../src/config/constants';
 import { getTodayString, formatClockTime } from '../../src/utils/time';
-import { subscribeSwimmers } from '../../src/services/swimmers';
-import {
-  subscribeTodayAttendance,
-  checkIn,
-  checkOut,
-  batchCheckIn,
-} from '../../src/services/attendance';
+import { checkIn, checkOut, batchCheckIn } from '../../src/services/attendance';
 import { exportAttendanceCSV, shareCSV } from '../../src/services/export';
 import { useSwimmersStore } from '../../src/stores/swimmersStore';
 import { useAttendanceStore } from '../../src/stores/attendanceStore';
 import { tapLight, tapMedium, notifySuccess, notifyError } from '../../src/utils/haptics';
-import type { Swimmer, AttendanceRecord, AttendanceStatus } from '../../src/types/firestore.types';
+import type { Swimmer, AttendanceStatus } from '../../src/types/firestore.types';
 import { withScreenErrorBoundary } from '../../src/components/ScreenErrorBoundary';
 
 type FilterGroup = Group | 'All';
+type SwimmerWithId = Swimmer & { id: string };
+
+interface AttendanceSection {
+  title: Group;
+  data: SwimmerWithId[];
+  presentCount: number;
+  uncheckedCount: number;
+}
 
 const STATUSES: { value: AttendanceStatus; label: string; color: string }[] = [
   { value: 'normal', label: 'Normal', color: colors.success },
@@ -51,17 +53,12 @@ function AttendanceScreen() {
   const todayRecords = useAttendanceStore((s) => s.todayRecords);
   const [selectedGroup, setSelectedGroup] = useState<FilterGroup>('All');
   const [checkoutModal, setCheckoutModal] = useState<{
-    swimmer: Swimmer & { id: string };
+    swimmer: SwimmerWithId;
     recordId: string;
   } | null>(null);
   const [checkoutStatus, setCheckoutStatus] = useState<AttendanceStatus>('normal');
   const [checkoutNote, setCheckoutNote] = useState('');
   const today = getTodayString();
-
-  const filtered = useMemo(() => {
-    if (selectedGroup === 'All') return swimmers;
-    return swimmers.filter((s) => s.group === selectedGroup);
-  }, [swimmers, selectedGroup]);
 
   const getRecord = useCallback(
     (swimmerId: string) =>
@@ -74,18 +71,41 @@ function AttendanceScreen() {
     return new Set(todayRecords.filter((r) => !r.departedAt).map((r) => r.swimmerId));
   }, [todayRecords]);
 
-  const presentCount = useMemo(() => {
-    if (selectedGroup === 'All') return presentIds.size;
-    return filtered.filter((s) => presentIds.has(s.id)).length;
-  }, [presentIds, filtered, selectedGroup]);
+  const checkedIds = useMemo(() => {
+    return new Set(todayRecords.map((r) => r.swimmerId));
+  }, [todayRecords]);
 
-  // Swimmers not yet checked in (for batch)
-  const uncheckedSwimmers = useMemo(() => {
-    const checkedIds = new Set(todayRecords.map((r) => r.swimmerId));
-    return filtered.filter((s) => !checkedIds.has(s.id));
-  }, [filtered, todayRecords]);
+  /**
+   * Build one section per training group, in GROUPS-defined order. Sections
+   * with zero swimmers are dropped so the list never renders an empty header.
+   * When a specific group is selected, only its section appears (other groups
+   * hide entirely).
+   */
+  const sections = useMemo<AttendanceSection[]>(() => {
+    const visibleGroups = selectedGroup === 'All' ? GROUPS : [selectedGroup];
+    return visibleGroups
+      .map((group): AttendanceSection => {
+        const groupSwimmers = swimmers.filter((s) => s.group === group);
+        const sectionPresent = groupSwimmers.filter((s) => presentIds.has(s.id)).length;
+        const sectionUnchecked = groupSwimmers.filter((s) => !checkedIds.has(s.id)).length;
+        return {
+          title: group,
+          data: groupSwimmers,
+          presentCount: sectionPresent,
+          uncheckedCount: sectionUnchecked,
+        };
+      })
+      .filter((section) => section.data.length > 0);
+  }, [swimmers, selectedGroup, presentIds, checkedIds]);
 
-  const handleCheckIn = async (swimmer: Swimmer & { id: string }) => {
+  /** Header counts: present/total across whatever groups are visible. */
+  const headerStats = useMemo(() => {
+    const visibleSwimmers = sections.flatMap((s) => s.data);
+    const visiblePresent = sections.reduce((sum, s) => sum + s.presentCount, 0);
+    return { total: visibleSwimmers.length, present: visiblePresent };
+  }, [sections]);
+
+  const handleCheckIn = async (swimmer: SwimmerWithId) => {
     if (!coach) return;
     const record = getRecord(swimmer.id);
 
@@ -130,42 +150,44 @@ function AttendanceScreen() {
     }
   };
 
-  const handleBatchCheckIn = () => {
-    if (uncheckedSwimmers.length === 0) {
-      Alert.alert('All Checked In', 'Everyone in this group is already checked in.');
+  /**
+   * Batch check-in for one group section. Pulls the unchecked swimmers from
+   * the section so multi-group taps stay isolated.
+   */
+  const handleBatchCheckInGroup = (group: Group) => {
+    const groupSwimmers = swimmers.filter((s) => s.group === group);
+    const unchecked = groupSwimmers.filter((s) => !checkedIds.has(s.id));
+    if (unchecked.length === 0) {
+      Alert.alert('All Checked In', `Everyone in ${group} is already checked in.`);
       return;
     }
-    Alert.alert(
-      'Batch Check-In',
-      `Check in all ${uncheckedSwimmers.length} ${selectedGroup} swimmers?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Check In All',
-          onPress: async () => {
-            if (!coach) return;
-            try {
-              tapMedium();
-              await batchCheckIn(
-                uncheckedSwimmers,
-                { uid: coach.uid, displayName: coach.displayName },
-                today,
-              );
-              notifySuccess();
-            } catch (error) {
-              notifyError();
-              Alert.alert(
-                'Attendance Error',
-                error instanceof Error ? error.message : 'Unable to batch check in swimmers.',
-              );
-            }
-          },
+    Alert.alert('Batch Check-In', `Check in all ${unchecked.length} ${group} swimmers?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Check In All',
+        onPress: async () => {
+          if (!coach) return;
+          try {
+            tapMedium();
+            await batchCheckIn(
+              unchecked,
+              { uid: coach.uid, displayName: coach.displayName },
+              today,
+            );
+            notifySuccess();
+          } catch (error) {
+            notifyError();
+            Alert.alert(
+              'Attendance Error',
+              error instanceof Error ? error.message : 'Unable to batch check in swimmers.',
+            );
+          }
         },
-      ],
-    );
+      },
+    ]);
   };
 
-  const renderSwimmer = ({ item }: { item: Swimmer & { id: string } }) => {
+  const renderSwimmer = ({ item }: { item: SwimmerWithId }) => {
     const record = getRecord(item.id);
     const isPresent = record && !record.departedAt;
     const hasDeparted = record && record.departedAt;
@@ -202,14 +224,6 @@ function AttendanceScreen() {
             {item.firstName} {item.lastName}
           </Text>
           <View style={styles.metaRow}>
-            <Text
-              style={[
-                styles.groupLabel,
-                { color: groupColors[item.group] || colors.textSecondary },
-              ]}
-            >
-              {item.group}
-            </Text>
             {record && (
               <Text style={styles.timeText}>
                 {isPresent && record.arrivedAt
@@ -229,6 +243,33 @@ function AttendanceScreen() {
     );
   };
 
+  const renderSectionHeader = ({ section }: { section: AttendanceSection }) => {
+    const groupColor = groupColors[section.title] || colors.accent;
+    return (
+      <View style={styles.sectionHeader}>
+        <View style={styles.sectionHeaderLeft}>
+          <View style={[styles.sectionDot, { backgroundColor: groupColor }]} />
+          <Text style={[styles.sectionTitle, { color: groupColor }]}>
+            {section.title.toUpperCase()}
+          </Text>
+          <Text style={styles.sectionCount}>
+            {section.presentCount}/{section.data.length}
+          </Text>
+        </View>
+        {section.uncheckedCount > 0 && (
+          <TouchableOpacity
+            style={styles.sectionCheckInBtn}
+            onPress={() => handleBatchCheckInGroup(section.title)}
+          >
+            <Text style={styles.sectionCheckInBtnText}>
+              CHECK IN ALL ({section.uncheckedCount})
+            </Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    );
+  };
+
   return (
     <View style={styles.container}>
       {/* Scorebug Header */}
@@ -244,9 +285,9 @@ function AttendanceScreen() {
           <Text style={styles.headerLabel}>PRACTICE</Text>
         </View>
         <View style={styles.headerCenter}>
-          <Text style={styles.presentCount}>{presentCount}</Text>
+          <Text style={styles.presentCount}>{headerStats.present}</Text>
           <Text style={styles.presentSep}>/</Text>
-          <Text style={styles.totalCount}>{filtered.length}</Text>
+          <Text style={styles.totalCount}>{headerStats.total}</Text>
         </View>
         <View style={styles.headerRight}>
           <TouchableOpacity
@@ -266,7 +307,7 @@ function AttendanceScreen() {
         </View>
       </View>
 
-      {/* Group Filter + Batch Button */}
+      {/* Group Filter Chips — narrows to a single section, or 'All' shows every group */}
       <View style={styles.filterContainer}>
         <FlatList
           horizontal
@@ -294,18 +335,15 @@ function AttendanceScreen() {
             );
           }}
         />
-        {selectedGroup !== 'All' && uncheckedSwimmers.length > 0 && (
-          <TouchableOpacity style={styles.batchBtn} onPress={handleBatchCheckIn}>
-            <Text style={styles.batchBtnText}>CHECK IN ALL ({uncheckedSwimmers.length})</Text>
-          </TouchableOpacity>
-        )}
       </View>
 
-      {/* Swimmer List */}
-      <FlatList
-        data={filtered}
+      {/* Group-segmented swimmer list */}
+      <SectionList
+        sections={sections}
         keyExtractor={(item) => item.id}
         renderItem={renderSwimmer}
+        renderSectionHeader={renderSectionHeader}
+        stickySectionHeadersEnabled
         contentContainerStyle={styles.list}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
@@ -457,17 +495,40 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
   filterChipTextActive: { color: colors.text },
-  batchBtn: {
-    marginHorizontal: spacing.lg,
-    marginBottom: spacing.sm,
-    padding: spacing.sm,
+  // Section headers
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: colors.bgBase,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    marginHorizontal: -spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  sectionHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  sectionDot: { width: 10, height: 10, borderRadius: 5 },
+  sectionTitle: {
+    fontFamily: fontFamily.heading,
+    fontSize: fontSize.md,
+    letterSpacing: 1,
+  },
+  sectionCount: {
+    fontFamily: fontFamily.statMono,
+    fontSize: fontSize.xs,
+    color: colors.textSecondary,
+  },
+  sectionCheckInBtn: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
     borderRadius: borderRadius.sm,
     backgroundColor: colors.purple,
-    alignItems: 'center',
   },
-  batchBtnText: {
+  sectionCheckInBtnText: {
     fontFamily: fontFamily.bodySemi,
-    fontSize: fontSize.sm,
+    fontSize: fontSize.xs,
     color: colors.text,
     letterSpacing: 1,
   },
@@ -479,7 +540,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bgDeep,
     padding: spacing.lg,
     borderRadius: borderRadius.md,
-    marginBottom: spacing.sm,
+    marginTop: spacing.sm,
     borderWidth: 1,
     borderColor: colors.border,
   },
@@ -489,7 +550,6 @@ const styles = StyleSheet.create({
   swimmerInfo: { flex: 1 },
   swimmerName: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.md, color: colors.text },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: 2 },
-  groupLabel: { fontFamily: fontFamily.pixel, fontSize: fontSize.pixel },
   timeText: { fontFamily: fontFamily.statMono, fontSize: fontSize.xs, color: colors.textSecondary },
   tapHint: {
     fontFamily: fontFamily.pixel,
