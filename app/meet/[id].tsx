@@ -217,22 +217,12 @@ function MeetDetailScreen() {
               </TouchableOpacity>
             )}
             {meet.status === 'in_progress' && (
-              <View style={{ gap: spacing.sm }}>
-                <TouchableOpacity
-                  style={[styles.startBtn, { backgroundColor: colors.gold }]}
-                  onPress={() => router.push(`/meet/${id}/live`)}
-                >
-                  <Text style={[styles.startBtnText, { color: colors.bgDeep }]}>
-                    LIVE TIMING MODE
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.startBtn, { backgroundColor: colors.goldDark }]}
-                  onPress={() => updateMeet(id!, { status: 'completed' })}
-                >
-                  <Text style={styles.startBtnText}>COMPLETE MEET</Text>
-                </TouchableOpacity>
-              </View>
+              <TouchableOpacity
+                style={[styles.startBtn, { backgroundColor: colors.goldDark }]}
+                onPress={() => updateMeet(id!, { status: 'completed' })}
+              >
+                <Text style={styles.startBtnText}>COMPLETE MEET</Text>
+              </TouchableOpacity>
             )}
 
             <TouchableOpacity

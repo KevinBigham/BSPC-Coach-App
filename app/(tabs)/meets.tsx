@@ -103,14 +103,6 @@ function MeetsTabScreen() {
                           {daysAway === 0 ? 'TODAY' : `${daysAway}d away`}
                         </Text>
                       )}
-                      {meet.status === 'in_progress' && (
-                        <TouchableOpacity
-                          style={styles.liveBtn}
-                          onPress={() => router.push(`/meet/${meet.id}/live`)}
-                        >
-                          <Text style={styles.liveBtnText}>LIVE MODE</Text>
-                        </TouchableOpacity>
-                      )}
                     </View>
                   </View>
                 </TouchableOpacity>
@@ -212,18 +204,6 @@ const styles = StyleSheet.create({
   meetFooter: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   meetEvents: { fontFamily: fontFamily.statMono, fontSize: fontSize.xs, color: colors.accent },
   daysAway: { fontFamily: fontFamily.stat, fontSize: fontSize.xs, color: colors.gold },
-  liveBtn: {
-    backgroundColor: colors.gold,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    borderRadius: borderRadius.sm,
-  },
-  liveBtnText: {
-    fontFamily: fontFamily.bodySemi,
-    fontSize: fontSize.xs,
-    color: colors.bgDeep,
-    letterSpacing: 1,
-  },
   emptyState: { alignItems: 'center', paddingVertical: spacing.xxl },
   emptyTitle: {
     fontFamily: fontFamily.heading,

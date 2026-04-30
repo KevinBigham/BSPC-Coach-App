@@ -431,32 +431,6 @@ function RootNavigator() {
           }}
         />
         <Stack.Screen
-          name="meet/[id]/live"
-          options={{
-            headerShown: true,
-            title: 'LIVE MODE',
-            headerStyle: { backgroundColor: colors.bgElevated },
-            headerTintColor: colors.accent,
-            headerTitleStyle: { fontFamily: fontFamily.heading, fontSize: 22, color: colors.text },
-          }}
-        />
-        <Stack.Screen
-          name="meet/[id]/timer"
-          options={{
-            headerShown: false,
-          }}
-        />
-        <Stack.Screen
-          name="meet/[id]/results"
-          options={{
-            headerShown: true,
-            title: 'RESULTS',
-            headerStyle: { backgroundColor: colors.bgElevated },
-            headerTintColor: colors.accent,
-            headerTitleStyle: { fontFamily: fontFamily.heading, fontSize: 22, color: colors.text },
-          }}
-        />
-        <Stack.Screen
           name="video"
           options={{
             headerShown: true,
