@@ -89,3 +89,16 @@
 - Validation: `npm test`, `cd functions && npm test`, `npm run typecheck`, `cd functions && npm run build`, `npm run lint` — all pass (lint 0 errors, 181 pre-existing warnings).
 - **Original 10-list is now fully closed.** 7 items done in Waves 1+2, 2 done in Wave 3, 1 stale-found-done during reviews.
 - Architectural follow-up flagged for a future sprint: replace the symlink in functions/src/utils/notificationRules/ with a more portable mechanism (copy + sync, monorepo workspaces, or path alias).
+
+## 2026-04-29 — Sprint-NEXT-Arch-Cleanup
+
+- Branch `codex/sprint-next-arch-cleanup` stacked on `bfced92` (main). Three commits:
+  - `e6969d2` — `chore(functions): sync shared notification rules copy`
+  - `97ec17c` — `chore(services): document intentional service swallows`
+  - `d57d627` — `test(notificationRules): lock missed-practice asymmetry`
+- **P1** Replaced the Wave 3 filesystem symlink with a generated, tracked regular file (`mode change 120000 => 100644` on merge). New `scripts/sync-functions-shared.js` (Node, zero deps, idempotent) writes or verifies the functions copy with a generated header. `functions/package.json` gates `prebuild` and `predeploy` on `--verify`; the root CI workflow (`.github/workflows/ci.yml`) and the Cloud Functions deploy workflow (`.github/workflows/functions-deploy.yml`) gate on `--verify` before quality / build / deploy. `preserveSymlinks: true` removed from `functions/tsconfig.json`. Convention documented in `AGENTS.md`. Drift gate independently verified: corrupting the source makes `--verify` exit 1 with a useful line-numbered diff.
+- **P2** Audited every catch block across `src/services/*.ts`. No new logger calls were needed — every long-tail catch was already logging via Wave 1 P4 or existing code. Six services received explicit `// Intentionally swallowed: ...` comments documenting WHY the catch logs and continues instead of rethrowing: `csvImport`, `hy3Import`, `meetResultsImport`, `notifications`, `sdifImport`, `swimmerVoiceNotes`. Throw / swallow behavior unchanged; service catch count unchanged.
+- **P3** Locked in the intentional asymmetry between client display (`evaluateMissedPractice` — no history is missed) and Cloud Functions firing (`evaluateMissedPracticeGap` — no history is no-fire, so newly-added swimmers don't get spam-notified). Top-of-file rationale block in `src/utils/notificationRules/evaluation.ts`, cross-referencing JSDoc on both functions, and a `describe('missed-practice asymmetry (INTENTIONAL)')` invariant test that pins both no-history behaviors. The Wave 3 "future audit: pick one and unify" loose end is closed by documenting the divergence as correct, not by unifying.
+- Test corpus: client 1023 → **1024** / 102 unchanged. Functions unchanged at 111 / 18. Combined **1135 / 120**.
+- Validation: `npm run sync:functions-shared:verify`, `npm run typecheck`, `npm run lint:errors`, `npm test`, `cd functions && npm run build` (with `prebuild` verify firing), `cd functions && npm test` — all pass.
+- No schema, time-precision, deployment, or UI behavior changes. No new dependencies.
