@@ -70,7 +70,7 @@ const STATUS_COLORS: Record<string, string> = {
 
 function SwimmerProfileScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { coach, isAdmin } = useAuth();
+  const { coach } = useAuth();
   const { showToast } = useToast();
   const { swimmer, notes, times, attendance, goals, loading, prCount, todayAttendance } =
     useSwimmerData(id);
@@ -246,14 +246,6 @@ function SwimmerProfileScreen() {
             </View>
           </View>
           <View style={styles.headerButtons}>
-            {isAdmin && (
-              <TouchableOpacity
-                style={styles.medicalBtn}
-                onPress={() => router.push(`/swimmer/medical?id=${id}`)}
-              >
-                <Text style={styles.medicalBtnText}>MED</Text>
-              </TouchableOpacity>
-            )}
             <TouchableOpacity
               style={styles.inviteBtn}
               onPress={() =>
@@ -1255,21 +1247,6 @@ const styles = StyleSheet.create({
     color: colors.accent,
     letterSpacing: 1,
   },
-  medicalBtn: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: borderRadius.sm,
-    borderWidth: 1,
-    borderColor: colors.error,
-    alignItems: 'center',
-  },
-  medicalBtnText: {
-    fontFamily: fontFamily.bodySemi,
-    fontSize: fontSize.xs,
-    color: colors.error,
-    letterSpacing: 1,
-  },
-
   // Tabs
   tabBar: {
     flexDirection: 'row',

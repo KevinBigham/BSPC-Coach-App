@@ -76,15 +76,6 @@ export interface Swimmer {
   createdBy: string;
 }
 
-export interface MedicalInfo {
-  allergies: string[];
-  conditions: string[];
-  medications: string[];
-  emergencyNotes: string;
-  updatedAt: FirebaseTimestamp;
-  updatedBy: string;
-}
-
 export interface SwimTime {
   id?: string;
   event: string;

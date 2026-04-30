@@ -89,7 +89,6 @@ describe('parent portal callables', () => {
         gender: 'F',
         active: true,
         parentContacts: [{ email: 'private@example.com' }],
-        medical: { allergies: ['private'] },
       }),
     );
     mockTimesCollection.get.mockResolvedValue(

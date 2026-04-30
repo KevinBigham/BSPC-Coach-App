@@ -243,16 +243,6 @@ function RootNavigator() {
           }}
         />
         <Stack.Screen
-          name="swimmer/medical"
-          options={{
-            headerShown: true,
-            title: 'MEDICAL INFO',
-            headerStyle: { backgroundColor: colors.bgElevated },
-            headerTintColor: colors.accent,
-            headerTitleStyle: { fontFamily: fontFamily.heading, fontSize: 22, color: colors.text },
-          }}
-        />
-        <Stack.Screen
           name="forgot-password"
           options={{
             headerShown: true,
