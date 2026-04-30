@@ -121,3 +121,26 @@
 - **Validation**: `npm run typecheck`, `npm run lint:errors`, `npm run quality`, `npm run quality:dead-code`, `npm test`, `(cd functions && npm test)`, `(cd functions && npm run build)`, `npm run sync:functions-shared:verify` — all pass after each phase.
 - **Schema**: no schema changes. Existing legacy data on disk (medical info, live_events, splits, entries, relays, dashboard_recent_prs aggregation) is left untouched; the app simply stops reading or writing it.
 - **Deploy needed on next push**: `firebase deploy --only functions` (deleted `generatePractice` callable + `recomputeDashboardRecentPRsAggregation`). Plus the Wave 3 rules+indexes deploy is still pending.
+
+## 2026-04-30 — Open Source Readiness Docs
+
+- Added root `README.md` focused on reviewer onboarding: purpose, users served, current status, stack, setup, environment variables, checks, roadmap, security/privacy notes, and maintainer context.
+- Added external-maintainer files: `LICENSE` (MIT), `SECURITY.md`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `ROADMAP.md`, and `docs/screenshots/README.md`.
+- Added GitHub issue templates for bug reports, feature requests, and public-safe security review requests.
+- Expanded `.env.example` with placeholder-only Expo, parent portal, and Functions configuration.
+- Removed a pre-existing Firebase web API key and personal Apple submit values from tracked EAS/internal handoff config; native builds now require maintainer-local/EAS env configuration.
+- Updated `CODEBASE_AUDIT.md` with open-source readiness inventory and secret/private-data scan notes.
+- Recorded package-audit advisories as a remaining package-health risk; no dependency changes were made in this docs/readiness slice.
+- No runtime, schema, Firebase rules, deployment, dependency, or UI behavior changes.
+
+## 2026-04-30 — Readiness Review Pass
+
+- Reviewed Codex's readiness diff for accuracy and reviewer polish: README, LICENSE, SECURITY, CONTRIBUTING, CODE_OF_CONDUCT, ROADMAP, issue templates, `.env.example`, EAS placeholders, and CODEBASE_AUDIT §9 all check out — no overclaims, no fake metrics, repo-map and env coverage match source.
+- Removed an irrelevant Supabase reference from `SECURITY.md`; the runtime is Firebase-only and Supabase was explicitly rejected per `MASTER_PLAN.md`.
+- Set `outputFileTracingRoot` in `parent-portal/next.config.ts` to silence the Next multi-lockfile workspace-root warning.
+- Sharpened `CODEBASE_AUDIT.md` §9 with a per-workspace audit-advisory table (root cause, recommended next action, stop-condition relevance) and a git-history note on the prior Firebase web API key (public client config by design; rotation optional).
+- Added `docs/release/open-source-review-checklist.md` as a reviewer-facing summary of validation commands run and outstanding items.
+- Held all `npm audit fix` work for a focused package-health PR per workspace; documented exactly what each fix path requires.
+- Validation re-run after edits: secret-pattern scan, `git diff --check`, `sync:functions-shared:verify`, `typecheck`, `lint:errors`, `quality:dead-code`, jest client (97/939), jest functions (17/102), functions build, parent-portal typecheck/lint/build — all green.
+- License: MIT confirmed.
+- No runtime, schema, Firebase rules, deployment, dependency, or test-corpus changes.

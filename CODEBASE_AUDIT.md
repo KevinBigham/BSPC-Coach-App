@@ -460,3 +460,59 @@ No dependency changes are warranted. The audit's instruction in `.codex/decision
 
 - Component decomposition for the largest screens (`app/swimmer/[id].tsx`, `app/(tabs)/practice.tsx`, `app/_layout.tsx`, etc.) — split only when paired with focused feature work or test-backed refactors.
 - Generated-output local cleanup (`.expo/`, `dist/`, `coverage/`, `functions/lib/`, `parent-portal/.next/`) — performed locally on demand; not a commit-class change.
+
+## 9. Open Source Readiness Audit (2026-04-30)
+
+### Inventory
+
+| Item | State after readiness pass |
+|---|---|
+| `README.md` | Added root overview, setup, stack, checks, roadmap summary, security/privacy notes, maintainer note |
+| `LICENSE` | Added MIT license |
+| `CONTRIBUTING.md` | Added setup, validation, PR, and privacy expectations |
+| `SECURITY.md` | Added responsible disclosure and minors/family-data handling guidance |
+| `CODE_OF_CONDUCT.md` | Added concise project conduct standard |
+| `.env.example` | Expanded with Expo, parent portal, and Functions placeholders only |
+| `.github/ISSUE_TEMPLATE/` | Added bug, feature, and security-review templates |
+| `ROADMAP.md` | Added reviewer-friendly near-term roadmap |
+| Screenshots/docs | Added `docs/screenshots/README.md`; no screenshots committed until redacted demo data exists |
+
+### Secret And Private-Data Checks
+
+- `git ls-files` confirms tracked credential-like files are limited to `.env.example`.
+- Local ignored files exist for developer use (`.env`, service-account JSON, credentials, roster spreadsheet), but they are not tracked.
+- `.gitignore` excludes env files, service accounts, native credentials, generated output, and raw roster spreadsheets.
+- Tracked secret-pattern scan initially found a committed Firebase web API key in `eas.json` and `.codex/handoff.json`; those values were replaced with placeholders / environment-variable references.
+- Follow-up scan found expected password parameter names only; no tracked private key, service account, roster spreadsheet, real `.env` file, or API key remained.
+
+### Package Health Surface
+
+- Root scripts include install, start, lint, typecheck, Jest, shared-functions sync verification, quality, dead-code, circular dependency, and EAS build commands.
+- Functions scripts include test, build, serve, deploy, and generated shared-copy verification.
+- Parent portal scripts include dev, build, start, lint, and typecheck.
+- Native production builds are EAS-backed and require maintainer credentials; ordinary readiness verification should use local typecheck/lint/test/build commands first.
+- EAS native builds now require `EXPO_PUBLIC_*` Firebase values from EAS environment variables or a maintainer-local environment, not committed JSON.
+
+### Audit Advisory Status (verified 2026-04-30)
+
+`npm audit --audit-level=high` was run in all three workspaces. Findings and recommended next actions:
+
+| Workspace | Counts | Root cause | Recommended next action | Stop-condition relevance |
+|---|---|---|---|---|
+| Root | 4 low / 28 moderate / 1 high / 1 critical | Expo SDK 54 transitive chain (`expo-manifests`, `expo-dev-client`, `expo-dev-launcher`, `expo-splash-screen`, `@expo/prebuild-config`, `@expo/config`, `@expo/config-plugins`) | Wait for Expo SDK upgrade; do not patch ad-hoc | Fix would require Expo SDK migration → out of scope for readiness PR |
+| Functions | 2 low / 10 moderate / 1 critical | `uuid <14` reachable via `gaxios → google-gax → teeny-request` and `firebase-admin → @google-cloud/storage`. Critical advisory only resolves with `--force` (would install `firebase-admin@10.1.0`) | Defer to a focused Functions package-health PR after a `firebase-admin` major-version upgrade is planned and validated | Fix would require `firebase-admin` major-version migration → out of scope for readiness PR |
+| Parent portal | 1 moderate / 1 high / 1 critical | `next 15.5.14`, `postcss <8.5.10`, `protobufjs <7.5.5` | `npm --prefix parent-portal audit fix` (no `--force`) closes the postcss + protobufjs advisories via patch bumps. The Next high advisory (`GHSA-q4gf-8mx6-v5v3`, affected range `9.3.4-canary.0 - 16.3.0-canary.5`) is not resolved by the patch bump and stays open until a Next minor/major upgrade ships the fix | Safe to apply but better as its own PR with full parent-portal verification |
+
+### Git History Note
+
+The previously-tracked Firebase web API key (replaced with placeholders in this readiness pass) remains in earlier commits' history. Firebase web API keys are designed to be embedded in mobile/web clients and are not authentication secrets — security is enforced via Firebase Auth and Firestore/Storage rules. Rotation is optional and not blocking, but it is a clean pre-publication step if the maintainer wants the project-identifying value to differ from the historical one. If rotated, the new key replaces values in EAS env config, GitHub Actions secrets, and any maintainer-local `.env`.
+
+### Remaining Readiness Risks
+
+- No redacted product screenshots are committed yet.
+- The repository now declares MIT licensing; maintainers should confirm this is the intended public license before external publication.
+- Local ignored sensitive files remain on the maintainer machine and should not be included in archives or manual uploads.
+- EAS build/submit requires maintainers to configure Firebase app config and Apple credentials outside git before native release builds.
+- Parent portal remains scaffold/in-progress and should be described that way until launch criteria are met.
+- Package audit advisories remain open per the table above; remediation should be a separate, scoped package-health PR per workspace.
+- Parent portal still emits a `next lint` deprecation warning. The deprecation does not block builds; migrating to the ESLint CLI is a future hygiene task tracked in ROADMAP.

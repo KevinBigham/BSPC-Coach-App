@@ -50,7 +50,7 @@
   },
   "firebase_project": {
     "project_id": "bspc-coach",
-    "api_key": "AIzaSyCR_X-LQST_7xDpqWoUcVCzwmEc9Rctvs8",
+    "api_key": "configured via EXPO_PUBLIC_FIREBASE_API_KEY",
     "runtime": "Node.js 20",
     "functions_region": "us-central1"
   },

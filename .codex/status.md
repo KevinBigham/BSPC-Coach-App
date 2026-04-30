@@ -221,3 +221,30 @@
 - **Net negative dependencies**: `react-native-pdf`, `react-native-blob-util` removed.
 - **Still open**: Detox / Maestro E2E coverage (`e2e/maestro/` exists with stub flows). Nested sub-component extraction in `app/swimmer/[id].tsx` and `app/(tabs)/practice.tsx` if deeper screen reduction is desired. `meet/new` rebuild — Kevin can ship a slim "add meet" flow later if he wants in-app meet creation back.
 - **Deploy reminder still pending Kevin**: `firebase deploy --only firestore:rules,firestore:indexes` from Wave 3. Plus, this sprint changed Cloud Functions (deleted `generatePractice` callable, deleted `recomputeDashboardRecentPRsAggregation` from `dashboardAggregations.ts`), so `firebase deploy --only functions` will need to fire on next deploy. Existing `aggregations/dashboard_recent_prs` documents will stop being maintained but stay on disk.
+
+## 2026-04-30 — Open Source Readiness Docs
+
+- Baseline: `39bd5e1` on `main`; working tree started clean.
+- Added missing external-review files: `README.md`, `LICENSE`, `SECURITY.md`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `ROADMAP.md`, GitHub issue templates, and `docs/screenshots/README.md`.
+- Expanded `.env.example` to cover Expo, parent portal, and local Functions placeholders. Removed the pre-existing tracked Firebase web API key from `eas.json` and `.codex/handoff.json`.
+- Updated `CODEBASE_AUDIT.md` with the readiness inventory, secret/private-data scan summary, package-health surface, and remaining readiness risks.
+- Secret posture at audit time:
+  - Tracked credential-like files: `.env.example` only.
+  - Ignored local sensitive files present but untracked: `.env`, `credentials.json`, `credentials/`, `google-service-account.json`, and a raw roster spreadsheet.
+  - `.gitignore` covers local env files, service accounts, credentials, generated output, and raw spreadsheet imports.
+- EAS build/submit now expects Firebase app config and Apple credentials to be supplied through maintainer-local/EAS configuration instead of committed JSON.
+- Package audit status is known but not remediated in this docs/readiness slice: root, Functions, and parent portal each report advisories; dry-run fixes touched broad transitive dependency chains and should be handled as a separate package-health PR.
+- No runtime, schema, Firebase rule, deployment, dependency, or UI behavior changes.
+
+## 2026-04-30 — Readiness Review Pass (review/cleanup)
+
+- Reviewed Codex's readiness diff for accuracy, overclaims, and reviewer polish. Findings: README is sober and matches package.json `v1.3.0`; repo-map directories all exist; `.env.example` covers every `process.env.*` reference under `app/`, `src/`, `functions/`, `parent-portal/`, and `scripts/`; SECURITY/CONTRIBUTING/ROADMAP make no fake metric, contributor, or adoption claims.
+- Verified the secret-pattern scan from the handoff comes back clean. `.gitignore` already covers `.env`, service accounts, native credentials, `*.xlsx/*.xls` roster spreadsheets, and credential dirs.
+- Trimmed an irrelevant Supabase RLS reference from `SECURITY.md`. The runtime is Firebase-only; `MASTER_PLAN.md` confirms Supabase was an explicitly rejected option, never deployed.
+- Set `outputFileTracingRoot` in `parent-portal/next.config.ts` to silence the Next.js multi-lockfile workspace-root warning. Patch is config-only; no behavior change.
+- Sharpened `CODEBASE_AUDIT.md` §9 with a per-workspace audit-advisory table (root counts/root cause/recommended next action, plus stop-condition relevance) and a git-history note explaining that Firebase web API keys are public client config — rotation is optional, not blocking.
+- Added `docs/release/open-source-review-checklist.md` as a one-page reviewer-facing summary of what was checked, validation commands run, and outstanding items.
+- License: MIT confirmed acceptable. No conflicts with current dependencies; matches README/LICENSE copyright line.
+- Audit advisories: parent-portal `npm audit fix` (no `--force`) would close postcss + protobufjs but leaves the Next high advisory open (the patch range from `15.5.14 → 15.5.15` does not escape the affected range `9.3.4-canary.0 - 16.3.0-canary.5`). Held the patch for a focused package-health PR. Root and Functions advisories trip the documented stop conditions (Expo SDK and `firebase-admin` major migrations) and remain documented only.
+- Validation in this pass: `git diff --check`, secret-pattern scan, `sync:functions-shared:verify`, `typecheck`, `lint:errors`, `quality:dead-code`, `npm test` (97/939), `npm --prefix functions test` (17/102), `npm --prefix functions run build`, `npm --prefix parent-portal run typecheck`, `npm --prefix parent-portal run lint`, `npm --prefix parent-portal run build` — all green.
+- No runtime, schema, Firebase rule, deployment, or test-corpus changes in this pass.
