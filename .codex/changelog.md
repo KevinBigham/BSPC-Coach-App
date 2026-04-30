@@ -102,3 +102,22 @@
 - Test corpus: client 1023 → **1024** / 102 unchanged. Functions unchanged at 111 / 18. Combined **1135 / 120**.
 - Validation: `npm run sync:functions-shared:verify`, `npm run typecheck`, `npm run lint:errors`, `npm test`, `cd functions && npm run build` (with `prebuild` verify firing), `cd functions && npm test` — all pass.
 - No schema, time-precision, deployment, or UI behavior changes. No new dependencies.
+
+## 2026-04-30 — Sprint-Feature-Prune (3 slices, 7 phases)
+
+- Eight commits stacked on `ab73b4b`. Plan in `.codex/handoffs/feature-prune-{1-surgical,2-meet-live,3-attendance-group-first}.json` (committed `0307d58`). Built end-to-end in one autonomous Claude session.
+- **Slice 1 — Surgical removals** (4 commits):
+  - `a693642` `feat(dashboard): drop Recent PRs feed, expand spark to 30-day window` — Removed the entire Recent PRs aggregation pipeline (UI block + hook state + service subscription + types + Cloud Function recompute + onTimesWritten conditional + rebuildAggregations call + 3 functions tests). Spark chart 7-day → 30-day window; per-day letter labels dropped.
+  - `a921033` `feat(roster): remove medical-info screen, button, type, and route` — Deleted `app/swimmer/medical.tsx` + Stack.Screen + admin-gated MED button + `MedicalInfo` interface. Existing Firestore documents stay on disk untouched.
+  - `479c3db` `feat(practice): remove practice-plan deep-link viewer` — Deleted `app/practice-plan/[id].tsx` + `subscribePracticePlanPdf` service. VIEW button now opens the PDF in the system viewer via `Linking.openURL` (matches the deep-link viewer's web/Expo Go fallback).
+  - `003cc1d` `feat(practice): remove AI practice generator (full stack)` — Deleted UI + client service + Cloud Function + practice prompts + 4 UI entry points. AI knowledge base + audio/video prompts kept (different consumers). Dropped `react-native-pdf` and `react-native-blob-util` deps that orphaned in slice 1 P3.
+- **Slice 2 — Meet/live ops removal** (2 commits):
+  - `a021a48` `feat(meets): remove entire Live Meet Ops section (H56-58)` — Deleted 3 routes (`live`, `timer`, `results`) + `liveMeetStore` + `liveMeet` service + `LaneSplitButton` + tests + LIVE buttons. Subcollections stay on disk untouched.
+  - `226cdae` `feat(meets): remove creation, entries, relays + collapse 4-tab to 2-tab` — Shipped P2 + P3 together (structurally coupled). Deleted `app/meet/{new,entries,relay-builder}.tsx` + 11 write helpers in `meets.ts` + `src/utils/relay.ts` (entire file) + critical-ops meets test. Kept `subscribeEntries` as read-only so the Psych Sheet tab still renders legacy data. Meet detail 4-tab → 2-tab. ⚠️ **Known gap**: removing `meet/new` kills the only in-app meet-creation path; Kevin can re-add a slim flow if needed.
+- **Slice 3 — Attendance group-first** (1 commit):
+  - `279dcf9` `feat(attendance): group-first SectionList layout` — Replaced FlatList with SectionList. One section per training group, sticky headers, per-section `CHECK IN ALL ({uncheckedCount})` button. Filter chips still narrow to one section.
+- **Sprint diff**: 49 files changed, +416 / −6442 lines (net **6026 lines deleted**).
+- **Test corpus**: client 1024 / 102 → **940 / 97** (−84 tests, −5 suites). Functions 111 / 18 → **102 / 17** (−9 tests, −1 suite). Combined 1135 / 120 → **1042 / 114**.
+- **Validation**: `npm run typecheck`, `npm run lint:errors`, `npm run quality`, `npm run quality:dead-code`, `npm test`, `(cd functions && npm test)`, `(cd functions && npm run build)`, `npm run sync:functions-shared:verify` — all pass after each phase.
+- **Schema**: no schema changes. Existing legacy data on disk (medical info, live_events, splits, entries, relays, dashboard_recent_prs aggregation) is left untouched; the app simply stops reading or writing it.
+- **Deploy needed on next push**: `firebase deploy --only functions` (deleted `generatePractice` callable + `recomputeDashboardRecentPRsAggregation`). Plus the Wave 3 rules+indexes deploy is still pending.

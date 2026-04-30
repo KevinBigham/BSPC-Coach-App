@@ -185,3 +185,39 @@
   - **Still open**: Detox / Maestro E2E coverage (`e2e/maestro/` exists with stub flows). Nested sub-component extraction in `app/swimmer/[id].tsx` and `app/(tabs)/practice.tsx` if deeper screen reduction becomes desired.
 - Architectural note: P1's copy+sync mechanism is intentionally simple — one shared file, plain Node script, single `SHARED_FILES` array for future expansion. If shared-file count grows past ~3, revisit a package / npm-workspaces approach.
 - Deploy reminder still pending Kevin: `firebase deploy --only firestore:rules,firestore:indexes` from Wave 3. This sprint added nothing new to that list.
+
+## 2026-04-30 — Sprint-Feature-Prune (3 slices, 7 phases)
+
+- Baseline: `ab73b4b` on `main`. Pre-sprint corpus: 1024 / 102 client + 111 / 18 functions = 1135 / 120 combined.
+- Kevin reviewed a 132-feature inventory and named items to remove or modify across 8 sections of the app. Plan written to `.codex/handoffs/feature-prune-{1-surgical,2-meet-live,3-attendance-group-first}.json` and committed as `0307d58` (`docs(handoffs): plan feature-prune sprint`). Then Claude built all three slices end-to-end in a single autonomous session — 7 implementation commits, 8 commits total.
+
+### Slice 1 — Surgical removals (P1–P4)
+
+- **P1** (`a693642`) — `feat(dashboard): drop Recent PRs feed, expand spark to 30-day window`. Removed the entire Recent PRs vertical slice: client UI block + recentPRs state in `useDashboardData` + `subscribeDashboardRecentPRsAggregation` service + `DashboardRecentPRsAggregation` type + `recomputeDashboardRecentPRsAggregation` Cloud Function + `RECENT_PRS_DOC_PATH` + `onTimesWritten` conditional recompute (touchesPR logic) + `rebuildAggregations` call. Tests deleted in 3 functions test files. Spark chart: 7-day → 30-day window (loop `i = 6` → `i = 29`), drop per-day letter labels and `dayLabel` field (30 labels don't fit cleanly), section title `7-DAY` → `30-DAY`.
+- **P2** (`a921033`) — `feat(roster): remove medical-info screen, button, type, and route`. Deleted `app/swimmer/medical.tsx`, dropped Stack.Screen, removed admin-gated MED button + medicalBtn styles in `app/swimmer/[id].tsx` (drops the now-unused `isAdmin` destructure), dropped `MedicalInfo` interface, dropped the medical fixture line in `parentPortal.test.ts` (whitelist-based sanitizer made it redundant). Existing Firestore documents stay on disk untouched.
+- **P3** (`479c3db`) — `feat(practice): remove practice-plan deep-link viewer`. Deleted `app/practice-plan/[id].tsx` + `subscribePracticePlanPdf` service helper + its test. Modified VIEW button in `practice-pdf-uploader.tsx` to resolve storage URL via `getDownloadURL` and open in system viewer via `Linking.openURL` (matching the deep-link viewer's web/Expo Go fallback path). Dropped `react-native-pdf` and `react-native-blob-util` deps that became orphaned.
+- **P4** (`003cc1d`) — `feat(practice): remove AI practice generator (full stack)`. Deleted UI + client service + Cloud Function + practice prompts module + tests + 4 UI entry points. The AI knowledge base (`functions/src/ai/swimKnowledge.ts`) and audio/video extraction prompts stay — different consumers.
+
+### Slice 2 — Meet/live ops removal (P1, P2+3)
+
+- **P1** (`a021a48`) — `feat(meets): remove entire Live Meet Ops section (H56-58)`. Deleted 3 routes (`live`, `timer`, `results`) + `liveMeetStore` + `liveMeet` service + `LaneSplitButton` + their tests + `LIVE TIMING MODE` button + `LIVE MODE` pill in meets tab. Existing `meets/{id}/live_events` and `meets/{id}/splits` subcollections stay on disk untouched.
+- **P2 + P3** (`226cdae`) — `feat(meets): remove creation, entries, relays + collapse 4-tab to 2-tab`. Shipped together because the meet detail tabs were structurally coupled to the entry/relay write paths. Deleted: `app/meet/{new,entries,relay-builder}.tsx` + `meets.ts` write helpers (`addMeet`, `addEntry`, `addEntriesBatch`, `removeEntry`, `updateEntry`, `validateMeetEntry`, `addRelay`, `updateRelay`, `deleteRelay`, `validateRelay`, `subscribeRelays`) + `src/utils/relay.ts` (estimateSplit, optimizeFreeRelayOrder, optimizeMedleyRelayOrder, estimateRelayTime, calculatePlacement, formatRelayLeg) + their tests + `test/critical-ops/meets.criticalOp.test.ts`. Kept `subscribeEntries` as read-only so the meet detail Psych Sheet tab can still render legacy `meets/{id}/entries`. Meet detail collapsed from 4 tabs to 2 (Overview + Psych Sheet); stats row trimmed from 4 boxes to 3 (drops RELAYS column). `+ NEW` FAB removed from meets tab + fab styles + stale "Create your first meet" empty-state copy.
+- ⚠️ **KNOWN GAP** (surfaced to Kevin in commit body): removing `meet/new` killed the only in-app path to create a meet doc. SDIF/HY3 import attaches to existing meets only; it does not auto-create them. Existing meets in Firestore still display, but new meets must be added via Firestore console (admin) or by re-adding a slim "add meet" flow in a future sprint. This was an explicit stop_condition trigger in the slice 2 handoff; Kevin's "Do all 3 slices" directive overrode the halt.
+
+### Slice 3 — Attendance group-first
+
+- **Slice 3** (`279dcf9`) — `feat(attendance): group-first SectionList layout`. Replaced the FlatList-of-all-swimmers with a SectionList: one section per training group (in `GROUPS`-defined order; empty groups dropped). Section header shows group name (in group color), present/total count, and a `CHECK IN ALL ({uncheckedCount})` button that batches just that section's swimmers. Sticky headers keep the group context visible while scrolling. Filter chips still narrow to one section. The previous standalone `CHECK IN ALL` button (visible only when a single group was selected) is now redundant — the per-section button covers both 'All' and single-group views. Per-row group label dropped since the section header carries that context.
+
+### Sprint totals
+
+- **Sprint diff**: 49 files changed, +416 / −6442 lines (net **6026 lines deleted**).
+- **Test corpus deltas**: client 1024 / 102 → **940 / 97** (−84 tests, −5 suites). Functions 111 / 18 → **102 / 17** (−9 tests, −1 suite from `generatePractice.test.ts`). Combined 1135 / 120 → **1042 / 114**.
+- **Validation**: `npm run typecheck`, `npm run lint:errors`, `npm run quality`, `npm run quality:dead-code`, `npm test`, `(cd functions && npm test)`, `(cd functions && npm run build)`, `npm run sync:functions-shared:verify` — all pass after each phase.
+- **Dead-code surface**: pre-existing 5 unused exported types + 1 duplicate export only. No new dead code introduced.
+
+### Loose ends update
+
+- **Closed in this sprint**: Recent PRs aggregation pipeline (full vertical slice including Cloud Function), medical-info schema + UI, practice-plan deep-link route + subscription, AI practice generator + Cloud Function, entire Live Meet Ops section + its store + service, meet creation/entries/relays write surface, 4-tab meet detail.
+- **Net negative dependencies**: `react-native-pdf`, `react-native-blob-util` removed.
+- **Still open**: Detox / Maestro E2E coverage (`e2e/maestro/` exists with stub flows). Nested sub-component extraction in `app/swimmer/[id].tsx` and `app/(tabs)/practice.tsx` if deeper screen reduction is desired. `meet/new` rebuild — Kevin can ship a slim "add meet" flow later if he wants in-app meet creation back.
+- **Deploy reminder still pending Kevin**: `firebase deploy --only firestore:rules,firestore:indexes` from Wave 3. Plus, this sprint changed Cloud Functions (deleted `generatePractice` callable, deleted `recomputeDashboardRecentPRsAggregation` from `dashboardAggregations.ts`), so `firebase deploy --only functions` will need to fire on next deploy. Existing `aggregations/dashboard_recent_prs` documents will stop being maintained but stay on disk.
