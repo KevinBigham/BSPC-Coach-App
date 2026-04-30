@@ -150,19 +150,6 @@ export function subscribeTodayPracticePlan(
   });
 }
 
-export function subscribePracticePlanPdf(
-  planId: string,
-  callback: (plan: DashboardPracticePlanPdfWithId | null) => void,
-): Unsubscribe {
-  return onSnapshot(doc(db, 'practice_plans', planId), (snapshot) => {
-    if (!snapshot.exists()) {
-      callback(null);
-      return;
-    }
-    callback({ id: snapshot.id, ...snapshot.data() } as DashboardPracticePlanPdfWithId);
-  });
-}
-
 export async function duplicateAsTemplate(
   plan: PlanWithId,
   coachUid: string,

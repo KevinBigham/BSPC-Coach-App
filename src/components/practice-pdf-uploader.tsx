@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Linking } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
-import { router } from 'expo-router';
 import { Eye, FileUp } from 'lucide-react-native';
+import { getDownloadURL, ref } from 'firebase/storage';
+import { storage } from '../config/firebase';
 import { useToast } from '../contexts/ToastContext';
 import { colors, spacing, fontSize, borderRadius, fontFamily } from '../config/theme';
 import {
@@ -133,7 +134,17 @@ export default function PracticePdfUploader({ coachId }: PracticePdfUploaderProp
           <>
             <TouchableOpacity
               style={styles.primaryButton}
-              onPress={() => router.push(`/practice-plan/${todayPlan.id}`)}
+              onPress={async () => {
+                try {
+                  const url = await getDownloadURL(ref(storage, todayPlan.storagePath));
+                  await Linking.openURL(url);
+                } catch (error) {
+                  showToast(
+                    error instanceof Error ? error.message : 'Unable to open practice PDF',
+                    'error',
+                  );
+                }
+              }}
             >
               <Eye size={18} color={colors.bgDeep} strokeWidth={2.5} />
               <Text style={styles.primaryButtonText}>VIEW</Text>

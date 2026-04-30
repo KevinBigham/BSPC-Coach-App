@@ -52,7 +52,6 @@ import {
   calculateSetYardage,
   calculateTotalYardage,
   subscribeTodayPracticePlan,
-  subscribePracticePlanPdf,
   createDashboardPracticePlanPdf,
   uploadDashboardPracticePlanPdf,
 } from '../practicePlans';
@@ -338,15 +337,6 @@ describe('dashboard practice pdf helpers', () => {
       filename: 'practice.pdf',
       date: '2026-04-18',
     });
-  });
-
-  it('subscribes to a single dashboard practice pdf document by id', () => {
-    firestore.onSnapshot.mockReturnValue(jest.fn());
-
-    subscribePracticePlanPdf('pdf-1', jest.fn());
-
-    expect(firestore.doc).toHaveBeenCalledWith(expect.anything(), 'practice_plans', 'pdf-1');
-    expect(firestore.onSnapshot).toHaveBeenCalled();
   });
 
   it('uploads dashboard pdfs to the coach/date storage path', async () => {
