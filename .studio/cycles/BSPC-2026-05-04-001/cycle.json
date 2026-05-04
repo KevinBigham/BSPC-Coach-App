@@ -1,0 +1,61 @@
+{
+  "cycle_id": "BSPC-2026-05-04-001",
+  "title": "Roster sync — Coach App → Parent App",
+  "created": "2026-05-04",
+  "phase": "awaiting_dispatch",
+  "scope_change": "none",
+  "goal": "Establish the one-way sync pipeline that pushes parent-safe swimmer roster data from BSPC Coach App (Firebase) to BSPC Parent App (Supabase), end-to-end, with one parent-readable mirror table protected by RLS and a Firestore-triggered Cloud Function as the bridge.",
+  "non_goals": [
+    "Attendance sync (cycle 2)",
+    "Notes sync (cycle 3, after note-visibility opt-in flag)",
+    "Mapping Coach App swimmers to Supabase families/parent accounts",
+    "Replacing or modifying existing Supabase swimmers table",
+    "Replacing Coach App's parent-portal Next.js scaffold",
+    "New libraries beyond what's already in both repos"
+  ],
+  "lineage": {
+    "orchestrator": "Claude Code Web",
+    "builder": "Codex (Cloud or local CLI — TBD at dispatch)",
+    "reviewer": "Claude Code Web",
+    "two_agent_isolation_satisfied": true
+  },
+  "scope": {
+    "parent_app_changes": {
+      "create": [
+        "supabase/migrations/00006_coach_roster_mirror.sql",
+        "lib/supabase/coachRosterMirror.ts",
+        "__tests__/lib/supabase/coachRosterMirror.test.ts"
+      ],
+      "modify": [],
+      "do_not_touch": ["supabase/migrations/00001_initial_schema.sql", "existing swimmers table"]
+    },
+    "coach_app_changes": {
+      "create": [
+        "functions/src/triggers/onSwimmerWritten.ts",
+        "functions/src/utils/supabaseClient.ts",
+        "functions/src/__tests__/triggers/onSwimmerWritten.test.ts"
+      ],
+      "modify": [
+        "functions/src/index.ts (add export)",
+        ".env.example (add SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY placeholders)",
+        "functions/package.json (add @supabase/supabase-js dep)"
+      ]
+    }
+  },
+  "branch": "cycle/bspc/BSPC-2026-05-04-001-roster-sync",
+  "pr_title": "[CYCLE BSPC-2026-05-04-001] Roster sync — Coach App → Parent App",
+  "risk_level": "medium",
+  "risk_factors": [
+    "service-role key handling (security-sensitive)",
+    "cross-repo coordination",
+    "two backends touched"
+  ],
+  "rollback_plan": "Revert PRs. If migration applied: drop coach_roster_mirror table or write down-migration. Disable Cloud Function via Firebase console if misbehaves.",
+  "acceptance_criteria_count": 9,
+  "minimum_test_count": 4,
+  "lines_of_code_estimate": "150-250",
+  "authorization_required": "Kevin says 'go' to dispatch builder",
+  "merge_authorization_required": "Kevin says 'merge it' (only Kevin)",
+  "review_round": 1,
+  "events": []
+}
