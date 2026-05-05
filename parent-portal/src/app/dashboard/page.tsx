@@ -95,6 +95,17 @@ export default function DashboardPage() {
         </div>
       )}
 
+      <div
+        className="card mb-6"
+        style={{ borderColor: 'var(--gold)', background: 'rgba(255,215,0,0.06)' }}
+      >
+        <span className="pixel-label">PARENT-SAFE VIEW</span>
+        <p className="text-[var(--text-secondary)] text-sm mt-3">
+          This portal shows linked swimmers, times, attendance, goals, and schedule context. Coach
+          notes, internal observations, and AI draft review stay in the coach app.
+        </p>
+      </div>
+
       {swimmers.length > 0 ? (
         <div className="space-y-4">
           <h3 className="heading text-xl">YOUR SWIMMERS</h3>

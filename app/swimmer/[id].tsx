@@ -12,7 +12,7 @@ import {
   Image,
 } from 'react-native';
 import { useLocalSearchParams, Stack, router } from 'expo-router';
-import { ArrowLeft, Plus } from 'lucide-react-native';
+import { ArrowLeft, CalendarCheck, FileText, Mic, Plus } from 'lucide-react-native';
 import {
   doc,
   collection,
@@ -56,6 +56,12 @@ import type {
 import { withScreenErrorBoundary } from '../../src/components/ScreenErrorBoundary';
 import { toDateSafe, type FirestoreTimestampLike } from '../../src/utils/date';
 import { useSwimmerData, type SwimmerProfileNote } from '../../src/hooks/useSwimmerData';
+import {
+  buildProfileCoachSnapshot,
+  type DemoFact,
+  type DemoFactTone,
+  type ProfileCoachSnapshot,
+} from '../../src/utils/demoReadiness';
 
 type Tab = 'overview' | 'voice' | 'notes' | 'times' | 'attendance' | 'timeline';
 type ProfileNote = SwimmerProfileNote;
@@ -141,6 +147,19 @@ function SwimmerProfileScreen() {
     ]);
   };
 
+  const handleOpenNoteAction = () => {
+    setShowNoteComposer(true);
+    setActiveTab('notes');
+  };
+
+  const handleOpenVoiceAction = () => {
+    setActiveTab('voice');
+  };
+
+  const handleOpenAttendanceAction = () => {
+    setActiveTab('attendance');
+  };
+
   const dateOfBirth = toDateSafe(swimmer?.dateOfBirth as FirestoreTimestampLike);
   const age = dateOfBirth ? calculateAge(dateOfBirth) : null;
 
@@ -152,6 +171,20 @@ function SwimmerProfileScreen() {
   const headerAttendanceColor = todayAttendance
     ? STATUS_COLORS[todayAttendance.status || 'normal'] || colors.success
     : colors.textSecondary;
+  const coachSnapshot = useMemo(
+    () =>
+      swimmer
+        ? buildProfileCoachSnapshot({
+            swimmer,
+            notes,
+            times,
+            attendance,
+            goals,
+            todayAttendance,
+          })
+        : null,
+    [swimmer, notes, times, attendance, goals, todayAttendance],
+  );
 
   if (loading) {
     return (
@@ -312,6 +345,10 @@ function SwimmerProfileScreen() {
               attendanceCount={attendance.length}
               goals={goals}
               swimmerId={id!}
+              coachSnapshot={coachSnapshot}
+              onAddNoteAction={handleOpenNoteAction}
+              onVoiceNoteAction={handleOpenVoiceAction}
+              onAttendanceAction={handleOpenAttendanceAction}
             />
           )}
           {activeTab === 'voice' && coach?.uid && (
@@ -371,6 +408,10 @@ function OverviewTab({
   attendanceCount,
   goals,
   swimmerId,
+  coachSnapshot,
+  onAddNoteAction,
+  onVoiceNoteAction,
+  onAttendanceAction,
 }: {
   swimmer: Swimmer;
   noteCount: number;
@@ -379,6 +420,10 @@ function OverviewTab({
   attendanceCount: number;
   goals: (SwimmerGoal & { id: string })[];
   swimmerId: string;
+  coachSnapshot: ProfileCoachSnapshot | null;
+  onAddNoteAction: () => void;
+  onVoiceNoteAction: () => void;
+  onAttendanceAction: () => void;
 }) {
   const dob = toDateSafe(swimmer.dateOfBirth as FirestoreTimestampLike);
   const age = dob ? calculateAge(dob) : null;
@@ -397,6 +442,15 @@ function OverviewTab({
 
   return (
     <View style={styles.overviewContainer}>
+      {coachSnapshot && (
+        <CoachSnapshotCard
+          snapshot={coachSnapshot}
+          onAddNoteAction={onAddNoteAction}
+          onVoiceNoteAction={onVoiceNoteAction}
+          onAttendanceAction={onAttendanceAction}
+        />
+      )}
+
       <View style={styles.overviewRow}>
         <View style={styles.overviewStat}>
           <Text style={styles.overviewStatNum}>{noteCount}</Text>
@@ -519,7 +573,7 @@ function OverviewTab({
 
       {swimmer.parentContacts?.length > 0 && (
         <View style={styles.overviewCard}>
-          <Text style={styles.overviewCardTitle}>PARENT CONTACTS</Text>
+          <Text style={styles.overviewCardTitle}>FAMILY CONTACTS — COACH VIEW</Text>
           {swimmer.parentContacts.map((pc, i) => (
             <View key={i} style={styles.contactRow}>
               <Text style={styles.contactName}>{pc.name}</Text>
@@ -529,6 +583,104 @@ function OverviewTab({
           ))}
         </View>
       )}
+    </View>
+  );
+}
+
+function CoachSnapshotCard({
+  snapshot,
+  onAddNoteAction,
+  onVoiceNoteAction,
+  onAttendanceAction,
+}: {
+  snapshot: ProfileCoachSnapshot;
+  onAddNoteAction: () => void;
+  onVoiceNoteAction: () => void;
+  onAttendanceAction: () => void;
+}) {
+  return (
+    <View style={styles.overviewCard}>
+      <View style={styles.snapshotHeaderRow}>
+        <Text style={styles.overviewCardTitle}>COACH SNAPSHOT</Text>
+        <View style={[styles.snapshotPill, styles.snapshotPillCoach]}>
+          <Text style={[styles.snapshotPillText, styles.snapshotPillCoachText]}>COACH VIEW</Text>
+        </View>
+      </View>
+      <View style={[styles.nextActionPanel, getNextActionPanelStyle(snapshot.nextAction.tone)]}>
+        <View style={styles.nextActionHeader}>
+          <Text style={styles.nextActionLabel}>{snapshot.nextAction.label}</Text>
+          {snapshot.nextAction.privacy && (
+            <View style={[styles.snapshotPill, styles.snapshotPillCoach]}>
+              <Text style={[styles.snapshotPillText, styles.snapshotPillCoachText]}>
+                {snapshot.nextAction.privacy}
+              </Text>
+            </View>
+          )}
+        </View>
+        <Text style={styles.nextActionText}>{snapshot.nextAction.value}</Text>
+        <View style={styles.quickActionRow}>
+          <TouchableOpacity
+            style={[styles.quickActionBtn, styles.quickActionBtnPrimary]}
+            onPress={onAddNoteAction}
+            accessibilityRole="button"
+            accessibilityLabel="Add a coach-only note"
+          >
+            <FileText size={14} color={colors.bgDeep} strokeWidth={2.5} />
+            <Text style={[styles.quickActionBtnText, styles.quickActionBtnTextPrimary]}>NOTE</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.quickActionBtn}
+            onPress={onVoiceNoteAction}
+            accessibilityRole="button"
+            accessibilityLabel="Open voice note recorder"
+          >
+            <Mic size={14} color={colors.gold} strokeWidth={2.5} />
+            <Text style={styles.quickActionBtnText}>VOICE</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.quickActionBtn}
+            onPress={onAttendanceAction}
+            accessibilityRole="button"
+            accessibilityLabel="Review attendance context"
+          >
+            <CalendarCheck size={14} color={colors.gold} strokeWidth={2.5} />
+            <Text style={styles.quickActionBtnText}>ATTEND</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+      <SnapshotFactRow fact={snapshot.todayStatus} />
+      <SnapshotFactRow fact={snapshot.bestTime} />
+      <SnapshotFactRow fact={snapshot.attendanceCount} />
+      <SnapshotFactRow fact={snapshot.activeGoalCount} />
+      <SnapshotFactRow fact={snapshot.mediaSafety} />
+      <SnapshotFactRow fact={snapshot.recentNote} multiline />
+      <View style={styles.boundaryNotice}>
+        <Text style={styles.boundaryTitle}>{snapshot.parentBoundary.label}</Text>
+        <Text style={styles.boundaryText}>{snapshot.parentBoundary.value}</Text>
+      </View>
+    </View>
+  );
+}
+
+function SnapshotFactRow({ fact, multiline = false }: { fact: DemoFact; multiline?: boolean }) {
+  return (
+    <View style={styles.snapshotRow}>
+      <View style={styles.snapshotLabelCol}>
+        <Text style={styles.snapshotLabel}>{fact.label}</Text>
+        {fact.privacy && (
+          <View style={[styles.snapshotPill, styles.snapshotPillCoach]}>
+            <Text style={[styles.snapshotPillText, styles.snapshotPillCoachText]}>
+              {fact.privacy}
+            </Text>
+          </View>
+        )}
+      </View>
+      <Text
+        style={[styles.snapshotValue, getSnapshotValueStyle(fact.tone)]}
+        numberOfLines={multiline ? 3 : 1}
+      >
+        {fact.value || fact.label}
+      </Text>
     </View>
   );
 }
@@ -700,6 +852,13 @@ function NotesTab({
         <Plus size={18} color={colors.bgDeep} strokeWidth={2.5} />
         <Text style={styles.addNoteFabText}>{showComposer ? 'CLOSE' : 'NOTE'}</Text>
       </TouchableOpacity>
+
+      <View style={styles.noteBoundaryNotice}>
+        <Text style={styles.noteBoundaryTitle}>COACH-ONLY NOTES</Text>
+        <Text style={styles.noteBoundaryText}>
+          Notes saved here stay in the coach workflow. Parent-safe views do not show these notes.
+        </Text>
+      </View>
 
       {showComposer && (
         <View style={styles.noteForm}>
@@ -1300,6 +1459,149 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     marginBottom: spacing.sm,
   },
+  snapshotHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  snapshotRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderLight,
+  },
+  snapshotLabelCol: {
+    flex: 1,
+    gap: spacing.xs,
+  },
+  snapshotLabel: {
+    fontFamily: fontFamily.pixel,
+    fontSize: fontSize.pixel,
+    color: colors.textSecondary,
+    lineHeight: 12,
+  },
+  snapshotValue: {
+    flex: 1.25,
+    fontFamily: fontFamily.bodySemi,
+    fontSize: fontSize.sm,
+    color: colors.text,
+    textAlign: 'right',
+    lineHeight: 19,
+  },
+  snapshotValueGood: { color: colors.success },
+  snapshotValueAccent: { color: colors.gold },
+  snapshotValueWarning: { color: colors.warning },
+  snapshotValueDanger: { color: colors.error },
+  snapshotValueNeutral: { color: colors.text },
+  snapshotPill: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: borderRadius.xs,
+    borderWidth: 1,
+  },
+  snapshotPillCoach: {
+    borderColor: colors.gold,
+    backgroundColor: 'rgba(255, 215, 0, 0.1)',
+  },
+  snapshotPillText: {
+    fontFamily: fontFamily.pixel,
+    fontSize: 6,
+  },
+  snapshotPillCoachText: {
+    color: colors.gold,
+  },
+  nextActionPanel: {
+    padding: spacing.md,
+    borderRadius: borderRadius.sm,
+    borderWidth: 1,
+    marginBottom: spacing.md,
+    backgroundColor: 'rgba(255, 215, 0, 0.08)',
+  },
+  nextActionPanelNeutral: {
+    borderColor: colors.borderAccent,
+    backgroundColor: 'rgba(179, 136, 255, 0.08)',
+  },
+  nextActionPanelWarning: {
+    borderColor: colors.warning,
+    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+  },
+  nextActionPanelDanger: {
+    borderColor: colors.error,
+    backgroundColor: 'rgba(244, 63, 94, 0.1)',
+  },
+  nextActionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: spacing.md,
+    marginBottom: spacing.xs,
+  },
+  nextActionLabel: {
+    fontFamily: fontFamily.pixel,
+    fontSize: fontSize.pixel,
+    color: colors.gold,
+    lineHeight: 12,
+  },
+  nextActionText: {
+    fontFamily: fontFamily.bodySemi,
+    fontSize: fontSize.md,
+    color: colors.text,
+    lineHeight: 22,
+    marginBottom: spacing.md,
+  },
+  quickActionRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  quickActionBtn: {
+    flex: 1,
+    minHeight: 42,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    borderRadius: borderRadius.sm,
+    borderWidth: 1,
+    borderColor: colors.gold,
+    backgroundColor: 'rgba(0,0,0,0.2)',
+  },
+  quickActionBtnPrimary: {
+    backgroundColor: colors.gold,
+  },
+  quickActionBtnText: {
+    fontFamily: fontFamily.bodySemi,
+    fontSize: fontSize.xs,
+    color: colors.gold,
+    letterSpacing: 1,
+  },
+  quickActionBtnTextPrimary: {
+    color: colors.bgDeep,
+  },
+  boundaryNotice: {
+    marginTop: spacing.md,
+    padding: spacing.md,
+    borderRadius: borderRadius.sm,
+    borderWidth: 1,
+    borderColor: colors.gold,
+    backgroundColor: 'rgba(255, 215, 0, 0.08)',
+  },
+  boundaryTitle: {
+    fontFamily: fontFamily.pixel,
+    fontSize: fontSize.pixel,
+    color: colors.gold,
+    marginBottom: spacing.xs,
+  },
+  boundaryText: {
+    fontFamily: fontFamily.body,
+    fontSize: fontSize.sm,
+    color: colors.text,
+    lineHeight: 20,
+  },
   listItem: {
     fontFamily: fontFamily.body,
     fontSize: fontSize.sm,
@@ -1476,6 +1778,26 @@ const styles = StyleSheet.create({
   },
   addNoteButtonDisabled: { opacity: 0.5 },
   addNoteButtonText: { fontFamily: fontFamily.bodySemi, color: colors.text, fontSize: fontSize.md },
+  noteBoundaryNotice: {
+    padding: spacing.md,
+    borderRadius: borderRadius.sm,
+    borderWidth: 1,
+    borderColor: colors.gold,
+    backgroundColor: 'rgba(255, 215, 0, 0.08)',
+    marginBottom: spacing.md,
+  },
+  noteBoundaryTitle: {
+    fontFamily: fontFamily.pixel,
+    fontSize: fontSize.pixel,
+    color: colors.gold,
+    marginBottom: spacing.xs,
+  },
+  noteBoundaryText: {
+    fontFamily: fontFamily.body,
+    fontSize: fontSize.sm,
+    color: colors.text,
+    lineHeight: 20,
+  },
   noteCard: {
     backgroundColor: colors.bgDeep,
     borderRadius: borderRadius.md,
@@ -1721,5 +2043,31 @@ const styles = StyleSheet.create({
   },
   modalSaveText: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.md, color: colors.text },
 });
+
+function getSnapshotValueStyle(tone: DemoFactTone) {
+  switch (tone) {
+    case 'good':
+      return styles.snapshotValueGood;
+    case 'accent':
+      return styles.snapshotValueAccent;
+    case 'warning':
+      return styles.snapshotValueWarning;
+    case 'danger':
+      return styles.snapshotValueDanger;
+    default:
+      return styles.snapshotValueNeutral;
+  }
+}
+
+function getNextActionPanelStyle(tone: DemoFactTone) {
+  switch (tone) {
+    case 'warning':
+      return styles.nextActionPanelWarning;
+    case 'danger':
+      return styles.nextActionPanelDanger;
+    default:
+      return styles.nextActionPanelNeutral;
+  }
+}
 
 export default withScreenErrorBoundary(SwimmerProfileScreen, 'SwimmerProfileScreen');

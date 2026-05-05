@@ -132,6 +132,18 @@ export default function SwimmerPage({ params }: { params: Promise<{ id: string }
 
       {tab === 'overview' && (
         <div className="space-y-6">
+          <div
+            className="card"
+            style={{ borderColor: 'var(--gold)', background: 'rgba(255,215,0,0.06)' }}
+          >
+            <span className="pixel-label">PARENT-SAFE PROFILE</span>
+            <p className="text-[var(--text-secondary)] text-sm mt-3">
+              This view is limited to family-safe roster context, goals, strengths, times, schedule,
+              and attendance. Coach notes, internal observations, and AI draft review are not shown
+              here.
+            </p>
+          </div>
+
           <div className="grid grid-cols-3 gap-4">
             <div className="card text-center">
               <span className="stat-number text-3xl">{prList.length}</span>

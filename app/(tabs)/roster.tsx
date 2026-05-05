@@ -8,11 +8,11 @@ import {
   StyleSheet,
   Alert,
   Image,
+  ActivityIndicator,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../../src/config/firebase';
-import { useAuth } from '../../src/contexts/AuthContext';
 import {
   colors,
   spacing,
@@ -25,13 +25,13 @@ import { GROUPS, type Group } from '../../src/config/constants';
 import { subscribeSwimmers, updateSwimmer } from '../../src/services/swimmers';
 import { exportRosterCSV, shareCSV } from '../../src/services/export';
 import { useSwimmersStore } from '../../src/stores/swimmersStore';
-import { getPRCount } from '../../src/services/aggregations';
 import type {
   Swimmer,
   AttendanceAggregation,
   SwimmerAggregation,
 } from '../../src/types/firestore.types';
 import { withScreenErrorBoundary } from '../../src/components/ScreenErrorBoundary';
+import { buildRosterDemoFacts, type DemoFactTone } from '../../src/utils/demoReadiness';
 
 type SortOption = 'az' | 'za' | 'group' | 'newest';
 const SORT_LABELS: Record<SortOption, string> = {
@@ -43,8 +43,8 @@ const SORT_LABELS: Record<SortOption, string> = {
 
 function RosterScreen() {
   const params = useLocalSearchParams<{ group?: string }>();
-  const { isAdmin } = useAuth();
   const activeSwimmers = useSwimmersStore((s) => s.swimmers);
+  const activeLoading = useSwimmersStore((s) => s.loading);
   const [inactiveSwimmers, setInactiveSwimmers] = useState<(Swimmer & { id: string })[]>([]);
   const [showInactive, setShowInactive] = useState(false);
   const [search, setSearch] = useState('');
@@ -102,6 +102,7 @@ function RosterScreen() {
   }, [showInactive]);
 
   const swimmers = showInactive ? inactiveSwimmers : activeSwimmers;
+  const showInitialLoading = !showInactive && activeLoading && activeSwimmers.length === 0;
 
   const filtered = useMemo(() => {
     let result = swimmers;
@@ -140,6 +141,11 @@ function RosterScreen() {
     return result;
   }, [swimmers, selectedGroup, search, sort]);
 
+  const representedGroupCount = useMemo(
+    () => new Set(swimmers.map((swimmer) => swimmer.group)).size,
+    [swimmers],
+  );
+
   const cycleSort = () => {
     const options: SortOption[] = ['az', 'za', 'group', 'newest'];
     const next = options[(options.indexOf(sort) + 1) % options.length];
@@ -162,62 +168,62 @@ function RosterScreen() {
     );
   };
 
-  const renderSwimmer = ({ item }: { item: Swimmer & { id: string } }) => (
-    <TouchableOpacity
-      style={styles.swimmerRow}
-      onPress={() => router.push(`/swimmer/${item.id}`)}
-      onLongPress={showInactive ? () => handleActivate(item) : undefined}
-    >
-      {item.profilePhotoUrl ? (
-        <Image source={{ uri: item.profilePhotoUrl }} style={styles.avatarImage} />
-      ) : (
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>
-            {item.firstName[0]}
-            {item.lastName[0]}
-          </Text>
-        </View>
-      )}
-      <View style={styles.swimmerInfo}>
-        <Text style={styles.swimmerName}>
-          {item.lastName}, {item.firstName}
-        </Text>
-        <View style={styles.swimmerMeta}>
-          <View
-            style={[
-              styles.groupBadge,
-              {
-                backgroundColor: 'rgba(0,0,0,0.3)',
-                borderColor: groupColors[item.group] || colors.textSecondary,
-              },
-            ]}
-          >
-            <Text
-              style={[
-                styles.groupBadgeText,
-                { color: groupColors[item.group] || colors.textSecondary },
-              ]}
-            >
-              {item.group}
+  const renderSwimmer = ({ item }: { item: Swimmer & { id: string } }) => {
+    const facts = buildRosterDemoFacts(item, attendanceAggs[item.id], swimmerAggs[item.id]);
+
+    return (
+      <TouchableOpacity
+        style={styles.swimmerRow}
+        onPress={() => router.push(`/swimmer/${item.id}`)}
+        onLongPress={showInactive ? () => handleActivate(item) : undefined}
+        accessibilityRole="button"
+        accessibilityLabel={`Open ${item.firstName} ${item.lastName} profile`}
+      >
+        {item.profilePhotoUrl ? (
+          <Image source={{ uri: item.profilePhotoUrl }} style={styles.avatarImage} />
+        ) : (
+          <View style={styles.avatar}>
+            <Text style={styles.avatarText}>
+              {item.firstName[0]}
+              {item.lastName[0]}
             </Text>
           </View>
-          {attendanceAggs[item.id] && (
-            <Text style={styles.aggStat}>
-              {Math.round(attendanceAggs[item.id].attendancePercent30)}%
-            </Text>
-          )}
-          {swimmerAggs[item.id] && getPRCount(swimmerAggs[item.id]) > 0 && (
-            <Text style={styles.aggStatPR}>
-              {getPRCount(swimmerAggs[item.id])} PR
-              {getPRCount(swimmerAggs[item.id]) !== 1 ? 's' : ''}
-            </Text>
-          )}
-          {item.usaSwimmingId && <Text style={styles.usaId}>USA #{item.usaSwimmingId}</Text>}
+        )}
+        <View style={styles.swimmerInfo}>
+          <Text style={styles.swimmerName}>
+            {item.lastName}, {item.firstName}
+          </Text>
+          <View style={styles.swimmerMeta}>
+            <View
+              style={[
+                styles.groupBadge,
+                {
+                  backgroundColor: 'rgba(0,0,0,0.3)',
+                  borderColor: groupColors[item.group] || colors.textSecondary,
+                },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.groupBadgeText,
+                  { color: groupColors[item.group] || colors.textSecondary },
+                ]}
+              >
+                {item.group}
+              </Text>
+            </View>
+            {facts.map((fact) => (
+              <View key={fact.label} style={[styles.factChip, getFactChipStyle(fact.tone)]}>
+                <Text style={[styles.factChipText, getFactTextStyle(fact.tone)]}>{fact.label}</Text>
+              </View>
+            ))}
+            {item.usaSwimmingId && <Text style={styles.usaId}>USA #{item.usaSwimmingId}</Text>}
+          </View>
         </View>
-      </View>
-      <Text style={styles.chevron}>›</Text>
-    </TouchableOpacity>
-  );
+        <Text style={styles.chevron}>›</Text>
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <View style={styles.container}>
@@ -226,6 +232,11 @@ function RosterScreen() {
         <View>
           <Text style={styles.countNum}>{filtered.length}</Text>
           <Text style={styles.countLabel}>{showInactive ? 'INACTIVE' : 'SWIMMERS'}</Text>
+          <Text style={styles.countHelper}>
+            {selectedGroup === 'All'
+              ? `${representedGroupCount} groups represented`
+              : `${selectedGroup} group selected`}
+          </Text>
         </View>
         <TouchableOpacity
           style={styles.exportBtn}
@@ -266,7 +277,7 @@ function RosterScreen() {
       <View style={styles.searchRow}>
         <TextInput
           style={styles.searchInput}
-          placeholder="Search swimmers..."
+          placeholder="Search by first or last name..."
           placeholderTextColor={colors.textSecondary}
           value={search}
           onChangeText={setSearch}
@@ -303,31 +314,48 @@ function RosterScreen() {
         )}
       />
 
-      {/* Swimmer List */}
-      <FlatList
-        data={filtered}
-        keyExtractor={(item) => item.id}
-        renderItem={renderSwimmer}
-        contentContainerStyle={styles.list}
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyTitle}>
-              {swimmers.length === 0
-                ? showInactive
-                  ? 'NO INACTIVE SWIMMERS'
-                  : 'NO SWIMMERS YET'
-                : 'NO RESULTS'}
-            </Text>
-            <Text style={styles.emptySubtitle}>
-              {swimmers.length === 0
-                ? showInactive
-                  ? 'All swimmers are currently active'
-                  : 'Tap + to add your first swimmer'
-                : 'Try a different search or filter'}
-            </Text>
-          </View>
-        }
-      />
+      {showInitialLoading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.accent} />
+          <Text style={styles.loadingTitle}>LOADING ROSTER</Text>
+          <Text style={styles.loadingSubtitle}>Preparing active swimmers and coach facts.</Text>
+        </View>
+      ) : (
+        <FlatList
+          data={filtered}
+          keyExtractor={(item) => item.id}
+          renderItem={renderSwimmer}
+          contentContainerStyle={styles.list}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyTitle}>
+                {swimmers.length === 0
+                  ? showInactive
+                    ? 'NO INACTIVE SWIMMERS'
+                    : 'ROSTER IS EMPTY'
+                  : 'NO MATCHING SWIMMERS'}
+              </Text>
+              <Text style={styles.emptySubtitle}>
+                {swimmers.length === 0
+                  ? showInactive
+                    ? 'All swimmers are currently active.'
+                    : 'Add a safe demo swimmer or import a redacted roster before showing this view.'
+                  : 'Adjust search, group, or active status filters.'}
+              </Text>
+            </View>
+          }
+        />
+      )}
+
+      {!showInitialLoading && filtered.length > 0 && (
+        <View style={styles.privacyBar}>
+          <Text style={styles.privacyBarTitle}>DEMO SAFETY</Text>
+          <Text style={styles.privacyBarText}>
+            Media flags are surfaced here so coach-only privacy concerns are visible before opening
+            a profile.
+          </Text>
+        </View>
+      )}
 
       {showInactive && inactiveSwimmers.length > 0 && (
         <View style={styles.hintBar}>
@@ -377,6 +405,12 @@ const styles = StyleSheet.create({
     fontSize: fontSize.pixel,
     color: colors.gold,
     letterSpacing: 1,
+  },
+  countHelper: {
+    fontFamily: fontFamily.body,
+    fontSize: fontSize.xs,
+    color: colors.textSecondary,
+    marginTop: spacing.xs,
   },
   // Toggle
   toggleRow: {
@@ -494,6 +528,7 @@ const styles = StyleSheet.create({
   swimmerMeta: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'wrap',
     gap: spacing.sm,
     marginTop: spacing.xs,
   },
@@ -504,10 +539,46 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   groupBadgeText: { fontFamily: fontFamily.pixel, fontSize: fontSize.pixel },
-  aggStat: { fontFamily: fontFamily.statMono, fontSize: fontSize.xs, color: colors.success },
-  aggStatPR: { fontFamily: fontFamily.statMono, fontSize: fontSize.xs, color: colors.gold },
+  factChip: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: borderRadius.xs,
+    borderWidth: 1,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+  },
+  factChipGood: { borderColor: colors.success },
+  factChipAccent: { borderColor: colors.gold },
+  factChipWarning: { borderColor: colors.warning },
+  factChipDanger: { borderColor: colors.error },
+  factChipNeutral: { borderColor: colors.borderAccent },
+  factChipText: { fontFamily: fontFamily.pixel, fontSize: fontSize.pixel },
+  factTextGood: { color: colors.success },
+  factTextAccent: { color: colors.gold },
+  factTextWarning: { color: colors.warning },
+  factTextDanger: { color: colors.error },
+  factTextNeutral: { color: colors.textSecondary },
   usaId: { fontFamily: fontFamily.statMono, fontSize: fontSize.xs, color: colors.textSecondary },
   chevron: { fontSize: fontSize.xxl, color: colors.textSecondary, marginLeft: spacing.sm },
+  // Loading
+  loadingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.xl,
+    gap: spacing.sm,
+  },
+  loadingTitle: {
+    fontFamily: fontFamily.heading,
+    fontSize: fontSize.xl,
+    color: colors.text,
+    letterSpacing: 1,
+  },
+  loadingSubtitle: {
+    fontFamily: fontFamily.body,
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    textAlign: 'center',
+  },
   // Empty
   emptyContainer: { alignItems: 'center', paddingVertical: spacing.xxxl },
   emptyTitle: {
@@ -520,6 +591,29 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.body,
     fontSize: fontSize.sm,
     color: colors.textSecondary,
+    textAlign: 'center',
+    paddingHorizontal: spacing.xl,
+    lineHeight: 20,
+  },
+  // Privacy
+  privacyBar: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    backgroundColor: colors.bgElevated,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  privacyBarTitle: {
+    fontFamily: fontFamily.pixel,
+    fontSize: fontSize.pixel,
+    color: colors.gold,
+    marginBottom: spacing.xs,
+  },
+  privacyBarText: {
+    fontFamily: fontFamily.body,
+    fontSize: fontSize.xs,
+    color: colors.textSecondary,
+    lineHeight: 16,
   },
   // Hint
   hintBar: {
@@ -554,5 +648,35 @@ const styles = StyleSheet.create({
   },
   fabText: { color: colors.bgDeep, fontSize: 28, fontWeight: '400', marginTop: -2 },
 });
+
+function getFactChipStyle(tone: DemoFactTone) {
+  switch (tone) {
+    case 'good':
+      return styles.factChipGood;
+    case 'accent':
+      return styles.factChipAccent;
+    case 'warning':
+      return styles.factChipWarning;
+    case 'danger':
+      return styles.factChipDanger;
+    default:
+      return styles.factChipNeutral;
+  }
+}
+
+function getFactTextStyle(tone: DemoFactTone) {
+  switch (tone) {
+    case 'good':
+      return styles.factTextGood;
+    case 'accent':
+      return styles.factTextAccent;
+    case 'warning':
+      return styles.factTextWarning;
+    case 'danger':
+      return styles.factTextDanger;
+    default:
+      return styles.factTextNeutral;
+  }
+}
 
 export default withScreenErrorBoundary(RosterScreen, 'RosterScreen');
