@@ -53,6 +53,7 @@ export const colors = {
   groupAdvanced: '#3B82F6',
   groupPlatinum: '#A0AEC0',
   groupDiamond: '#38BDF8',
+  groupMasters: '#2FA872',
 } as const;
 
 export const fontFamily = {
@@ -105,4 +106,5 @@ export const groupColors: Record<string, string> = {
   Advanced: colors.groupAdvanced,
   Platinum: colors.groupPlatinum,
   Diamond: colors.groupDiamond,
+  Masters: colors.groupMasters,
 };
