@@ -41,7 +41,14 @@ beforeEach(() => {
 describe('audio.createAudioSession (critical op)', () => {
   it('happy path: writes a session in the uploading state with empty storagePath', async () => {
     const coach = buildCoach();
-    const id = await createAudioSession(coach.uid, coach.displayName, 600, '2026-04-28', 'Gold');
+    const id = await createAudioSession(
+      coach.uid,
+      coach.displayName,
+      600,
+      '2026-04-28',
+      ['swimmer-001'],
+      'Gold',
+    );
 
     expect(id).toBe('sess-AUD-fixture');
     const payload = firestore.addDoc.mock.calls[0][1];
@@ -51,6 +58,7 @@ describe('audio.createAudioSession (critical op)', () => {
       duration: 600,
       practiceDate: '2026-04-28',
       group: 'Gold',
+      selectedSwimmerIds: ['swimmer-001'],
       status: 'uploading',
       storagePath: '',
       transcription: null,
@@ -60,14 +68,14 @@ describe('audio.createAudioSession (critical op)', () => {
 
   it('edge: defaults group to null when omitted', async () => {
     const coach = buildCoach();
-    await createAudioSession(coach.uid, coach.displayName, 300, '2026-04-28');
+    await createAudioSession(coach.uid, coach.displayName, 300, '2026-04-28', ['swimmer-001']);
     const payload = firestore.addDoc.mock.calls[0][1];
     expect(payload.group).toBeNull();
   });
 
   it('failure-shape: createdAt and updatedAt are both stamped at write time', async () => {
     const coach = buildCoach();
-    await createAudioSession(coach.uid, coach.displayName, 60, '2026-04-28');
+    await createAudioSession(coach.uid, coach.displayName, 60, '2026-04-28', ['swimmer-001']);
     const payload = firestore.addDoc.mock.calls[0][1];
     expect(payload.createdAt).toBeDefined();
     expect(payload.updatedAt).toBeDefined();

@@ -180,6 +180,7 @@ export interface AudioSession {
   duration: number;
   practiceDate: string;
   group?: Group;
+  selectedSwimmerIds?: string[];
   status: AudioSessionStatus;
   transcription?: string;
   errorMessage?: string;

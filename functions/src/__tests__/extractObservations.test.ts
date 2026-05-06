@@ -44,6 +44,7 @@ jest.mock('../ai/prompts', () => ({
 }));
 
 import { extractObservations } from '../ai/extractObservations';
+import { getPrompt } from '../ai/prompts';
 
 describe('extractObservations', () => {
   const swimmers = [
@@ -77,6 +78,7 @@ describe('extractObservations', () => {
       // drafts collection
       return { doc: jest.fn().mockReturnValue({ id: 'draft-id' }) };
     });
+    db.doc.mockReset();
 
     mockGenerateContent.mockResolvedValue({
       response: {
@@ -218,5 +220,61 @@ describe('extractObservations', () => {
 
     const setCall = mockBatch.set.mock.calls[0][1];
     expect(setCall.confidence).toBe(1);
+  });
+
+  it('passes selected swimmers into the prompt and only writes selected swimmer drafts', async () => {
+    db.doc.mockImplementation((path: string) => {
+      if (path === 'swimmers/s1') {
+        return {
+          get: jest.fn().mockResolvedValue(
+            createMockDoc('s1', {
+              firstName: 'Jane',
+              lastName: 'Smith',
+              displayName: 'Jane Smith',
+              active: true,
+              group: 'Gold',
+            }),
+          ),
+        };
+      }
+      return { get: jest.fn().mockResolvedValue(createMockDoc('missing', {}, false)) };
+    });
+
+    mockGenerateContent.mockResolvedValueOnce({
+      response: {
+        candidates: [
+          {
+            content: {
+              parts: [
+                {
+                  text: JSON.stringify([
+                    {
+                      swimmerName: 'Bob Jones',
+                      observation: 'Good kick tempo',
+                      tags: ['kick'],
+                      confidence: 0.8,
+                    },
+                    {
+                      swimmerName: 'Jane Smith',
+                      observation: 'Great catch position',
+                      tags: ['technique'],
+                      confidence: 0.9,
+                    },
+                  ]),
+                },
+              ],
+            },
+          },
+        ],
+      },
+    });
+
+    await extractObservations('session-1', 'Jane and Bob did well', 'Gold', ['s1']);
+
+    expect(getPrompt).toHaveBeenCalledWith('Jane and Bob did well', 'Jane Smith', 'Gold', [
+      { id: 's1', displayName: 'Jane Smith' },
+    ]);
+    expect(mockBatch.set).toHaveBeenCalledTimes(1);
+    expect(mockBatch.set.mock.calls[0][1].swimmerId).toBe('s1');
   });
 });

@@ -1,6 +1,24 @@
 import { GROUP_SKILL_PRIORITIES, COMMON_FAULTS } from './swimKnowledge';
 
-export function getPrompt(transcription: string, swimmerNames: string, group?: string): string {
+export interface PromptSwimmer {
+  id: string;
+  displayName: string;
+}
+
+function buildSelectedSwimmersBlock(selectedSwimmers?: PromptSwimmer[]): string {
+  if (!selectedSwimmers || selectedSwimmers.length === 0) return '';
+  const lines = selectedSwimmers
+    .map((swimmer) => `- swimmer_id: ${swimmer.id}\n  name: ${swimmer.displayName}`)
+    .join('\n');
+  return `\nselected_swimmers:\n${lines}\n\nONLY produce observation drafts for the swimmers listed above. Ignore mentions of any other swimmer.`;
+}
+
+export function getPrompt(
+  transcription: string,
+  swimmerNames: string,
+  group?: string,
+  selectedSwimmers?: PromptSwimmer[],
+): string {
   // Build group-specific context when available
   let groupContext = '';
   if (group) {
@@ -23,6 +41,7 @@ export function getPrompt(transcription: string, swimmerNames: string, group?: s
   return `You are an AI assistant for BSPC swim coaches. Analyze the following transcription of a coaching session and extract individual observations about specific swimmers.
 
 KNOWN SWIMMERS ON THE TEAM: ${swimmerNames}
+${buildSelectedSwimmersBlock(selectedSwimmers)}
 ${groupContext}
 
 TRANSCRIPTION:
