@@ -222,6 +222,7 @@ export interface VideoSession {
   practiceDate: string;
   group?: Group;
   taggedSwimmerIds: string[];
+  selectedSwimmerIds?: string[];
   status: VideoSessionStatus;
   frameCount?: number;
   errorMessage?: string;

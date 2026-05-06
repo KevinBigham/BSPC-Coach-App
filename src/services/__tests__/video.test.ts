@@ -155,6 +155,7 @@ describe('createVideoSession', () => {
         practiceDate: '2026-04-01',
         group: 'Gold',
         taggedSwimmerIds: ['s1', 's2'],
+        selectedSwimmerIds: ['s1', 's2'],
         status: 'uploading',
         storagePath: '',
       }),
@@ -162,9 +163,25 @@ describe('createVideoSession', () => {
   });
 
   it('defaults group to null when not provided', async () => {
-    await createVideoSession('c1', 'Coach K', 60, '2026-04-02', [], undefined, []);
+    await createVideoSession('c1', 'Coach K', 60, '2026-04-02', ['s1'], undefined, [
+      consentedSwimmers[0],
+    ]);
     const call = firestore.addDoc.mock.calls[0][1];
     expect(call.group).toBeNull();
+  });
+
+  it('rejects empty selected swimmer ids', async () => {
+    await expect(
+      createVideoSession('c1', 'Coach K', 60, '2026-04-02', [], undefined, []),
+    ).rejects.toThrow(/selected swimmer/i);
+    expect(firestore.addDoc).not.toHaveBeenCalled();
+  });
+
+  it('rejects creation without selected swimmer ids', async () => {
+    await expect(
+      (createVideoSession as any)('c1', 'Coach K', 60, '2026-04-02', undefined, undefined, []),
+    ).rejects.toThrow(/selected swimmer/i);
+    expect(firestore.addDoc).not.toHaveBeenCalled();
   });
 
   it('rejects when a tagged swimmer is missing from the roster context', async () => {
@@ -173,6 +190,20 @@ describe('createVideoSession', () => {
         consentedSwimmers[0],
       ]),
     ).rejects.toThrow(/roster context/i);
+    expect(firestore.addDoc).not.toHaveBeenCalled();
+  });
+
+  it('rejects when a selected swimmer does not have media consent', async () => {
+    await expect(
+      createVideoSession('c1', 'Coach K', 120, '2026-04-01', ['s3'], 'Gold', [
+        {
+          ...consentedSwimmers[0],
+          id: 's3',
+          displayName: 'Consent Blocked',
+          mediaConsent: { granted: false, date: new Date('2026-04-01T00:00:00Z') },
+        },
+      ]),
+    ).rejects.toThrow(/media consent/i);
     expect(firestore.addDoc).not.toHaveBeenCalled();
   });
 });

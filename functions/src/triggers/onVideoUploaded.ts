@@ -1,6 +1,6 @@
 import { onDocumentUpdated } from 'firebase-functions/v2/firestore';
 import * as admin from 'firebase-admin';
-import { getVideoAnalysisPrompt } from '../ai/videoPrompts';
+import { getVideoAnalysisPrompt, type VideoPromptSwimmer } from '../ai/videoPrompts';
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -30,14 +30,20 @@ export const onVideoUploaded = onDocumentUpdated(
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
-      // Step 2: Resolve swimmer names from tagged IDs
-      const swimmerNames: string[] = [];
-      const taggedIds: string[] = after.taggedSwimmerIds || [];
-      for (const swimmerId of taggedIds) {
+      // Step 2: Resolve swimmer names from the pre-flight selected IDs.
+      const selectedIds: string[] =
+        Array.isArray(after.selectedSwimmerIds) && after.selectedSwimmerIds.length > 0
+          ? after.selectedSwimmerIds
+          : after.taggedSwimmerIds || [];
+      const selectedSwimmers: VideoPromptSwimmer[] = [];
+      for (const swimmerId of selectedIds) {
         const swimmerDoc = await db.doc(`swimmers/${swimmerId}`).get();
         if (swimmerDoc.exists) {
           const data = swimmerDoc.data();
-          swimmerNames.push(`${data?.firstName} ${data?.lastName}`);
+          selectedSwimmers.push({
+            id: swimmerId,
+            displayName: `${data?.firstName} ${data?.lastName}`,
+          });
         }
       }
 
@@ -55,7 +61,7 @@ export const onVideoUploaded = onDocumentUpdated(
       });
       const model = vertexAi.getGenerativeModel({ model: 'gemini-2.0-flash' });
 
-      const prompt = getVideoAnalysisPrompt(swimmerNames, after.group || undefined);
+      const prompt = getVideoAnalysisPrompt(selectedSwimmers, after.group || undefined);
 
       let result;
       if (fileSize < 20 * 1024 * 1024) {
@@ -148,17 +154,20 @@ export const onVideoUploaded = onDocumentUpdated(
       }
 
       // Step 6: Write drafts to subcollection
-      // Build swimmer name → ID map for matching
+      // Build swimmer name → ID map for matching only the selected swimmers.
       const nameToId: Record<string, string> = {};
-      for (let i = 0; i < swimmerNames.length; i++) {
-        nameToId[swimmerNames[i].toLowerCase()] = taggedIds[i];
+      const idToName: Record<string, string> = {};
+      for (const swimmer of selectedSwimmers) {
+        nameToId[swimmer.displayName.toLowerCase()] = swimmer.id;
+        idToName[swimmer.id] = swimmer.displayName;
         // Also index by first name for partial matches
-        const firstName = swimmerNames[i].split(' ')[0];
-        if (firstName) nameToId[firstName.toLowerCase()] = taggedIds[i];
+        const firstName = swimmer.displayName.split(' ')[0];
+        if (firstName) nameToId[firstName.toLowerCase()] = swimmer.id;
       }
 
       const draftsRef = db.collection(`video_sessions/${sessionId}/drafts`);
       const batch = db.batch();
+      let draftWriteCount = 0;
 
       for (const obs of observations) {
         const swimmerNameLower = (obs.swimmerName || '').toLowerCase();
@@ -166,14 +175,14 @@ export const onVideoUploaded = onDocumentUpdated(
           nameToId[swimmerNameLower] ||
           Object.entries(nameToId).find(
             ([name]) => swimmerNameLower.includes(name) || name.includes(swimmerNameLower),
-          )?.[1] ||
-          taggedIds[0] || // Default to first tagged swimmer
-          '';
+          )?.[1];
+
+        if (!matchedId) continue;
 
         const draftRef = draftsRef.doc();
         batch.set(draftRef, {
           swimmerId: matchedId,
-          swimmerName: obs.swimmerName || 'Unknown',
+          swimmerName: idToName[matchedId],
           observation: obs.observation || '',
           diagnosis: obs.diagnosis || '',
           drillRecommendation: obs.drillRecommendation || '',
@@ -182,9 +191,12 @@ export const onVideoUploaded = onDocumentUpdated(
           confidence: typeof obs.confidence === 'number' ? obs.confidence : 0.7,
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
         });
+        draftWriteCount += 1;
       }
 
-      await batch.commit();
+      if (draftWriteCount > 0) {
+        await batch.commit();
+      }
 
       // Step 7: Update status to review
       await sessionRef.update({

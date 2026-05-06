@@ -10,10 +10,28 @@ import {
   BREAKOUT_FOCUS_POINTS,
 } from './swimKnowledge';
 
-export function getVideoAnalysisPrompt(swimmerNames: string[], group?: string): string {
+export interface VideoPromptSwimmer {
+  id: string;
+  displayName: string;
+}
+
+function buildSelectedSwimmersBlock(selectedSwimmers: VideoPromptSwimmer[]): string {
+  if (selectedSwimmers.length === 0) return '';
+  const lines = selectedSwimmers
+    .map((swimmer) => `- swimmer_id: ${swimmer.id}\n  name: ${swimmer.displayName}`)
+    .join('\n');
+  return `\nselected_swimmers:\n${lines}\n\nONLY produce observation drafts for the swimmers listed above. Ignore mentions of any other swimmer.`;
+}
+
+export function getVideoAnalysisPrompt(
+  selectedSwimmers: VideoPromptSwimmer[],
+  group?: string,
+): string {
   const namesStr =
-    swimmerNames.length > 0
-      ? `The following swimmers may be visible: ${swimmerNames.join(', ')}.`
+    selectedSwimmers.length > 0
+      ? `The following swimmers may be visible: ${selectedSwimmers
+          .map((swimmer) => swimmer.displayName)
+          .join(', ')}.`
       : 'Try to identify any swimmers visible in the video.';
 
   // Build group-specific context
@@ -48,6 +66,7 @@ export function getVideoAnalysisPrompt(swimmerNames: string[], group?: string): 
   return `You are an expert USA Swimming coach and biomechanics analyst reviewing a poolside coaching video for the BSPC swim team.
 
 ${namesStr}
+${buildSelectedSwimmersBlock(selectedSwimmers)}
 ${groupSection}
 
 BSPC DRILL LIBRARY (recommend from these when possible):
