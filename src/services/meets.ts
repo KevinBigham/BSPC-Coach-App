@@ -105,7 +105,7 @@ export function generatePsychSheet(entries: EntryWithId[]): PsychSheetEntry[] {
 export function getMeetStatusColor(status: Meet['status']): string {
   switch (status) {
     case 'upcoming':
-      return '#B388FF'; // accent
+      return '#f5a623'; // accent
     case 'in_progress':
       return '#FFD700'; // gold
     case 'completed':

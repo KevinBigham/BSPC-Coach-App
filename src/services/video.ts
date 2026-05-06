@@ -172,9 +172,9 @@ export function getVideoStatusColor(status: VideoSessionStatus): string {
     case 'uploading':
       return '#7a7a8e';
     case 'uploaded':
-      return '#B388FF';
+      return '#f5a623';
     case 'extracting_frames':
-      return '#B388FF';
+      return '#f5a623';
     case 'analyzing':
       return '#FFD700';
     case 'review':

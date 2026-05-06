@@ -1,44 +1,50 @@
-// BSPC Coach App — "Arcade Prime Time" Theme
-// Dark broadcast-studio aesthetic with retro pixel accents
+// BSPC Coach App — Power Cats Theme
+//
+// Source: www.bspowercats.com homepage and swim-lessons page sampled on
+// 2026-05-06. Google Sites' embedded Power Cats widget exposes:
+// --bg #1b163d, --bg2 #0d0a24, --gold #f5a623, --gold-dim #c4841a,
+// --gold-light #fde68a, --text #fff, --text-dim #ccc. The bare domain did
+// not resolve, so the canonical www host was used. Legacy purple key names
+// remain as compatibility aliases, but now resolve to Power Cats orange.
 
 export const colors = {
   // Dark Backgrounds
-  bgDeep: '#08080f',
-  bgBase: '#0a0a12',
-  bgElevated: '#131320',
-  bgSurface: '#161628',
+  bgDeep: '#0d0a24',
+  bgBase: '#1b163d',
+  bgElevated: '#241d4a',
+  bgSurface: '#2a2360',
 
   // BSPC Identity
-  purple: '#4A0E78',
-  purpleDark: '#350A58',
-  purpleLight: '#7B3FA0',
-  purpleGlow: '#6B2FA0',
+  purple: '#f5a623',
+  purpleDark: '#c4841a',
+  purpleLight: '#fde68a',
+  purpleGlow: '#f5a623',
 
-  // Arcade Accents
+  // Power Cats Accents
   gold: '#FFD700',
   goldDark: '#CCB000',
-  accent: '#B388FF', // light purple — active states, links, tab highlights
-  success: '#CCB000', // dark gold — success, streaks, attendance confirmed
+  accent: '#f5a623', // primary buttons, pills, active states, links
+  success: '#2FA872', // attendance confirmed, positive status
 
   // Semantic
-  background: '#0a0a12',
-  surface: '#131320',
-  surfaceElevated: '#161628',
-  text: '#f0f0f8',
-  textSecondary: '#a0a0b8',
-  textInverse: '#0a0a12',
-  border: '#2a2a40',
-  borderLight: '#1e1e32',
-  borderAccent: '#3a3a55',
+  background: '#1b163d',
+  surface: '#241d4a',
+  surfaceElevated: '#2a2360',
+  text: '#ffffff',
+  textSecondary: '#cccccc',
+  textInverse: '#0d0a24',
+  border: '#4f474e',
+  borderLight: '#2a2360',
+  borderAccent: '#c4841a',
 
   // Status
-  successLight: 'rgba(204, 176, 0, 0.12)',
+  successLight: 'rgba(47, 168, 114, 0.12)',
   error: '#f43f5e',
   errorLight: 'rgba(244, 63, 94, 0.12)',
-  warning: '#fbbf24',
-  warningLight: 'rgba(251, 191, 36, 0.12)',
-  info: '#B388FF',
-  infoLight: 'rgba(179, 136, 255, 0.10)',
+  warning: '#f5a623',
+  warningLight: 'rgba(245, 166, 35, 0.12)',
+  info: '#7dd3fc',
+  infoLight: 'rgba(125, 211, 252, 0.10)',
 
   // Group badges
   groupBronze: '#CD7F32',
@@ -46,7 +52,7 @@ export const colors = {
   groupGold: '#FFD700',
   groupAdvanced: '#3B82F6',
   groupPlatinum: '#A0AEC0',
-  groupDiamond: '#8B5CF6',
+  groupDiamond: '#38BDF8',
 } as const;
 
 export const fontFamily = {

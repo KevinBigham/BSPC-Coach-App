@@ -176,8 +176,8 @@ describe('submitRSVP', () => {
 });
 
 describe('getEventTypeColor', () => {
-  it('returns purple for practice', () => {
-    expect(getEventTypeColor('practice')).toBe('#4A0E78');
+  it('returns Power Cats orange for practice', () => {
+    expect(getEventTypeColor('practice')).toBe('#f5a623');
   });
 
   it('returns gold for meet', () => {
@@ -185,7 +185,7 @@ describe('getEventTypeColor', () => {
   });
 
   it('returns accent for team_event', () => {
-    expect(getEventTypeColor('team_event')).toBe('#B388FF');
+    expect(getEventTypeColor('team_event')).toBe('#f5a623');
   });
 
   it('returns fallback for unknown type', () => {

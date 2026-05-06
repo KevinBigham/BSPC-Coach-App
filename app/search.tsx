@@ -464,7 +464,7 @@ const styles = StyleSheet.create({
   noteDate: { fontFamily: fontFamily.statMono, fontSize: fontSize.xs, color: colors.textSecondary },
   noteTagRow: { flexDirection: 'row', gap: spacing.xs, marginTop: spacing.sm },
   noteTag: {
-    backgroundColor: 'rgba(74, 14, 120, 0.3)',
+    backgroundColor: 'rgba(245, 166, 35, 0.16)',
     paddingHorizontal: spacing.sm,
     paddingVertical: 2,
     borderRadius: borderRadius.xs,

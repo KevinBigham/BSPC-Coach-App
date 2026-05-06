@@ -25,7 +25,7 @@ exports[`SparkLine matches the rendered snapshot 1`] = `
           "width": 6,
         },
         {
-          "backgroundColor": "#B388FF",
+          "backgroundColor": "#f5a623",
           "bottom": 8.5,
           "left": 0,
         },
@@ -43,7 +43,7 @@ exports[`SparkLine matches the rendered snapshot 1`] = `
           "width": 6,
         },
         {
-          "backgroundColor": "#B388FF",
+          "backgroundColor": "#f5a623",
           "bottom": 25.5,
           "left": 28.5,
         },
@@ -61,7 +61,7 @@ exports[`SparkLine matches the rendered snapshot 1`] = `
           "width": 6,
         },
         {
-          "backgroundColor": "#B388FF",
+          "backgroundColor": "#f5a623",
           "bottom": 17,
           "left": 57,
         },
@@ -79,7 +79,7 @@ exports[`SparkLine matches the rendered snapshot 1`] = `
           "width": 6,
         },
         {
-          "backgroundColor": "#B388FF",
+          "backgroundColor": "#f5a623",
           "bottom": 34,
           "left": 85.5,
         },
@@ -97,7 +97,7 @@ exports[`SparkLine matches the rendered snapshot 1`] = `
           "width": 6,
         },
         {
-          "backgroundColor": "#B388FF",
+          "backgroundColor": "#f5a623",
           "bottom": 0,
           "left": 114,
         },
@@ -115,7 +115,7 @@ exports[`SparkLine matches the rendered snapshot 1`] = `
           "right": 0,
         },
         {
-          "backgroundColor": "#B388FF",
+          "backgroundColor": "#f5a623",
           "bottom": 0,
           "opacity": 0.2,
         },

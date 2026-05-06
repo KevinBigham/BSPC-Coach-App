@@ -421,7 +421,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  tagActive: { backgroundColor: 'rgba(74, 14, 120, 0.3)', borderColor: colors.purple },
+  tagActive: { backgroundColor: 'rgba(245, 166, 35, 0.16)', borderColor: colors.purple },
   tagText: { fontFamily: fontFamily.bodySemi, fontSize: fontSize.xs, color: colors.textSecondary },
   tagTextActive: { color: colors.purpleLight },
 

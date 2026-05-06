@@ -16,7 +16,7 @@ export const standardBgColors: Record<StandardLevel, string> = {
   A: 'rgba(179, 136, 255, 0.15)',
   AA: 'rgba(255, 215, 0, 0.15)',
   AAA: 'rgba(204, 176, 0, 0.18)',
-  AAAA: 'rgba(74, 14, 120, 0.25)',
+  AAAA: 'rgba(245, 166, 35, 0.14)',
 };
 
 export const standardBorderColors: Record<StandardLevel, string> = {

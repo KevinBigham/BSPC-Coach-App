@@ -122,15 +122,15 @@ export function sortEventsChronologically<T extends { startDate: string; startTi
 export function getEventTypeColor(type: CalendarEvent['type']): string {
   switch (type) {
     case 'practice':
-      return '#4A0E78'; // purple
+      return '#f5a623'; // Power Cats orange
     case 'meet':
       return '#FFD700'; // gold
     case 'team_event':
-      return '#B388FF'; // accent
+      return '#f5a623'; // accent
     case 'fundraiser':
       return '#CCB000'; // dark gold
     case 'social':
-      return '#7B3FA0'; // purple light
+      return '#fde68a'; // light accent
     default:
       return '#7a7a8e';
   }

@@ -19,7 +19,7 @@ import type {
 import type { Group } from '../config/constants';
 import type { GroupReportStats } from './docExport';
 
-const BSPC_PURPLE = 'B388FF';
+const BSPC_ORANGE = 'F5A623';
 const BSPC_GOLD = 'FFD700';
 
 function brandHeader(text: string): Paragraph {
@@ -48,7 +48,7 @@ function titleParagraph(text: string): Paragraph {
         text: text.toUpperCase(),
         bold: true,
         size: 36,
-        color: BSPC_PURPLE,
+        color: BSPC_ORANGE,
         font: 'Arial',
       }),
     ],
@@ -60,14 +60,14 @@ function sectionHeading(text: string): Paragraph {
     heading: HeadingLevel.HEADING_2,
     spacing: { before: 300, after: 100 },
     border: {
-      bottom: { style: BorderStyle.SINGLE, size: 1, color: BSPC_PURPLE },
+      bottom: { style: BorderStyle.SINGLE, size: 1, color: BSPC_ORANGE },
     },
     children: [
       new TextRun({
         text: text.toUpperCase(),
         bold: true,
         size: 24,
-        color: BSPC_PURPLE,
+        color: BSPC_ORANGE,
         font: 'Arial',
       }),
     ],

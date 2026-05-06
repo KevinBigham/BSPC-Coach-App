@@ -70,14 +70,14 @@
     "phases_completed": 16
   },
   "theme": {
-    "name": "Arcade Prime Time",
-    "description": "Dark broadcast studio aesthetic with retro arcade accents",
+    "name": "Power Cats",
+    "description": "Deep navy BSPC palette with Power Cats orange primary actions and gold reserved for PR/time-standard accents",
     "fonts": ["Teko (headings)", "JetBrains Mono (stats)", "Inter (body)", "Press Start 2P (pixel labels)"],
     "primary_colors": {
-      "purple": "#B388FF",
+      "orange": "#F5A623",
       "gold": "#FFD700",
-      "bg_deep": "#0a0a12",
-      "bg_base": "#12121e"
+      "bg_deep": "#0D0A24",
+      "bg_base": "#1B163D"
     },
     "rule": "No emoji in UIs — use lucide-react-native icons only"
   },
@@ -117,7 +117,7 @@
     "path_note": "npx/npm commands need: export PATH=\"/opt/homebrew/bin:$PATH\""
   },
   "completed_phases": [
-    {"phase": "0-1", "description": "Full app foundation — 49 screens, 28 services, Arcade Prime Time theme"},
+    {"phase": "0-1", "description": "Full app foundation — 49 screens, 28 services, Power Cats theme"},
     {"phase": "2", "description": "Developer tooling — ESLint, Prettier, Husky, zero any types"},
     {"phase": "3", "description": "EAS Build setup — dev/preview/production profiles"},
     {"phase": "4", "description": "Testing infrastructure — Jest, RNTL, Firebase mocks"},
