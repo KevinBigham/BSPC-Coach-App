@@ -43,7 +43,7 @@
     "state": "Zustand 5 (8 stores) + React Context (Auth, Toast)",
     "backend": "Firebase JS SDK 12 (Firestore, Auth, Storage, Cloud Functions v2)",
     "ai": "Google Cloud Vertex AI — Gemini 2.0 Flash via Cloud Functions",
-    "testing": "Jest 29 + jest-expo + @testing-library/react-native (858 client tests across 87 suites; 65 functions tests across 12 suites)",
+    "testing": "Jest 29 + jest-expo + @testing-library/react-native (950 client tests across 99 suites; 106 functions tests across 18 suites)",
     "error_tracking": "Sentry (@sentry/react-native) — production only",
     "build": "EAS Build (dev/preview/production profiles)",
     "ci_cd": "GitHub Actions — typecheck, lint, test, EAS build, functions deploy"
@@ -55,16 +55,16 @@
     "functions_region": "us-central1"
   },
   "app_stats": {
-    "screens": 49,
-    "services": 30,
+    "screens": 48,
+    "services": 32,
     "stores": 8,
     "components": 22,
     "utils": 8,
-    "cloud_functions": 7,
-    "test_suites": 87,
-    "tests_passing": 858,
-    "functions_test_suites": 12,
-    "functions_tests_passing": 65,
+    "cloud_functions": 16,
+    "test_suites": 99,
+    "tests_passing": 950,
+    "functions_test_suites": 18,
+    "functions_tests_passing": 106,
     "firestore_collections": 17,
     "commit_count": 24,
     "phases_completed": 16
@@ -98,7 +98,7 @@
   "ai_features": {
     "audio_transcription": "Record coaching audio → Cloud Function transcribes via Gemini → extracts per-swimmer observations → coach reviews/approves → posts to swimmer notes",
     "video_analysis": "Upload poolside video → Cloud Function sends to Gemini → generates technique observations with diagnosis + drill recommendations → coach reviews → posts to swimmer notes",
-    "practice_generation": "Coach selects group + focus + yardage → Cloud Function generates structured plan via Gemini with age-appropriate sets and intervals",
+    "practice_generation": "Removed in Sprint-Feature-Prune; practice plans are authored manually or from shared templates",
     "pipeline": "All AI results go through a draft review system (approve/reject) before posting to swimmer profiles"
   },
   "offline_support": {

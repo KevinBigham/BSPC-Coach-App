@@ -42,4 +42,10 @@ EXPO_PUBLIC_BSPC_ENV=demo FIREBASE_ADMIN_KEY_PATH=./google-service-account.json 
 
 ## E2E results: 2026-05-07
 
-Pending local development build and demo Firebase project seeding.
+- Not run in this Codex pass: `maestro` CLI is not installed on this host and no local development build/demo Firebase project is available.
+- YAML updated for the video pre-flight contract in `e2e/maestro/05-video-consent-block.yaml`.
+- Required local command once a development build is installed:
+
+```bash
+maestro test e2e/maestro
+```

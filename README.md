@@ -5,7 +5,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Node 20](https://img.shields.io/badge/Node.js-20-43853d.svg)](package.json)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Strict-3178c6.svg)](tsconfig.json)
-[![Tests](https://img.shields.io/badge/tests-1041_passing-success.svg)](#quality-checks)
+[![Tests](https://img.shields.io/badge/tests-1056_passing-success.svg)](#quality-checks)
 
 BSPC Coach App is an open-source Expo and Firebase toolkit for youth swim teams to manage attendance, schedules, meet context, swimmer notes, parent coordination, and coach communication.
 
@@ -28,8 +28,8 @@ npm run typecheck
 npm run lint:errors
 npm run quality:dead-code      # knip — dead code / unused exports
 npm run madge:circular         # circular dependency check
-npm test -- --runInBand        # 939 tests across 97 suites
-npm --prefix functions test -- --runInBand   # 102 tests across 17 suites
+npm test -- --runInBand        # 950 tests across 99 suites
+npm --prefix functions test -- --runInBand   # 106 tests across 18 suites
 npm --prefix functions run build
 ```
 
@@ -56,11 +56,11 @@ No usage metrics, adoption claims, star counts, or contributor counts are assert
 
 | | |
 |---|---|
-| **Coach app screens** | 47 (Expo Router) |
+| **Coach app screens** | 48 (Expo Router) |
 | **Service modules** | 32 |
 | **Cloud Functions** | 16 (triggers, callables, scheduled) |
 | **TypeScript LoC** | ~38.5k across coach app, parent portal, and functions |
-| **Tests** | 1,041 across 114 suites (client + functions) |
+| **Tests** | 1,056 across 117 suites (client + functions) |
 | **Quality gates in CI** | typecheck · lint · jest (×2) · functions build · parent portal build · knip · madge · sync verify · strict-types · randomness · process |
 | **License** | MIT |
 
@@ -109,7 +109,7 @@ flowchart LR
   class Auth,FS,ST,CF backend
 ```
 
-Cloud Functions break down into **8 Firestore/Storage triggers** (attendance, times, notes, video, audio, drafts, notifications, rule evaluation), **4 callables** (parent invites, parent portal data, topic subscriptions), and **3 scheduled jobs** (daily digest, calendar sync, aggregation rebuild).
+Cloud Functions break down into **9 Firestore/Storage triggers** (attendance, times, notes, video, audio, drafts, notifications, video session aggregation, rule evaluation), **4 callables** (parent invites, parent portal data, topic subscriptions), and **3 scheduled jobs** (daily digest, calendar sync, aggregation rebuild).
 
 ## Tech Stack
 
