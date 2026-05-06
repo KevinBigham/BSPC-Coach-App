@@ -5,7 +5,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Node 20](https://img.shields.io/badge/Node.js-20-43853d.svg)](package.json)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Strict-3178c6.svg)](tsconfig.json)
-[![Tests](https://img.shields.io/badge/tests-1056_passing-success.svg)](#quality-checks)
+[![Tests](https://img.shields.io/badge/tests-1059_passing-success.svg)](#quality-checks)
 
 BSPC Coach App is an open-source Expo and Firebase toolkit for youth swim teams to manage attendance, schedules, meet context, swimmer notes, parent coordination, and coach communication.
 
@@ -28,7 +28,7 @@ npm run typecheck
 npm run lint:errors
 npm run quality:dead-code      # knip — dead code / unused exports
 npm run madge:circular         # circular dependency check
-npm test -- --runInBand        # 950 tests across 99 suites
+npm test -- --runInBand        # 953 tests across 100 suites
 npm --prefix functions test -- --runInBand   # 106 tests across 18 suites
 npm --prefix functions run build
 ```
@@ -60,7 +60,7 @@ No usage metrics, adoption claims, star counts, or contributor counts are assert
 | **Service modules** | 32 |
 | **Cloud Functions** | 16 (triggers, callables, scheduled) |
 | **TypeScript LoC** | ~38.5k across coach app, parent portal, and functions |
-| **Tests** | 1,056 across 117 suites (client + functions) |
+| **Tests** | 1,059 across 118 suites (client + functions) |
 | **Quality gates in CI** | typecheck · lint · jest (×2) · functions build · parent portal build · knip · madge · sync verify · strict-types · randomness · process |
 | **License** | MIT |
 

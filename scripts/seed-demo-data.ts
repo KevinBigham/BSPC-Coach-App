@@ -168,7 +168,6 @@ export function buildDemoAttendance(
         practiceDate,
         arrivedAt: addDays(PRACTICE_START, day),
         status: 'normal',
-        note: null as unknown as undefined,
         markedBy: 'demo-coach-alpha',
         coachName: 'Demo Coach Alpha',
         createdAt: addDays(PRACTICE_START, day),
@@ -278,7 +277,6 @@ export function buildDemoSessions(swimmers: DemoSwimmer[]) {
     taggedSwimmerIds: videoSelected.map((swimmer) => swimmer.id),
     selectedSwimmerIds: videoSelected.map((swimmer) => swimmer.id),
     status: 'review',
-    errorMessage: null as unknown as undefined,
     createdAt: DEMO_NOW,
     updatedAt: DEMO_NOW,
   };
@@ -295,7 +293,6 @@ export function buildDemoSessions(swimmers: DemoSwimmer[]) {
       selectedSwimmerIds: audioSelected.map((swimmer) => swimmer.id),
       status: 'review' as const,
       transcription: 'BSPC Demo 01 and BSPC Demo 02 held streamline through breakout.',
-      errorMessage: null as unknown as undefined,
       createdAt: DEMO_NOW,
       updatedAt: DEMO_NOW,
     },

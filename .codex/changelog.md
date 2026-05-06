@@ -164,6 +164,6 @@
 - Added deterministic convention demo data seeding (`scripts/seed-demo-data.ts`), npm seed scripts, `.env.example` safety-belt placeholders, builder tests, and `docs/release/demo-runbook.md`.
 - Added Masters as a first-class training group so seeded demo data does not write unsupported group strings.
 - Deprecated stale `MASTER_PLAN.md` with a banner pointing to `README.md`, `CODEBASE_AUDIT.md`, and `.codex/status.md` as current source of truth.
-- Refreshed README and `.codex/handoff.json` app stats: 48 screens, 32 services, 16 Cloud Functions, 950 client tests / 99 suites, 106 Functions tests / 18 suites.
+- Refreshed README and `.codex/handoff.json` app stats: 48 screens, 32 services, 16 Cloud Functions, 953 client tests / 100 suites, 106 Functions tests / 18 suites.
 - Updated `e2e/maestro/05-video-consent-block.yaml` for the new video pre-flight picker. Maestro was not run on this host because the CLI and a seeded development build were unavailable.
-- Validation: focused picker/audio/video/seed/function tests passed; `npm test -- --runInBand` passed 950 / 99; `npm --prefix functions test -- --runInBand` passed 106 / 18; `npm --prefix functions run build`, `npm run typecheck`, `npm run lint:errors`, and `npm run quality:dead-code` passed.
+- Validation: focused picker/audio/video/seed/function tests passed; final `npm run quality`, `npm run quality:dead-code`, `npm run sync:functions-shared:verify`, and `git diff --check` passed. The full quality gate included `npm test -- --runInBand` (953 / 100), `npm --prefix functions test -- --runInBand` (106 / 18), Functions build, parent-portal build, madge, strict-types, randomness, and process checks.
