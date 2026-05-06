@@ -3,6 +3,7 @@ import {
   View,
   Text,
   FlatList,
+  SectionList,
   TouchableOpacity,
   TextInput,
   StyleSheet,
@@ -34,6 +35,12 @@ import type {
 import { withScreenErrorBoundary } from '../../src/components/ScreenErrorBoundary';
 
 type SortOption = 'az' | 'za' | 'group' | 'newest';
+type SwimmerWithId = Swimmer & { id: string };
+interface RosterSection {
+  title: Group;
+  data: SwimmerWithId[];
+}
+
 const SORT_LABELS: Record<SortOption, string> = {
   az: 'A-Z',
   za: 'Z-A',
@@ -45,7 +52,7 @@ function RosterScreen() {
   const params = useLocalSearchParams<{ group?: string }>();
   const { isAdmin } = useAuth();
   const activeSwimmers = useSwimmersStore((s) => s.swimmers);
-  const [inactiveSwimmers, setInactiveSwimmers] = useState<(Swimmer & { id: string })[]>([]);
+  const [inactiveSwimmers, setInactiveSwimmers] = useState<SwimmerWithId[]>([]);
   const [showInactive, setShowInactive] = useState(false);
   const [search, setSearch] = useState('');
   const [selectedGroup, setSelectedGroup] = useState<Group | 'All'>(
@@ -140,6 +147,16 @@ function RosterScreen() {
     return result;
   }, [swimmers, selectedGroup, search, sort]);
 
+  const sections = useMemo<RosterSection[]>(() => {
+    const visibleGroups = selectedGroup === 'All' ? GROUPS : [selectedGroup];
+    return visibleGroups
+      .map((group) => ({
+        title: group,
+        data: filtered.filter((swimmer) => swimmer.group === group),
+      }))
+      .filter((section) => section.data.length > 0);
+  }, [filtered, selectedGroup]);
+
   const cycleSort = () => {
     const options: SortOption[] = ['az', 'za', 'group', 'newest'];
     const next = options[(options.indexOf(sort) + 1) % options.length];
@@ -162,7 +179,7 @@ function RosterScreen() {
     );
   };
 
-  const renderSwimmer = ({ item }: { item: Swimmer & { id: string } }) => (
+  const renderSwimmer = ({ item }: { item: SwimmerWithId }) => (
     <TouchableOpacity
       style={styles.swimmerRow}
       onPress={() => router.push(`/swimmer/${item.id}`)}
@@ -218,6 +235,21 @@ function RosterScreen() {
       <Text style={styles.chevron}>›</Text>
     </TouchableOpacity>
   );
+
+  const renderSectionHeader = ({ section }: { section: RosterSection }) => {
+    const groupColor = groupColors[section.title] || colors.accent;
+    return (
+      <View style={styles.sectionHeader}>
+        <View style={styles.sectionHeaderLeft}>
+          <View style={[styles.sectionDot, { backgroundColor: groupColor }]} />
+          <Text style={[styles.sectionTitle, { color: groupColor }]}>
+            {section.title.toUpperCase()}
+          </Text>
+          <Text style={styles.sectionCount}>{section.data.length}</Text>
+        </View>
+      </View>
+    );
+  };
 
   return (
     <View style={styles.container}>
@@ -303,11 +335,13 @@ function RosterScreen() {
         )}
       />
 
-      {/* Swimmer List */}
-      <FlatList
-        data={filtered}
+      {/* Group-segmented swimmer list */}
+      <SectionList
+        sections={sections}
         keyExtractor={(item) => item.id}
         renderItem={renderSwimmer}
+        renderSectionHeader={renderSectionHeader}
+        stickySectionHeadersEnabled
         contentContainerStyle={styles.list}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
@@ -459,6 +493,31 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
   filterChipTextActive: { color: colors.text },
+  // Section headers
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: colors.bgBase,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    marginHorizontal: -spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  sectionHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  sectionDot: { width: 10, height: 10, borderRadius: 5 },
+  sectionTitle: {
+    fontFamily: fontFamily.heading,
+    fontSize: fontSize.md,
+    letterSpacing: 1,
+  },
+  sectionCount: {
+    fontFamily: fontFamily.statMono,
+    fontSize: fontSize.xs,
+    color: colors.textSecondary,
+  },
   // List
   list: { padding: spacing.lg, paddingBottom: 100 },
   swimmerRow: {
