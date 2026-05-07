@@ -39,6 +39,8 @@ function groupCode(group: Group): string {
       return 'PL';
     case 'Diamond':
       return 'DI';
+    case 'Masters':
+      return 'MA';
   }
 }
 

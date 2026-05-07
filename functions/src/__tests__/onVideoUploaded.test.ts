@@ -43,6 +43,7 @@ jest.mock('../ai/videoPrompts', () => ({
 }));
 
 import { onVideoUploaded } from '../triggers/onVideoUploaded';
+const { getVideoAnalysisPrompt } = require('../ai/videoPrompts');
 
 function makeEvent(beforeData: any, afterData: any, sessionId = 'vid-1') {
   return {
@@ -106,6 +107,7 @@ describe('onVideoUploaded', () => {
         status: 'uploaded',
         storagePath: 'video/test.mp4',
         taggedSwimmerIds: ['swimmer-1'],
+        selectedSwimmerIds: ['swimmer-1'],
         group: 'Gold',
       },
     );
@@ -114,6 +116,10 @@ describe('onVideoUploaded', () => {
 
     expect(mockDocRef.update).toHaveBeenCalledWith(
       expect.objectContaining({ status: 'analyzing' }),
+    );
+    expect(getVideoAnalysisPrompt).toHaveBeenCalledWith(
+      [{ id: 'swimmer-1', displayName: 'Jane Smith' }],
+      'Gold',
     );
     expect(mockGenerateContent).toHaveBeenCalled();
     expect(mockBatch.set).toHaveBeenCalled();
@@ -144,6 +150,54 @@ describe('onVideoUploaded', () => {
     const callArgs = mockGenerateContent.mock.calls[0][0];
     const parts = callArgs.contents[0].parts;
     expect(parts[0]).toHaveProperty('fileData');
+  });
+
+  it('does not write drafts for swimmers outside selectedSwimmerIds', async () => {
+    const handler = (onVideoUploaded as any).__wrapped ?? (onVideoUploaded as any).run;
+    if (!handler) return;
+
+    mockGenerateContent.mockResolvedValueOnce({
+      response: {
+        candidates: [
+          {
+            content: {
+              parts: [
+                {
+                  text: JSON.stringify([
+                    {
+                      swimmerName: 'Bob Jones',
+                      observation: 'Good kick position',
+                      diagnosis: 'Kicks are narrow',
+                      drillRecommendation: 'Streamline kick',
+                      phase: 'underwater',
+                      tags: ['technique'],
+                      confidence: 0.8,
+                    },
+                  ]),
+                },
+              ],
+            },
+          },
+        ],
+      },
+    });
+
+    const event = makeEvent(
+      { status: 'pending' },
+      {
+        status: 'uploaded',
+        storagePath: 'video/test.mp4',
+        taggedSwimmerIds: ['swimmer-1'],
+        selectedSwimmerIds: ['swimmer-1'],
+        group: 'Gold',
+      },
+    );
+
+    await handler(event);
+
+    expect(mockBatch.set).not.toHaveBeenCalled();
+    expect(mockBatch.commit).not.toHaveBeenCalled();
+    expect(mockDocRef.update).toHaveBeenCalledWith(expect.objectContaining({ status: 'review' }));
   });
 
   it('should fail on empty AI response', async () => {

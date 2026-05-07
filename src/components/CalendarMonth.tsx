@@ -76,7 +76,11 @@ export default function CalendarMonth({
             return (
               <TouchableOpacity
                 key={di}
-                style={[styles.dayCell, isToday && styles.todayCell, isSelected && styles.selectedCell]}
+                style={[
+                  styles.dayCell,
+                  isToday && styles.todayCell,
+                  isSelected && styles.selectedCell,
+                ]}
                 onPress={() => onSelectDate(dateStr)}
               >
                 <Text
@@ -90,12 +94,17 @@ export default function CalendarMonth({
                 </Text>
                 {dayEvents && (
                   <View style={styles.dotsRow}>
-                    {Array.from(dayEvents).slice(0, 3).map((type, i) => (
-                      <View
-                        key={i}
-                        style={[styles.dot, { backgroundColor: getEventTypeColor(type as CalendarEvent['type']) }]}
-                      />
-                    ))}
+                    {Array.from(dayEvents)
+                      .slice(0, 3)
+                      .map((type, i) => (
+                        <View
+                          key={i}
+                          style={[
+                            styles.dot,
+                            { backgroundColor: getEventTypeColor(type as CalendarEvent['type']) },
+                          ]}
+                        />
+                      ))}
                   </View>
                 )}
               </TouchableOpacity>
@@ -108,13 +117,30 @@ export default function CalendarMonth({
 }
 
 const styles = StyleSheet.create({
-  container: { backgroundColor: colors.bgDeep, borderRadius: borderRadius.md, padding: spacing.sm, borderWidth: 1, borderColor: colors.border },
+  container: {
+    backgroundColor: colors.bgDeep,
+    borderRadius: borderRadius.md,
+    padding: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
   headerRow: { flexDirection: 'row', marginBottom: spacing.xs },
   headerCell: { flex: 1, alignItems: 'center', paddingVertical: spacing.xs },
-  headerText: { fontFamily: fontFamily.pixel, fontSize: fontSize.pixel, color: colors.textSecondary, letterSpacing: 1 },
+  headerText: {
+    fontFamily: fontFamily.pixel,
+    fontSize: fontSize.pixel,
+    color: colors.textSecondary,
+    letterSpacing: 1,
+  },
   weekRow: { flexDirection: 'row' },
-  dayCell: { flex: 1, alignItems: 'center', paddingVertical: spacing.sm, borderRadius: borderRadius.sm, minHeight: 44 },
-  todayCell: { backgroundColor: 'rgba(74, 14, 120, 0.3)' },
+  dayCell: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.sm,
+    minHeight: 44,
+  },
+  todayCell: { backgroundColor: 'rgba(245, 166, 35, 0.16)' },
   selectedCell: { backgroundColor: colors.purple },
   dayText: { fontFamily: fontFamily.statMono, fontSize: fontSize.sm, color: colors.text },
   todayText: { color: colors.accent },

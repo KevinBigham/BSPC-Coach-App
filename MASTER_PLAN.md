@@ -1,5 +1,12 @@
 # BSPC Coach App — Master Plan
 
+> **Deprecated planning snapshot (2026-05-06):** This file is retained for
+> historical context only. It predates the 2026-04-30 Feature Prune and may
+> describe removed surfaces such as AI practice generation, Live Meet Mode,
+> medical-info screens, Recent PRs, and in-app meet creation. Use
+> `README.md`, `CODEBASE_AUDIT.md`, and `.codex/status.md` as the current
+> source of truth.
+
 **Version:** 1.3.2
 **Last updated:** 2026-04-09
 **Status:** Shipped retrospective + forward plan

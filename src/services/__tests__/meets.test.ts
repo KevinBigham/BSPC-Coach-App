@@ -230,7 +230,7 @@ describe('generatePsychSheet', () => {
 
 describe('getMeetStatusColor', () => {
   it('returns correct colors for each status', () => {
-    expect(getMeetStatusColor('upcoming')).toBe('#B388FF');
+    expect(getMeetStatusColor('upcoming')).toBe('#f5a623');
     expect(getMeetStatusColor('in_progress')).toBe('#FFD700');
     expect(getMeetStatusColor('completed')).toBe('#CCB000');
     expect(getMeetStatusColor('cancelled')).toBe('#7a7a8e');

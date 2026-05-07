@@ -32,6 +32,7 @@ import type { AudioSession } from '../src/types/firestore.types';
 import { enqueueUpload } from '../src/utils/offlineQueue';
 import { tapMedium, notifySuccess } from '../src/utils/haptics';
 import { withScreenErrorBoundary } from '../src/components/ScreenErrorBoundary';
+import SwimmerPicker from '../src/components/SwimmerPicker';
 
 type RecordingState = 'idle' | 'recording' | 'stopped';
 type NativeRecording = {
@@ -58,6 +59,7 @@ function AudioScreen() {
   const [isUploading, setIsUploading] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
   const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
+  const [selectedSwimmerIds, setSelectedSwimmerIds] = useState<string[]>([]);
   const [sessions, setSessions] = useState<(AudioSession & { id: string })[]>([]);
 
   const recordingRef = useRef<NativeRecording | null>(null);
@@ -169,6 +171,11 @@ function AudioScreen() {
   // ── Platform-dispatched recording controls ──
   const startRecording = async () => {
     tapMedium();
+    if (selectedSwimmerIds.length === 0) {
+      Alert.alert('Pick Swimmers', 'Select at least one swimmer before recording.');
+      return;
+    }
+
     if (Platform.OS === 'web') {
       await startRecordingWeb();
       return;
@@ -193,6 +200,10 @@ function AudioScreen() {
     if (isWeb && audioChunksRef.current.length === 0) return;
     if (!isWeb && !recordingRef.current) return;
     if (!coach) return;
+    if (selectedSwimmerIds.length === 0) {
+      Alert.alert('Pick Swimmers', 'Select at least one swimmer before uploading.');
+      return;
+    }
 
     let uri: string | null = null;
     if (isWeb) {
@@ -210,18 +221,21 @@ function AudioScreen() {
         coach.displayName || 'Unknown',
         duration,
         today,
+        selectedSwimmerIds,
         selectedGroup || undefined,
       );
       await updateAudioSession(sessionId, { status: 'queued' });
       await enqueueUpload({
         type: 'audio',
         uri,
-        metadata: { sessionId, coachId: coach.uid, date: today },
+        metadata: { sessionId, coachId: coach.uid, date: today, selectedSwimmerIds },
       });
       notifySuccess();
       Alert.alert('Queued', 'Recording saved. It will upload when you reconnect.');
       setRecordingState('idle');
       setDuration(0);
+      setSelectedGroup(null);
+      setSelectedSwimmerIds([]);
       return;
     }
 
@@ -235,6 +249,7 @@ function AudioScreen() {
         coach.displayName || 'Unknown',
         duration,
         today,
+        selectedSwimmerIds,
         selectedGroup || undefined,
       );
 
@@ -256,6 +271,7 @@ function AudioScreen() {
       setRecordingState('idle');
       setDuration(0);
       setSelectedGroup(null);
+      setSelectedSwimmerIds([]);
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : 'Upload failed';
       Alert.alert('Upload Failed', msg);
@@ -276,6 +292,8 @@ function AudioScreen() {
           mediaRecorderRef.current = null;
           setRecordingState('idle');
           setDuration(0);
+          setSelectedSwimmerIds([]);
+          setSelectedGroup(null);
         },
       },
     ]);
@@ -301,94 +319,117 @@ function AudioScreen() {
         )}
 
         <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-          {/* Recorder Card */}
-          <View style={styles.recorderCard}>
-            <Text style={styles.cardTitle}>RECORD</Text>
-
-            {/* Duration Display */}
-            <View style={styles.durationRow}>
-              <Text style={styles.durationText}>{formatDuration(duration)}</Text>
-              {recordingState === 'recording' && <View style={styles.recordingDot} />}
+          {selectedSwimmerIds.length === 0 && recordingState === 'idle' ? (
+            <View style={styles.recorderCard}>
+              <Text style={styles.cardTitle}>PICK SWIMMERS</Text>
+              <Text style={styles.pickerHint}>
+                Audio notes are scoped to selected active swimmers before recording starts.
+              </Text>
+              <SwimmerPicker mode="multi" onSelect={setSelectedSwimmerIds} />
             </View>
+          ) : (
+            <View style={styles.recorderCard}>
+              <Text style={styles.cardTitle}>RECORD</Text>
+              <View style={styles.selectionSummary}>
+                <Text style={styles.selectionText}>
+                  {selectedSwimmerIds.length} swimmer{selectedSwimmerIds.length !== 1 ? 's' : ''}{' '}
+                  selected
+                </Text>
+                {recordingState === 'idle' && (
+                  <TouchableOpacity onPress={() => setSelectedSwimmerIds([])}>
+                    <Text style={styles.changeSelectionText}>CHANGE</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
 
-            {/* Group Picker */}
-            {recordingState !== 'recording' && (
-              <View style={styles.groupPicker}>
-                <Text style={styles.groupPickerLabel}>GROUP (OPTIONAL)</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                  <View style={styles.groupRow}>
-                    <TouchableOpacity
-                      style={[styles.groupChip, !selectedGroup && styles.groupChipActive]}
-                      onPress={() => setSelectedGroup(null)}
-                    >
-                      <Text
-                        style={[styles.groupChipText, !selectedGroup && styles.groupChipTextActive]}
-                      >
-                        All
-                      </Text>
-                    </TouchableOpacity>
-                    {GROUPS.map((g) => (
+              {/* Duration Display */}
+              <View style={styles.durationRow}>
+                <Text style={styles.durationText}>{formatDuration(duration)}</Text>
+                {recordingState === 'recording' && <View style={styles.recordingDot} />}
+              </View>
+
+              {/* Group Picker */}
+              {recordingState !== 'recording' && (
+                <View style={styles.groupPicker}>
+                  <Text style={styles.groupPickerLabel}>GROUP (OPTIONAL)</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                    <View style={styles.groupRow}>
                       <TouchableOpacity
-                        key={g}
-                        style={[
-                          styles.groupChip,
-                          selectedGroup === g && styles.groupChipActive,
-                          selectedGroup === g && { borderColor: groupColors[g] },
-                        ]}
-                        onPress={() => setSelectedGroup(g)}
+                        style={[styles.groupChip, !selectedGroup && styles.groupChipActive]}
+                        onPress={() => setSelectedGroup(null)}
                       >
                         <Text
                           style={[
                             styles.groupChipText,
-                            selectedGroup === g && { color: groupColors[g] },
+                            !selectedGroup && styles.groupChipTextActive,
                           ]}
                         >
-                          {g}
+                          All
                         </Text>
                       </TouchableOpacity>
-                    ))}
-                  </View>
-                </ScrollView>
-              </View>
-            )}
-
-            {/* Controls */}
-            <View style={styles.controls}>
-              {recordingState === 'idle' && (
-                <TouchableOpacity style={styles.recordBtn} onPress={startRecording}>
-                  <View style={styles.recordBtnDot} />
-                  <Text style={styles.recordBtnText}>START RECORDING</Text>
-                </TouchableOpacity>
-              )}
-
-              {recordingState === 'recording' && (
-                <TouchableOpacity style={styles.stopBtn} onPress={stopRecording}>
-                  <View style={styles.stopBtnSquare} />
-                  <Text style={styles.stopBtnText}>STOP</Text>
-                </TouchableOpacity>
-              )}
-
-              {recordingState === 'stopped' && !isUploading && (
-                <>
-                  <TouchableOpacity style={styles.uploadBtn} onPress={handleUpload}>
-                    <Text style={styles.uploadBtnText}>UPLOAD</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.discardBtn} onPress={handleDiscard}>
-                    <Text style={styles.discardBtnText}>DISCARD</Text>
-                  </TouchableOpacity>
-                </>
-              )}
-
-              {isUploading && (
-                <View style={styles.progressContainer}>
-                  <View style={styles.progressBar}>
-                    <View style={[styles.progressFill, { width: `${uploadProgress}%` }]} />
-                  </View>
-                  <Text style={styles.progressText}>{Math.round(uploadProgress)}%</Text>
+                      {GROUPS.map((g) => (
+                        <TouchableOpacity
+                          key={g}
+                          style={[
+                            styles.groupChip,
+                            selectedGroup === g && styles.groupChipActive,
+                            selectedGroup === g && { borderColor: groupColors[g] },
+                          ]}
+                          onPress={() => setSelectedGroup(g)}
+                        >
+                          <Text
+                            style={[
+                              styles.groupChipText,
+                              selectedGroup === g && { color: groupColors[g] },
+                            ]}
+                          >
+                            {g}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </ScrollView>
                 </View>
               )}
+
+              {/* Controls */}
+              <View style={styles.controls}>
+                {recordingState === 'idle' && (
+                  <TouchableOpacity style={styles.recordBtn} onPress={startRecording}>
+                    <View style={styles.recordBtnDot} />
+                    <Text style={styles.recordBtnText}>START RECORDING</Text>
+                  </TouchableOpacity>
+                )}
+
+                {recordingState === 'recording' && (
+                  <TouchableOpacity style={styles.stopBtn} onPress={stopRecording}>
+                    <View style={styles.stopBtnSquare} />
+                    <Text style={styles.stopBtnText}>STOP</Text>
+                  </TouchableOpacity>
+                )}
+
+                {recordingState === 'stopped' && !isUploading && (
+                  <>
+                    <TouchableOpacity style={styles.uploadBtn} onPress={handleUpload}>
+                      <Text style={styles.uploadBtnText}>UPLOAD</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.discardBtn} onPress={handleDiscard}>
+                      <Text style={styles.discardBtnText}>DISCARD</Text>
+                    </TouchableOpacity>
+                  </>
+                )}
+
+                {isUploading && (
+                  <View style={styles.progressContainer}>
+                    <View style={styles.progressBar}>
+                      <View style={[styles.progressFill, { width: `${uploadProgress}%` }]} />
+                    </View>
+                    <Text style={styles.progressText}>{Math.round(uploadProgress)}%</Text>
+                  </View>
+                )}
+              </View>
             </View>
-          </View>
+          )}
 
           {/* Sessions List */}
           <View style={styles.sessionsHeader}>
@@ -464,6 +505,34 @@ const styles = StyleSheet.create({
     color: colors.text,
     letterSpacing: 1,
     marginBottom: spacing.md,
+  },
+  pickerHint: {
+    fontFamily: fontFamily.body,
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    marginBottom: spacing.lg,
+  },
+  selectionSummary: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    marginBottom: spacing.lg,
+    backgroundColor: colors.bgBase,
+  },
+  selectionText: {
+    fontFamily: fontFamily.bodySemi,
+    fontSize: fontSize.sm,
+    color: colors.text,
+  },
+  changeSelectionText: {
+    fontFamily: fontFamily.bodySemi,
+    fontSize: fontSize.xs,
+    color: colors.accent,
+    letterSpacing: 1,
   },
   durationRow: {
     flexDirection: 'row',

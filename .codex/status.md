@@ -262,3 +262,15 @@
 - Filled in `package.json` metadata: `description`, `license`, `author`, `homepage`, `repository`, `bugs`, and `keywords`. Kept `private: true` (Expo app, never npm-published).
 - Validation: `typecheck`, `lint:errors`, `quality:dead-code`, parent-portal build — all green. No `git diff --check` issues. Test counts unchanged (1,041 / 114).
 - Numbers in README are sourced from real artifacts: Cloud Functions count from `functions/src/index.ts`, screen count from `find app -name '*.tsx'`, LoC from `wc -l` on TS files in `src/ app/ functions/src/ parent-portal/src/`. No fake metrics.
+
+## 2026-05-06 — Sprint-Convention-Demo
+
+- Branch `codex/sprint-convention-demo` stacked on `283bc94`. Original cloud-synced checkout under `Documents/GitHub` hung on git/source reads, so work continued in a clean clone at `~/Projects/BSPC-Coach-App-convention-demo-20260506`.
+- Phase 1: wrote `.codex/handoffs/convention-demo-prune.json` with the portfolio handoff schema and explicit non-goals.
+- Phase 2: refreshed the theme from `www.bspowercats.com` tokens: deep navy backgrounds, Power Cats orange primary actions, gold retained for PR/time-standard accents. Parent portal tokens mirror the app palette.
+- Phase 3: refactored roster to the attendance-style group-first `SectionList`, preserving search/filter/active toggles and aggregation-fed attendance/PR columns.
+- Phase 4: added shared `SwimmerPicker`, required audio/video pre-flight swimmer selection, wrote `selectedSwimmerIds` on new audio/video sessions, and scoped Gemini prompts/draft creation to those selected swimmers without changing draft schemas.
+- Phase 5: added deterministic demo seed data (`scripts/seed-demo-data.ts`), `seed:demo` scripts, builder tests, demo env placeholders, Masters group support, and `docs/release/demo-runbook.md`.
+- Phase 6: deprecated stale `MASTER_PLAN.md` with a README-source-of-truth banner, refreshed `.codex/handoff.json` app stats, updated README stats, and updated the video Maestro flow for the pre-flight picker. Maestro was not run because the CLI and a seeded local development build were unavailable on this host.
+- Final validation: `npm run quality`, `npm run quality:dead-code`, `npm run sync:functions-shared:verify`, and `git diff --check` passed. The full gate included `npm test -- --runInBand` (953 / 100), `npm --prefix functions test -- --runInBand` (106 / 18), Functions build, parent-portal build, madge, strict-types, randomness, and process checks. Seed safety check refused when `EXPO_PUBLIC_BSPC_ENV!=demo`, as intended.
+- Loose ends: emulator-backed `seed:demo` execution and Maestro green pass require Kevin's demo Firebase project/service account plus installed dev build.

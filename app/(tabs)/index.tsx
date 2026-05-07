@@ -289,7 +289,7 @@ const styles = StyleSheet.create({
 
   // Welcome
   welcomeCard: {
-    backgroundColor: 'rgba(74, 14, 120, 0.25)',
+    backgroundColor: 'rgba(245, 166, 35, 0.14)',
     borderRadius: borderRadius.lg,
     padding: spacing.xl,
     flexDirection: 'row',

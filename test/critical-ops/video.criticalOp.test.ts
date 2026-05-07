@@ -71,22 +71,16 @@ describe('video.createVideoSession (critical op)', () => {
     expect(id).toBe('sess-VID-fixture');
     const payload = firestore.addDoc.mock.calls[0][1];
     expect(payload.taggedSwimmerIds).toEqual(taggedIds);
+    expect(payload.selectedSwimmerIds).toEqual(taggedIds);
     expect(payload.status).toBe('uploading');
     expect(payload.group).toBe('Gold');
   });
 
-  it('edge: empty tag list accepts an explicit empty roster', async () => {
-    const id = await createVideoSession(
-      'coach-001',
-      'Coach One',
-      30,
-      '2026-04-28',
-      [],
-      undefined,
-      [],
-    );
-    expect(id).toBe('sess-VID-fixture');
-    expect(firestore.addDoc).toHaveBeenCalled();
+  it('edge: empty selected list is rejected before Firestore write', async () => {
+    await expect(
+      createVideoSession('coach-001', 'Coach One', 30, '2026-04-28', [], undefined, []),
+    ).rejects.toThrow(/selected swimmer/i);
+    expect(firestore.addDoc).not.toHaveBeenCalled();
   });
 
   // ---------------------------------------------------------------------------

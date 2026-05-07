@@ -16,15 +16,12 @@ const DAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
 function getCellColor(count: number): string {
   if (count === 0) return colors.bgSurface;
-  if (count === 1) return 'rgba(74, 14, 120, 0.4)';
-  if (count === 2) return 'rgba(74, 14, 120, 0.7)';
+  if (count === 1) return 'rgba(245, 166, 35, 0.28)';
+  if (count === 2) return 'rgba(245, 166, 35, 0.48)';
   return colors.purple;
 }
 
-export default function AttendanceHeatmap({
-  data,
-  weeks = 12,
-}: AttendanceHeatmapProps) {
+export default function AttendanceHeatmap({ data, weeks = 12 }: AttendanceHeatmapProps) {
   // Build a map of date -> count
   const countMap: Record<string, number> = {};
   for (const d of data) {
@@ -56,7 +53,9 @@ export default function AttendanceHeatmap({
       {/* Day labels */}
       <View style={styles.dayLabels}>
         {DAY_LABELS.map((label, i) => (
-          <Text key={i} style={styles.dayLabel}>{i % 2 === 1 ? label : ''}</Text>
+          <Text key={i} style={styles.dayLabel}>
+            {i % 2 === 1 ? label : ''}
+          </Text>
         ))}
       </View>
       {/* Grid */}
@@ -64,13 +63,7 @@ export default function AttendanceHeatmap({
         {grid.map((week, wi) => (
           <View key={wi} style={styles.weekColumn}>
             {week.map((day, di) => (
-              <View
-                key={di}
-                style={[
-                  styles.cell,
-                  { backgroundColor: getCellColor(day.count) },
-                ]}
-              />
+              <View key={di} style={[styles.cell, { backgroundColor: getCellColor(day.count) }]} />
             ))}
           </View>
         ))}

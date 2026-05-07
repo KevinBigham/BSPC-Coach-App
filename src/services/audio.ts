@@ -17,6 +17,14 @@ import type { AudioSession } from '../types/firestore.types';
 
 type AudioSessionWithId = AudioSession & { id: string };
 
+function assertSelectedSwimmerIds(
+  selectedSwimmerIds: unknown,
+): asserts selectedSwimmerIds is string[] {
+  if (!Array.isArray(selectedSwimmerIds) || selectedSwimmerIds.length === 0) {
+    throw new Error('Cannot create audio session without selected swimmer ids');
+  }
+}
+
 export function subscribeAudioSessions(
   coachId: string,
   callback: (sessions: AudioSessionWithId[]) => void,
@@ -38,8 +46,11 @@ export async function createAudioSession(
   coachName: string,
   duration: number,
   practiceDate: string,
+  selectedSwimmerIds: string[],
   group?: string,
 ): Promise<string> {
+  assertSelectedSwimmerIds(selectedSwimmerIds);
+
   const docRef = await addDoc(collection(db, 'audio_sessions'), {
     coachId,
     coachName,
@@ -47,6 +58,7 @@ export async function createAudioSession(
     duration,
     practiceDate,
     group: group || null,
+    selectedSwimmerIds,
     status: 'uploading',
     transcription: null,
     errorMessage: null,

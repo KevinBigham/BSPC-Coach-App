@@ -24,6 +24,14 @@ import { canTagOrUploadMedia, assertCanTagSwimmers } from '../utils/mediaConsent
 
 type VideoSessionWithId = VideoSession & { id: string };
 
+function assertSelectedSwimmerIds(
+  selectedSwimmerIds: unknown,
+): asserts selectedSwimmerIds is string[] {
+  if (!Array.isArray(selectedSwimmerIds) || selectedSwimmerIds.length === 0) {
+    throw new Error('Cannot create video session without selected swimmer ids');
+  }
+}
+
 export function subscribeVideoSessions(
   coachId: string,
   callback: (sessions: VideoSessionWithId[]) => void,
@@ -74,19 +82,21 @@ export async function createVideoSession(
   coachName: string,
   duration: number,
   practiceDate: string,
-  taggedSwimmerIds: string[],
+  selectedSwimmerIds: string[],
   group: Group | undefined,
   swimmers: Array<Swimmer & { id: string }>,
 ): Promise<string> {
+  assertSelectedSwimmerIds(selectedSwimmerIds);
+
   // COPPA gate: roster context is mandatory at this service boundary.
-  for (const swimmerId of taggedSwimmerIds) {
+  for (const swimmerId of selectedSwimmerIds) {
     if (!swimmers.some((swimmer) => swimmer.id === swimmerId)) {
       throw new Error(
         `Cannot create video session: missing roster context for swimmer ${swimmerId}`,
       );
     }
   }
-  assertCanTagSwimmers(taggedSwimmerIds, swimmers);
+  assertCanTagSwimmers(selectedSwimmerIds, swimmers);
 
   const docRef = await addDoc(collection(db, 'video_sessions'), {
     coachId,
@@ -95,7 +105,8 @@ export async function createVideoSession(
     duration,
     practiceDate,
     group: group || null,
-    taggedSwimmerIds,
+    taggedSwimmerIds: selectedSwimmerIds,
+    selectedSwimmerIds,
     status: 'uploading' as VideoSessionStatus,
     errorMessage: null,
     createdAt: serverTimestamp(),
@@ -172,9 +183,9 @@ export function getVideoStatusColor(status: VideoSessionStatus): string {
     case 'uploading':
       return '#7a7a8e';
     case 'uploaded':
-      return '#B388FF';
+      return '#f5a623';
     case 'extracting_frames':
-      return '#B388FF';
+      return '#f5a623';
     case 'analyzing':
       return '#FFD700';
     case 'review':

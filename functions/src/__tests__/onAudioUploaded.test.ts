@@ -77,7 +77,12 @@ describe('onAudioUploaded', () => {
   it('should process audio when status changes to uploaded', async () => {
     const event = makeEvent(
       { status: 'pending' },
-      { status: 'uploaded', storagePath: 'audio/test.mp4', group: 'Gold' },
+      {
+        status: 'uploaded',
+        storagePath: 'audio/test.mp4',
+        group: 'Gold',
+        selectedSwimmerIds: ['swimmer-1', 'swimmer-2'],
+      },
     );
 
     // Access the underlying handler
@@ -102,6 +107,7 @@ describe('onAudioUploaded', () => {
         'session-1',
         'Transcribed coaching session text',
         'Gold',
+        ['swimmer-1', 'swimmer-2'],
       );
 
       // Should update status to review

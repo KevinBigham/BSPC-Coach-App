@@ -4,5 +4,8 @@ appId: com.bspowercats.coach
 - tapOn: "MORE"
 - tapOn: "VIDEO"
 - assertVisible: "VIDEO ANALYSIS"
+- assertVisible: "PICK SWIMMERS"
 - assertVisible:
     text: "hidden"
+- tapOn: "BSPC Demo 05"
+- assertVisible: "CAPTURE VIDEO"

@@ -70,7 +70,7 @@ describe('subscribeAudioSessions', () => {
 
 describe('createAudioSession', () => {
   it('creates an audio session and returns its id', async () => {
-    const id = await createAudioSession('c1', 'Coach K', 300, '2026-04-01', 'Gold');
+    const id = await createAudioSession('c1', 'Coach K', 300, '2026-04-01', ['s1', 's2'], 'Gold');
     expect(id).toBe('new-audio-id');
     expect(firestore.addDoc).toHaveBeenCalledWith(
       expect.anything(),
@@ -78,15 +78,23 @@ describe('createAudioSession', () => {
         coachId: 'c1',
         duration: 300,
         status: 'uploading',
+        selectedSwimmerIds: ['s1', 's2'],
         group: 'Gold',
       }),
     );
   });
 
   it('defaults group to null when not provided', async () => {
-    await createAudioSession('c1', 'Coach K', 300, '2026-04-01');
+    await createAudioSession('c1', 'Coach K', 300, '2026-04-01', ['s1']);
     const call = firestore.addDoc.mock.calls[0][1];
     expect(call.group).toBeNull();
+  });
+
+  it('rejects creation without selected swimmer ids', async () => {
+    await expect((createAudioSession as any)('c1', 'Coach K', 300, '2026-04-01')).rejects.toThrow(
+      /selected swimmer/i,
+    );
+    expect(firestore.addDoc).not.toHaveBeenCalled();
   });
 });
 

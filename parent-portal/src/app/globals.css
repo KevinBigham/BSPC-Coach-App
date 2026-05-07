@@ -1,20 +1,23 @@
 @import "tailwindcss";
 
 :root {
-  --bg-deep: #08080f;
-  --bg-base: #0a0a12;
-  --bg-elevated: #0f1018;
-  --bg-surface: #12121f;
-  --purple: #4A0E78;
-  --purple-dark: #350A58;
-  --purple-light: #7B3FA0;
+  /* Power Cats palette sampled from www.bspowercats.com on 2026-05-06:
+     --bg #1b163d, --bg2 #0d0a24, --gold #f5a623, --gold-dim #c4841a,
+     --gold-light #fde68a, --text #fff, --text-dim #ccc. */
+  --bg-deep: #0d0a24;
+  --bg-base: #1b163d;
+  --bg-elevated: #241d4a;
+  --bg-surface: #2a2360;
+  --purple: #f5a623;
+  --purple-dark: #c4841a;
+  --purple-light: #fde68a;
   --gold: #FFD700;
   --gold-dark: #CCB000;
-  --accent: #B388FF;
-  --text: #e8e8f0;
-  --text-secondary: #7a7a8e;
-  --border: #1c1c2a;
-  --border-light: #14141f;
+  --accent: #f5a623;
+  --text: #ffffff;
+  --text-secondary: #cccccc;
+  --border: #4f474e;
+  --border-light: #2a2360;
   --error: #f43f5e;
 }
 
@@ -24,7 +27,7 @@ body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
-/* Arcade Prime Time dark theme */
+/* Power Cats dark theme */
 .card {
   background-color: var(--bg-deep);
   border: 1px solid var(--border);
@@ -80,5 +83,5 @@ body {
 }
 
 .btn-secondary:hover {
-  background-color: rgba(74, 14, 120, 0.3);
+  background-color: rgba(245, 166, 35, 0.16);
 }

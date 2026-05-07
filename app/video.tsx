@@ -23,14 +23,15 @@ import {
   getVideoStatusColor,
   validateMediaConsent,
 } from '../src/services/video';
-import { filterConsentedSwimmers } from '../src/utils/mediaConsent';
+import { canTagOrUploadMedia } from '../src/utils/mediaConsent';
 import { handleError } from '../src/utils/errorHandler';
 import { useToast } from '../src/contexts/ToastContext';
 import { enqueueUpload } from '../src/utils/offlineQueue';
 import { colors, spacing, fontSize, borderRadius, fontFamily } from '../src/config/theme';
-import { GROUPS, type Group } from '../src/config/constants';
+import type { Group } from '../src/config/constants';
 import { tapMedium, notifySuccess, notifyWarning } from '../src/utils/haptics';
 import { withScreenErrorBoundary } from '../src/components/ScreenErrorBoundary';
+import SwimmerPicker from '../src/components/SwimmerPicker';
 
 type UploadState = 'idle' | 'uploading' | 'queued';
 
@@ -56,6 +57,11 @@ function VideoScreen() {
   }, [coach?.uid, setSessions]);
 
   const pickVideo = async (useCamera: boolean) => {
+    if (selectedSwimmerIds.length === 0) {
+      Alert.alert('Pick Swimmers', 'Select at least one swimmer before choosing video.');
+      return;
+    }
+
     const opts: ImagePicker.ImagePickerOptions = {
       mediaTypes: ['videos'],
       videoMaxDuration: 300,
@@ -73,10 +79,17 @@ function VideoScreen() {
     setVideoDuration(Math.round((asset.duration || 0) / 1000));
   };
 
-  const toggleSwimmer = (id: string) => {
-    setSelectedSwimmerIds((prev) =>
-      prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id],
+  const swimmersWithIds = swimmers.filter((s): s is typeof s & { id: string } => !!s.id);
+  const nonConsentedCount =
+    swimmersWithIds.filter((swimmer) => swimmer.active !== false).length -
+    swimmersWithIds.filter((swimmer) => canTagOrUploadMedia(swimmer).allowed).length;
+
+  const handleSwimmerSelect = (ids: string[]) => {
+    setSelectedSwimmerIds(ids);
+    const selectedGroups = new Set(
+      swimmersWithIds.filter((swimmer) => ids.includes(swimmer.id)).map((swimmer) => swimmer.group),
     );
+    setSelectedGroup(selectedGroups.size === 1 ? ([...selectedGroups][0] as Group) : '');
   };
 
   const handleUpload = async () => {
@@ -89,7 +102,6 @@ function VideoScreen() {
     }
 
     // Belt-and-suspenders consent check
-    const swimmersWithIds = swimmers.filter((s): s is typeof s & { id: string } => !!s.id);
     const nonConsented = validateMediaConsent(selectedSwimmerIds, swimmersWithIds);
     if (nonConsented.length > 0) {
       notifyWarning();
@@ -130,6 +142,7 @@ function VideoScreen() {
             date: practiceDate,
             sessionId,
             taggedSwimmerIds: selectedSwimmerIds,
+            selectedSwimmerIds,
           },
         });
 
@@ -168,20 +181,37 @@ function VideoScreen() {
     }
   };
 
-  const consentedSwimmers = filterConsentedSwimmers(swimmers);
-  const filteredSwimmers = selectedGroup
-    ? consentedSwimmers.filter((s) => s.group === selectedGroup)
-    : consentedSwimmers;
-  const nonConsentedCount = swimmers.length - consentedSwimmers.length;
-
   return (
     <>
       <Stack.Screen options={{ title: 'VIDEO ANALYSIS' }} />
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+        {/* Pre-flight swimmer selection */}
+        {selectedSwimmerIds.length === 0 && uploadState === 'idle' && (
+          <View style={styles.captureSection}>
+            <Text style={styles.sectionTitle}>PICK SWIMMERS</Text>
+            {nonConsentedCount > 0 && (
+              <Text style={styles.consentWarning}>
+                {nonConsentedCount} swimmer{nonConsentedCount !== 1 ? 's' : ''} hidden — media
+                consent, Do Not Photograph, or active status blocks tagging
+              </Text>
+            )}
+            <SwimmerPicker mode="multi" requireConsent onSelect={handleSwimmerSelect} />
+          </View>
+        )}
+
         {/* Capture Buttons */}
-        {!videoUri && uploadState === 'idle' && (
+        {selectedSwimmerIds.length > 0 && !videoUri && uploadState === 'idle' && (
           <View style={styles.captureSection}>
             <Text style={styles.sectionTitle}>CAPTURE VIDEO</Text>
+            <View style={styles.selectionSummary}>
+              <Text style={styles.selectionText}>
+                {selectedSwimmerIds.length} swimmer{selectedSwimmerIds.length !== 1 ? 's' : ''}{' '}
+                selected
+              </Text>
+              <TouchableOpacity onPress={() => setSelectedSwimmerIds([])}>
+                <Text style={styles.changeSelectionText}>CHANGE</Text>
+              </TouchableOpacity>
+            </View>
             <View style={styles.captureRow}>
               <TouchableOpacity style={styles.captureBtn} onPress={() => pickVideo(true)}>
                 <Text style={styles.captureBtnText}>RECORD VIDEO</Text>
@@ -206,59 +236,11 @@ function VideoScreen() {
               </Text>
             </View>
 
-            {/* Group Filter */}
-            <Text style={styles.fieldLabel}>FILTER BY GROUP</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <View style={styles.chipRow}>
-                <TouchableOpacity
-                  style={[styles.chip, !selectedGroup && styles.chipActive]}
-                  onPress={() => setSelectedGroup('')}
-                >
-                  <Text style={[styles.chipText, !selectedGroup && styles.chipTextActive]}>
-                    ALL
-                  </Text>
-                </TouchableOpacity>
-                {GROUPS.map((g) => (
-                  <TouchableOpacity
-                    key={g}
-                    style={[styles.chip, selectedGroup === g && styles.chipActive]}
-                    onPress={() => setSelectedGroup(g)}
-                  >
-                    <Text style={[styles.chipText, selectedGroup === g && styles.chipTextActive]}>
-                      {g}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </ScrollView>
-
-            {/* Swimmer Tagging */}
-            <Text style={styles.fieldLabel}>
-              TAG SWIMMERS ({selectedSwimmerIds.length} selected)
-            </Text>
-            {nonConsentedCount > 0 && (
-              <Text style={styles.consentWarning}>
-                {nonConsentedCount} swimmer{nonConsentedCount !== 1 ? 's' : ''} hidden — media
-                consent, Do Not Photograph, or active status blocks tagging
+            <View style={styles.selectionSummary}>
+              <Text style={styles.selectionText}>
+                Analyzing {selectedSwimmerIds.length} selected swimmer
+                {selectedSwimmerIds.length !== 1 ? 's' : ''}
               </Text>
-            )}
-            <View style={styles.swimmerGrid}>
-              {filteredSwimmers.map((s) => {
-                const selected = selectedSwimmerIds.includes(s.id!);
-                return (
-                  <TouchableOpacity
-                    key={s.id}
-                    style={[styles.swimmerChip, selected && styles.swimmerChipActive]}
-                    onPress={() => toggleSwimmer(s.id!)}
-                  >
-                    <Text
-                      style={[styles.swimmerChipText, selected && styles.swimmerChipTextActive]}
-                    >
-                      {s.firstName} {s.lastName[0]}.
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
             </View>
 
             {/* Upload Button */}
@@ -360,6 +342,28 @@ const styles = StyleSheet.create({
   // Capture
   captureSection: { marginBottom: spacing.xl },
   captureRow: { flexDirection: 'row', gap: spacing.md },
+  selectionSummary: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    marginBottom: spacing.lg,
+    backgroundColor: colors.bgDeep,
+  },
+  selectionText: {
+    fontFamily: fontFamily.bodySemi,
+    fontSize: fontSize.sm,
+    color: colors.text,
+  },
+  changeSelectionText: {
+    fontFamily: fontFamily.bodySemi,
+    fontSize: fontSize.xs,
+    color: colors.accent,
+    letterSpacing: 1,
+  },
   captureBtn: {
     flex: 1,
     backgroundColor: colors.gold,

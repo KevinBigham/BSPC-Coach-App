@@ -1,5 +1,5 @@
 import * as admin from 'firebase-admin';
-import { getPrompt } from './prompts';
+import { getPrompt, type PromptSwimmer } from './prompts';
 
 if (!admin.apps.length) {
   admin.initializeApp();
@@ -18,21 +18,51 @@ export async function extractObservations(
   sessionId: string,
   transcription: string,
   group: string | null,
+  selectedSwimmerIds?: string[],
 ): Promise<void> {
-  // Fetch swimmer names for matching
-  let swimmerQuery: admin.firestore.Query = db.collection('swimmers').where('active', '==', true);
-  if (group) {
-    swimmerQuery = swimmerQuery.where('group', '==', group);
+  const scopedToSelected = Array.isArray(selectedSwimmerIds) && selectedSwimmerIds.length > 0;
+
+  let swimmers: Array<{
+    id: string;
+    firstName: string;
+    lastName: string;
+    displayName: string;
+  }>;
+
+  if (scopedToSelected) {
+    const selectedDocs = await Promise.all(
+      selectedSwimmerIds.map((swimmerId) => db.doc(`swimmers/${swimmerId}`).get()),
+    );
+    swimmers = selectedDocs
+      .filter((doc) => doc.exists)
+      .map((doc) => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          firstName: data?.firstName as string,
+          lastName: data?.lastName as string,
+          displayName: data?.displayName as string,
+        };
+      });
+  } else {
+    // Fetch swimmer names for legacy sessions that predate selectedSwimmerIds.
+    let swimmerQuery: admin.firestore.Query = db.collection('swimmers').where('active', '==', true);
+    if (group) {
+      swimmerQuery = swimmerQuery.where('group', '==', group);
+    }
+    const swimmerSnap = await swimmerQuery.get();
+    swimmers = swimmerSnap.docs.map((d) => ({
+      id: d.id,
+      firstName: d.data().firstName as string,
+      lastName: d.data().lastName as string,
+      displayName: d.data().displayName as string,
+    }));
   }
-  const swimmerSnap = await swimmerQuery.get();
-  const swimmers = swimmerSnap.docs.map((d) => ({
-    id: d.id,
-    firstName: d.data().firstName as string,
-    lastName: d.data().lastName as string,
-    displayName: d.data().displayName as string,
-  }));
 
   const swimmerNames = swimmers.map((s) => `${s.firstName} ${s.lastName}`).join(', ');
+  const selectedPromptSwimmers: PromptSwimmer[] | undefined = scopedToSelected
+    ? swimmers.map((swimmer) => ({ id: swimmer.id, displayName: swimmer.displayName }))
+    : undefined;
 
   // Call Gemini for extraction
   const { VertexAI } = await import('@google-cloud/vertexai');
@@ -42,7 +72,7 @@ export async function extractObservations(
   });
   const model = vertexAi.getGenerativeModel({ model: 'gemini-2.0-flash' });
 
-  const prompt = getPrompt(transcription, swimmerNames, group || undefined);
+  const prompt = getPrompt(transcription, swimmerNames, group || undefined, selectedPromptSwimmers);
 
   const result = await model.generateContent({
     contents: [{ role: 'user', parts: [{ text: prompt }] }],

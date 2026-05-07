@@ -96,7 +96,10 @@ INSTRUCTIONS:
     });
 
     // Step 5: Extract observations
-    await extractObservations(sessionId, transcription, after.group || null);
+    const selectedSwimmerIds = Array.isArray(after.selectedSwimmerIds)
+      ? after.selectedSwimmerIds
+      : undefined;
+    await extractObservations(sessionId, transcription, after.group || null, selectedSwimmerIds);
 
     // Step 6: Update to review
     await sessionRef.update({
