@@ -68,6 +68,9 @@
     "src/utils/deepLinking.ts": [
       "types"
     ],
+    "src/utils/demoReadiness.ts": [
+      "types"
+    ],
     "src/utils/offlineQueue.ts": [
       "types"
     ]
