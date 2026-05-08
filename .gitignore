@@ -65,3 +65,6 @@ credentials/
 # Raw roster/meet source spreadsheets — contain athlete PII, never commit
 *.xlsx
 *.xls
+
+# Claude Code session worktrees — operational, not project content
+.claude/worktrees/

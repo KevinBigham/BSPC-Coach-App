@@ -1,0 +1,14 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash '/Users/tkevinbigham/Documents/GitHub/BSPC-Coach-App/.codex/hooks/check.sh'"
+          }
+        ]
+      }
+    ]
+  }
+}
