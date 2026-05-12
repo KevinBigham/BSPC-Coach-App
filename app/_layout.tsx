@@ -142,11 +142,15 @@ function RootNavigator() {
   useEffect(() => {
     if (loading) return;
 
-    const onAuthScreen = segments[0] === 'login' || segments[0] === 'forgot-password';
+    const authExemptScreen =
+      segments[0] === 'login' ||
+      segments[0] === 'forgot-password' ||
+      segments[0] === 'offline-demo';
+    const authRedirectScreen = segments[0] === 'login' || segments[0] === 'forgot-password';
 
-    if (!user && !onAuthScreen) {
+    if (!user && !authExemptScreen) {
       router.replace('/login');
-    } else if (user && onAuthScreen) {
+    } else if (user && authRedirectScreen) {
       router.replace('/(tabs)');
     }
   }, [user, loading, segments]);
@@ -169,6 +173,16 @@ function RootNavigator() {
         }}
       >
         <Stack.Screen name="login" />
+        <Stack.Screen
+          name="offline-demo"
+          options={{
+            headerShown: true,
+            title: 'OFFLINE PRACTICE DEMO',
+            headerStyle: { backgroundColor: colors.bgElevated },
+            headerTintColor: colors.accent,
+            headerTitleStyle: { fontFamily: fontFamily.heading, fontSize: 22, color: colors.text },
+          }}
+        />
         <Stack.Screen name="(tabs)" />
         <Stack.Screen
           name="swimmer/new"
