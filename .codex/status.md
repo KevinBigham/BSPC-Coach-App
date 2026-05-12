@@ -59,7 +59,7 @@
     - `aiDrafts.approveAllDrafts(..., swimmersById?)` (pre-flights every draft before any commit)
     - `videoDrafts.approveVideoDraft(..., swimmer?)`
     - `video.createVideoSession(..., swimmers?)`
-    UI gating is unchanged and remains authoritative; the service-layer helper is the backstop for direct/automation callers.
+      UI gating is unchanged and remains authoritative; the service-layer helper is the backstop for direct/automation callers.
 - Test corpus deltas:
   - Critical-ops fast suite: 55 → **95 tests** in 1.26s (still well under the 30s budget).
   - Client: 913 / 92 → **960 / 97**.
@@ -274,3 +274,13 @@
 - Phase 6: deprecated stale `MASTER_PLAN.md` with a README-source-of-truth banner, refreshed `.codex/handoff.json` app stats, updated README stats, and updated the video Maestro flow for the pre-flight picker. Maestro was not run because the CLI and a seeded local development build were unavailable on this host.
 - Final validation: `npm run quality`, `npm run quality:dead-code`, `npm run sync:functions-shared:verify`, and `git diff --check` passed. The full gate included `npm test -- --runInBand` (953 / 100), `npm --prefix functions test -- --runInBand` (106 / 18), Functions build, parent-portal build, madge, strict-types, randomness, and process checks. Seed safety check refused when `EXPO_PUBLIC_BSPC_ENV!=demo`, as intended.
 - Loose ends: emulator-backed `seed:demo` execution and Maestro green pass require Kevin's demo Firebase project/service account plus installed dev build.
+
+## 2026-05-12 — Offline Practice Demo
+
+- Working path: `/Users/tkevinbigham/BSPC-Coach-App-main` was a source snapshot, not a git checkout (`git status` failed with `fatal: not a git repository`), so the publish branch was prepared from a fresh clean clone at `/Users/tkevinbigham/Projects/BSPC-Coach-App-offline-demo-publish`.
+- Added local-only offline practice demo entry from login and an auth-exempt `/offline-demo` route. Production Firebase login, coach session, upload queues, and media AI workflows were not weakened or bypassed.
+- Added `src/services/offlineDemoMedia.ts` for swimmer-name sanitization, document-directory path building, extension-preserving local media copies, AsyncStorage index metadata, index reads, and metadata-only reset.
+- Offline demo behavior: coach enters swimmer name, records/picks video, records audio, files are copied under `BSPC-Coach-Demo/<Sanitized_Swimmer_Name>/{video,audio}/<timestamp>.<ext>`, saved items are listed by swimmer, and each item has a system share action for later Files/AirDrop/YouTube manual upload.
+- Native permission config now includes `expo-image-picker` and `expo-av` config plugins so fresh iOS/Android builds can request camera, photo-library, and microphone access.
+- Validation: `npm run typecheck`, `npm test -- --runInBand src/services/__tests__/offlineDemoMedia.test.ts`, `npm test -- --runInBand src/services/__tests__/video.test.ts src/services/__tests__/audio.test.ts src/utils/__tests__/mediaConsent.test.ts`, `npm run sync:functions-shared:verify`, `npm run quality:dead-code`, native permission introspection, and `git diff --check` all passed on the publish branch. Permission proof showed iOS camera/microphone/photo strings, Android `RECORD_AUDIO`, and `expo-image-picker`'s native Android manifest declares `android.permission.CAMERA`.
+- Manual web smoke on `http://localhost:8087`: login showed `OFFLINE PRACTICE DEMO`; route opened at `/offline-demo` without Firebase login; visible controls included swimmer input, record/pick video, start recording, saved files, and share UI. Native phone smoke is still required for real camera, microphone, local file copy, and share sheet behavior.

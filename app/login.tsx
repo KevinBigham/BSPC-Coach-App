@@ -95,6 +95,14 @@ export default function LoginScreen() {
               <Text style={styles.buttonText}>SIGN IN</Text>
             )}
           </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.demoButton}
+            onPress={() => router.push('/offline-demo')}
+            disabled={loading}
+          >
+            <Text style={styles.demoButtonText}>OFFLINE PRACTICE DEMO</Text>
+          </TouchableOpacity>
         </View>
 
         <TouchableOpacity onPress={() => router.push('/forgot-password')}>
@@ -205,6 +213,21 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 20,
     letterSpacing: 2,
+  },
+  demoButton: {
+    borderWidth: 1,
+    borderColor: colors.accent,
+    padding: spacing.lg,
+    borderRadius: borderRadius.sm,
+    alignItems: 'center',
+    marginTop: spacing.md,
+    backgroundColor: colors.bgDeep,
+  },
+  demoButtonText: {
+    fontFamily: fontFamily.heading,
+    color: colors.accent,
+    fontSize: 18,
+    letterSpacing: 1,
   },
   forgotLink: {
     fontFamily: fontFamily.bodySemi,

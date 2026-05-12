@@ -36,6 +36,20 @@
     "plugins": [
       "expo-router",
       "expo-font",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow BSPC Coach to choose practice videos saved on this phone.",
+          "cameraPermission": "Allow BSPC Coach to record practice videos for offline demo use.",
+          "microphonePermission": "Allow BSPC Coach to capture audio while recording practice videos."
+        }
+      ],
+      [
+        "expo-av",
+        {
+          "microphonePermission": "Allow BSPC Coach to record offline practice audio notes."
+        }
+      ],
       "@config-plugins/react-native-blob-util",
       "@config-plugins/react-native-pdf"
     ],
