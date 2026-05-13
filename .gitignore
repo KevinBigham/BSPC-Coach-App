@@ -3,20 +3,110 @@
 # dependencies
 node_modules/
 
-# Expo
-.expo/
+# secrets
+.env
+.env.*
+*.env
+functions/.env
+parent-portal/.env
+*.pem
+*.key
+*.p12
+*.pfx
+credentials.json
+credentials/
+service-account*.json
+firebase-adminsdk*.json
+google-service-account*.json
+secrets.json
+*.kubeconfig
+.npmrc
+.pypirc
+.netrc
+
+# roster/data exports
+rosters/
+roster/
+swimmers/
+athletes/
+parents/
+guardians/
+emergency/
+medical/
+uploads/
+exports/
+data/private/
+data/real/
+*.real.json
+*roster*.json
+*swimmer*.json
+*parent*.json
+*.xlsx
+*.xls
+
+# databases/dumps
+*.db
+*.sqlite
+*.sqlite3
+*.sql
+*.dump
+backup.sql
+dump.sql
+
+# logs/transcripts
+*.log
+logs/
+transcripts/
+chat_logs/
+chat-history*
+.specstory/
+
+# backups
+*.bak
+*.backup
+*_backup*
+*_old*
+* copy.*
+* copy 2.*
+*.orig.*
+
+# AI-agent local context
+.codex/
+.claude/
+.cursor/
+.aider*
+.windsurf/
+.continue/
+scratchpads/
+memory/
+memories/
+handoffs/
+
+# build/package artifacts
 dist/
+build/
+.next/
+out/
+coverage/
+*.map
+*.tgz
 web-build/
 expo-env.d.ts
+*.tsbuildinfo
+functions/lib/
+parent-portal/.next/
+parent-portal/next-env.d.ts
+
+# Expo
+.expo/
 
 # Native
 .kotlin/
-*.orig.*
 *.jks
 *.p8
-*.p12
-*.key
 *.mobileprovision
+/ios
+/android
 
 # Metro
 .metro-health-check*
@@ -25,46 +115,12 @@ expo-env.d.ts
 npm-debug.*
 yarn-debug.*
 yarn-error.*
-coverage/
 
-# macOS
+# OS/editor
 .DS_Store
-*.pem
-
-# local env files
-.env
-.env*.local
-functions/.env
-parent-portal/.env
-
-# typescript
-*.tsbuildinfo
-
-# service accounts & signing
-google-service-account.json
-
-# generated native folders
-/ios
-/android
-
-# Cloud Functions build output
-functions/lib/
-
-# Next.js parent-portal build output
-parent-portal/.next/
-parent-portal/next-env.d.ts
+Thumbs.db
+.vscode/
+.idea/
 
 # Apple Developer credentials
 .apple-creds/
-*.p8
-
-# EAS local credentials — never commit (contains cert password)
-credentials.json
-credentials/
-
-# Raw roster/meet source spreadsheets — contain athlete PII, never commit
-*.xlsx
-*.xls
-
-# Claude Code session worktrees — operational, not project content
-.claude/worktrees/

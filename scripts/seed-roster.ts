@@ -1,8 +1,9 @@
 /**
- * Seed Firestore with BSPC roster from scripts/data/bspc-roster-2026.json.
+ * Seed Firestore with fake sample swimmer data by default.
  *
- * Source of truth: scripts/data/bspc-roster-2026.json (extracted from
- * "2025-2026 ROSTER APRIL 2026.xlsx" via scripts/extract-roster.py).
+ * Default source: scripts/data/example-seed-data.json.
+ * For a private real roster, set BSPC_ROSTER_JSON_PATH to a local ignored JSON
+ * file. Never commit real minor/swimmer roster data.
  *
  * Idempotent: upserts by firstName|lastName|dateOfBirth. Existing swimmers
  * are left untouched (their coach-edited fields like goals, strengths,
@@ -13,10 +14,11 @@
  * environment.
  *
  * Usage: npx tsx scripts/seed-roster.ts
+ * Private override: BSPC_ROSTER_JSON_PATH=./data/private/roster.json npx tsx scripts/seed-roster.ts
  */
 
 import { readFileSync } from 'fs';
-import { join } from 'path';
+import { join, resolve } from 'path';
 import { cert, initializeApp, getApps } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 
@@ -66,7 +68,15 @@ async function getExistingKeys(): Promise<Set<string>> {
 }
 
 async function main() {
-  const jsonPath = join(__dirname, 'data', 'bspc-roster-2026.json');
+  const privateRosterPath = process.env.BSPC_ROSTER_JSON_PATH?.trim();
+  const jsonPath = privateRosterPath
+    ? resolve(privateRosterPath)
+    : join(__dirname, 'data', 'example-seed-data.json');
+
+  if (privateRosterPath) {
+    console.warn('Using private roster path from BSPC_ROSTER_JSON_PATH. Confirm this file is ignored.');
+  }
+
   console.log(`Reading ${jsonPath}`);
   const entries: RosterEntry[] = JSON.parse(readFileSync(jsonPath, 'utf-8'));
   console.log(`Loaded ${entries.length} swimmers from JSON`);

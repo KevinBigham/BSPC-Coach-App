@@ -1,0 +1,56 @@
+[
+  {
+    "firstName": "Alex",
+    "lastName": "Example",
+    "gender": "F",
+    "group": "Bronze",
+    "dateOfBirth": null,
+    "usaSwimmingRegType": null,
+    "usaSwimmingExpDate": null
+  },
+  {
+    "firstName": "Jamie",
+    "lastName": "Sample",
+    "gender": "M",
+    "group": "Silver",
+    "dateOfBirth": null,
+    "usaSwimmingRegType": null,
+    "usaSwimmingExpDate": null
+  },
+  {
+    "firstName": "Taylor",
+    "lastName": "Test",
+    "gender": "F",
+    "group": "Gold",
+    "dateOfBirth": null,
+    "usaSwimmingRegType": null,
+    "usaSwimmingExpDate": null
+  },
+  {
+    "firstName": "Morgan",
+    "lastName": "Demo",
+    "gender": "M",
+    "group": "Advanced",
+    "dateOfBirth": null,
+    "usaSwimmingRegType": null,
+    "usaSwimmingExpDate": null
+  },
+  {
+    "firstName": "Casey",
+    "lastName": "Placeholder",
+    "gender": "F",
+    "group": "Platinum",
+    "dateOfBirth": null,
+    "usaSwimmingRegType": null,
+    "usaSwimmingExpDate": null
+  },
+  {
+    "firstName": "Riley",
+    "lastName": "Fictional",
+    "gender": "M",
+    "group": "Diamond",
+    "dateOfBirth": null,
+    "usaSwimmingRegType": null,
+    "usaSwimmingExpDate": null
+  }
+]

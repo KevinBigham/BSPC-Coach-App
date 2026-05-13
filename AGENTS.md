@@ -37,6 +37,8 @@ Act like a senior staff engineer with deep React Native, Expo Router, Firebase, 
 - Media consent must be checked before any video or audio tagging that involves a minor.
 - "Do Not Photograph" flags must be honored in tagging flows.
 - Reference: memory file `reference_coppa_safesport_compliance.md`.
+- Never commit real minors, students, swimmers, parents, guardians, emergency
+  contacts, medical notes, DOBs, roster exports, meet exports, or family data.
 
 ### Testing
 
@@ -81,6 +83,10 @@ If a task cannot be fully implemented, still use the structure and mark what is 
 - Prefer boring, interpretable code over clever abstractions.
 - No emoji in UIs — use `lucide-react-native` icons only.
 - Never `git add -A`; stage files explicitly so `.env`, credentials, and large binaries stay out of commits.
+- Never read, print, paste, or commit `.env` files, service-account files, private keys, local credentials, or real roster data.
+- Never hardcode secrets. Client Firebase config is public client config and must be restricted in Google Cloud/Firebase, not treated as a server secret.
+- If secrets, API keys, real minor data, or private family/swimmer data are found, stop and report only path/category/action with `[REDACTED]` or `[REDACTED-PII]`.
+- Before staging, show the explicit file list. Do not run `git add .`, `git add -A`, or equivalent broad staging commands.
 
 ## Conditional: Simulation / Save-Schema Work
 
@@ -108,10 +114,11 @@ Every completed chunk should leave:
 - What is risky.
 - What should be reviewed.
 - What is next.
+- Keep handoffs and status notes free of secrets, raw PII, local paths, and private roster contents.
 
 ### Portfolio Handoff Schema
 
-Hand-offs to Codex (or any other implementation agent) must include the following fields. They mirror the schema used by the MFD/MBD repos so a swap of agents stays cheap. A sample payload lives in [.codex/templates/handoff-slice.json](.codex/templates/handoff-slice.json).
+Hand-offs to Codex (or any other implementation agent) must include the following fields. Keep the payload in the issue, PR, or an approved project doc rather than in local agent-context folders.
 
 - `effort_level` — `low` | `medium` | `high`. Sets reviewer expectations.
 - `edit_radius` — explicit list of files or globs the slice may modify. Edits outside this list require justification.
@@ -164,8 +171,6 @@ Use this protocol before any cleanup or deletion work.
    - Commit message must say exactly what was removed and why.
    - Treat `knip` (configured for root, functions, and parent-portal workspaces) as the canonical dead-code gate. Do not treat `ts-prune` output as deletion-grade evidence — Expo Router default exports are expected false positives. Do not treat `depcheck` output as deletion-grade evidence — Expo config plugins, Babel plugin aliases, EAS dev profiles, and type-only packages produce false positives.
 5. Memory output:
-   - Update `AGENTS.md`.
-   - Update `.codex/status.md`.
-   - Update `.codex/decisions.md`.
-   - Update `.codex/changelog.md`.
-   - Create or update `CODEBASE_AUDIT.md`.
+   - Update durable project docs only when explicitly in scope.
+   - Do not commit local agent session folders or private handoff scratchpads.
+   - Create or update `CODEBASE_AUDIT.md` only when the audit scope explicitly asks for it.
