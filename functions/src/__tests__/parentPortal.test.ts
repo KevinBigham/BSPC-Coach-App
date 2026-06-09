@@ -1,9 +1,5 @@
 import { createMockDoc, createMockQuerySnapshot } from '../__mocks__/firebaseAdmin';
 
-const mockParentDocRef = {
-  get: jest.fn(),
-};
-
 const mockSwimmerDocRefs = new Map<string, { get: jest.Mock; collection: jest.Mock }>();
 const mockTimesCollection = {
   orderBy: jest.fn().mockReturnThis(),
@@ -30,9 +26,6 @@ function getSwimmerDocRef(id: string) {
 
 const mockDb = {
   collection: jest.fn().mockImplementation((path: string) => {
-    if (path === 'parents') {
-      return { doc: jest.fn(() => mockParentDocRef) };
-    }
     if (path === 'swimmers') {
       return { doc: jest.fn((id: string) => getSwimmerDocRef(id)) };
     }
@@ -50,6 +43,29 @@ jest.mock('firebase-admin/firestore', () => ({
 jest.mock('firebase-admin', () => ({
   apps: [{}],
   initializeApp: jest.fn(),
+}));
+
+// Identity gate now resolves via canonical profiles + guardianships
+// (UNIFY/05 §3.3, Phase A Option (b)) through the service-role client.
+const profilesBuilder = {
+  select: jest.fn().mockReturnThis(),
+  eq: jest.fn().mockReturnThis(),
+  maybeSingle: jest.fn(),
+};
+
+const guardianshipsBuilder = {
+  select: jest.fn().mockReturnThis(),
+  eq: jest.fn(),
+};
+
+const mockSupabaseFrom = jest.fn((table: string) =>
+  table === 'profiles' ? profilesBuilder : guardianshipsBuilder,
+);
+
+jest.mock('../config/supabase', () => ({
+  // Lazy lookup: jest hoists this factory above the const declarations, so
+  // mockSupabaseFrom must be dereferenced at call time, not factory-eval time.
+  supabase: { from: (table: string) => mockSupabaseFrom(table) },
 }));
 
 import { getParentPortalDashboard, getParentSwimmerPortalData } from '../callable/parentPortal';
@@ -72,14 +88,17 @@ describe('parent portal callables', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockSwimmerDocRefs.clear();
-    mockParentDocRef.get.mockResolvedValue(
-      createMockDoc('parent-1', {
-        uid: 'parent-1',
-        email: 'parent@example.com',
-        displayName: 'Parent',
-        linkedSwimmerIds: ['swimmer-1'],
-      }),
-    );
+    profilesBuilder.select.mockReturnThis();
+    profilesBuilder.eq.mockReturnThis();
+    guardianshipsBuilder.select.mockReturnThis();
+    profilesBuilder.maybeSingle.mockResolvedValue({
+      data: { id: 'profile-1', email: 'parent@example.com', full_name: 'Parent' },
+      error: null,
+    });
+    guardianshipsBuilder.eq.mockResolvedValue({
+      data: [{ swimmer_id: 'swimmer-1' }],
+      error: null,
+    });
     getSwimmerDocRef('swimmer-1').get.mockResolvedValue(
       createMockDoc('swimmer-1', {
         firstName: 'Jane',
@@ -194,5 +213,38 @@ describe('parent portal callables', () => {
       schedule: [],
     });
     expect(JSON.stringify(result)).not.toContain('private');
+  });
+
+  it('resolves the caller via profiles.user_id and authorizes via guardianships', async () => {
+    const handler = handlerOf(getParentPortalDashboard) as (request: unknown) => Promise<unknown>;
+    await handler(makeRequest());
+
+    expect(mockSupabaseFrom).toHaveBeenCalledWith('profiles');
+    expect(profilesBuilder.eq).toHaveBeenCalledWith('user_id', 'parent-1');
+    expect(mockSupabaseFrom).toHaveBeenCalledWith('guardianships');
+    expect(guardianshipsBuilder.eq).toHaveBeenCalledWith('guardian_profile_id', 'profile-1');
+  });
+
+  it('returns the placeholder profile and no swimmers when no profiles row exists', async () => {
+    profilesBuilder.maybeSingle.mockResolvedValue({ data: null, error: null });
+
+    const handler = handlerOf(getParentPortalDashboard) as (request: unknown) => Promise<unknown>;
+    const result = await handler(makeRequest());
+
+    expect(result).toEqual({
+      profile: { uid: 'parent-1', email: '', displayName: 'Parent', linkedSwimmerIds: [] },
+      swimmers: [],
+    });
+    expect(mockSupabaseFrom).not.toHaveBeenCalledWith('guardianships');
+  });
+
+  it('propagates identity resolution failures', async () => {
+    profilesBuilder.maybeSingle.mockResolvedValue({
+      data: null,
+      error: new Error('identity store down'),
+    });
+
+    const handler = handlerOf(getParentPortalDashboard) as (request: unknown) => Promise<unknown>;
+    await expect(handler(makeRequest())).rejects.toThrow('identity store down');
   });
 });

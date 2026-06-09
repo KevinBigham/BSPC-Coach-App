@@ -1,12 +1,7 @@
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { getFirestore } from 'firebase-admin/firestore';
 
-interface ParentProfile {
-  uid: string;
-  email: string;
-  displayName: string;
-  linkedSwimmerIds: string[];
-}
+import { resolveParentIdentity } from '../identity';
 
 interface ParentSwimmerSummary {
   id: string;
@@ -81,15 +76,6 @@ function toIsoDate(value: unknown): string | null {
   return null;
 }
 
-function sanitizeProfile(uid: string, data: DocData | undefined): ParentProfile {
-  return {
-    uid,
-    email: asString(data?.email),
-    displayName: asString(data?.displayName, asString(data?.email, 'Parent')),
-    linkedSwimmerIds: asStringArray(data?.linkedSwimmerIds),
-  };
-}
-
 function sanitizeSwimmerSummary(id: string, data: DocData): ParentSwimmerSummary {
   const firstName = asString(data.firstName);
   const lastName = asString(data.lastName);
@@ -134,14 +120,6 @@ function sanitizeAttendance(id: string, data: DocData): ParentAttendanceSummary 
   };
 }
 
-async function loadParentProfile(uid: string): Promise<ParentProfile> {
-  const snap = await getFirestore().collection('parents').doc(uid).get();
-  if (!snap.exists) {
-    return { uid, email: '', displayName: 'Parent', linkedSwimmerIds: [] };
-  }
-  return sanitizeProfile(uid, snap.data());
-}
-
 async function loadLinkedSwimmerSummaries(
   linkedSwimmerIds: string[],
 ): Promise<ParentSwimmerSummary[]> {
@@ -165,7 +143,7 @@ export const getParentPortalDashboard = onCall(
       throw new HttpsError('unauthenticated', 'Must be authenticated');
     }
 
-    const profile = await loadParentProfile(request.auth.uid);
+    const profile = await resolveParentIdentity(request.auth.uid);
     const swimmers = await loadLinkedSwimmerSummaries(profile.linkedSwimmerIds);
 
     return { profile, swimmers };
@@ -184,7 +162,7 @@ export const getParentSwimmerPortalData = onCall(
       throw new HttpsError('invalid-argument', 'Missing swimmerId');
     }
 
-    const profile = await loadParentProfile(request.auth.uid);
+    const profile = await resolveParentIdentity(request.auth.uid);
     if (!profile.linkedSwimmerIds.includes(swimmerId)) {
       throw new HttpsError('permission-denied', 'This swimmer is not linked to your account');
     }
