@@ -8,15 +8,13 @@ import {
   onAuthStateChanged,
   type User,
 } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
-import { auth, db } from './firebase';
+import { auth } from './firebase';
 
-export interface ParentProfile {
-  uid: string;
-  email: string;
-  displayName: string;
-  linkedSwimmerIds: string[];
-}
+// Profile read migrated to canonical profiles + guardianships (UNIFY/05 Phase A,
+// Option (b)); the Firebase session functions below stay until the identity-cluster
+// cutover. Re-exported so consumers of this module keep their imports unchanged.
+export { getParentProfile } from './profile';
+export type { ParentProfile } from './profile';
 
 export async function signIn(email: string, password: string) {
   return signInWithEmailAndPassword(auth, email, password);
@@ -32,10 +30,4 @@ export async function signOut() {
 
 export function onAuthChange(callback: (user: User | null) => void) {
   return onAuthStateChanged(auth, callback);
-}
-
-export async function getParentProfile(uid: string): Promise<ParentProfile | null> {
-  const snap = await getDoc(doc(db, 'parents', uid));
-  if (!snap.exists()) return null;
-  return { uid, ...snap.data() } as ParentProfile;
 }

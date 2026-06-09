@@ -1,0 +1,35 @@
+import { supabase } from './supabase';
+
+export interface ParentProfile {
+  uid: string;
+  email: string;
+  displayName: string;
+  linkedSwimmerIds: string[];
+}
+
+// Identity resolves from the canonical profiles + guardianships tables
+// (UNIFY/05 §3). `uid` is the caller's Supabase auth user id (auth.users.id);
+// the session provider in auth.ts stays on Firebase until the coordinated
+// identity-cluster cutover, so this read goes live at that cutover.
+export async function getParentProfile(uid: string): Promise<ParentProfile | null> {
+  const { data: profile, error } = await supabase
+    .from('profiles')
+    .select('id, email, full_name')
+    .eq('user_id', uid)
+    .maybeSingle();
+  if (error) throw error;
+  if (!profile) return null;
+
+  const { data: links, error: linksError } = await supabase
+    .from('guardianships')
+    .select('swimmer_id')
+    .eq('guardian_profile_id', profile.id);
+  if (linksError) throw linksError;
+
+  return {
+    uid,
+    email: profile.email,
+    displayName: profile.full_name,
+    linkedSwimmerIds: (links ?? []).map((link: { swimmer_id: string }) => link.swimmer_id),
+  };
+}
