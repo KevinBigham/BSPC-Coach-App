@@ -1,34 +1,40 @@
-jest.mock('../../src/config/firebase', () => ({
-  db: {},
-  auth: { currentUser: { uid: 'coach-001' } },
-  storage: {},
-  functions: {},
-}));
-
-jest.mock('firebase/firestore', () => ({
-  collection: jest.fn((...args: unknown[]) => ({
-    path: (args as string[]).slice(1).join('/'),
-  })),
-  query: jest.fn((ref: unknown) => ref),
-  where: jest.fn(),
-  orderBy: jest.fn(),
-  limit: jest.fn(),
-  doc: jest.fn((...args: unknown[]) => ({
-    path: (args as string[]).slice(1).join('/'),
-    id: (args as string[])[args.length - 1],
-  })),
-  addDoc: jest.fn().mockResolvedValue({ id: 'fixture-doc-id' }),
-  updateDoc: jest.fn().mockResolvedValue(undefined),
-  deleteDoc: jest.fn().mockResolvedValue(undefined),
-  onSnapshot: jest.fn(),
-  serverTimestamp: jest.fn(() => new Date('2026-04-28T12:00:00.000Z')),
-  Timestamp: { fromDate: jest.fn((d: unknown) => d) },
-}));
+// Data layer migrated Firestore -> Supabase (UNIFY Phase B). Same critical-op
+// contract; the mock is re-pointed at the Supabase client. created_at/updated_at
+// are DB-owned now (column default + BEFORE UPDATE trigger), so the old
+// "payload includes timestamps" assertions are inverted: the payload must NOT
+// send them.
+jest.mock('../../src/config/supabase', () => {
+  const makeQuery = () => {
+    const q: Record<string, jest.Mock> & { then: unknown } = {
+      select: jest.fn(() => q),
+      eq: jest.fn(() => q),
+      order: jest.fn(() => q),
+      insert: jest.fn(() => q),
+      update: jest.fn(() => q),
+      upsert: jest.fn(() => q),
+      single: jest.fn(() => Promise.resolve({ data: { id: 'fixture-row-id' }, error: null })),
+      then: (resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) =>
+        Promise.resolve({ data: [], error: null }).then(resolve, reject),
+    };
+    return q;
+  };
+  const swimmersQuery = makeQuery();
+  const scpQuery = makeQuery();
+  const supabase = {
+    from: jest.fn((table: string) =>
+      table === 'swimmer_coach_profile' ? scpQuery : swimmersQuery,
+    ),
+    channel: jest.fn(),
+    removeChannel: jest.fn(),
+  };
+  return { supabase, __swimmersQuery: swimmersQuery, __scpQuery: scpQuery };
+});
 
 import { addSwimmer, updateSwimmer } from '../../src/services/swimmers';
 import { buildSwimmer, buildRoster } from '../fixtures/coach';
 
-const firestore = require('firebase/firestore');
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { supabase, __swimmersQuery } = require('../../src/config/supabase');
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -41,14 +47,14 @@ describe('roster.addSwimmer (critical op)', () => {
 
     await addSwimmer(input as never, 'coach-001');
 
-    expect(firestore.collection).toHaveBeenCalledWith(expect.anything(), 'swimmers');
-    const written = firestore.addDoc.mock.calls[0][1];
-    expect(written.firstName).toBe('Athlete001');
-    expect(written.lastName).toBe('TestGO');
-    expect(written.group).toBe('Gold');
-    expect(written.createdBy).toBe('coach-001');
-    expect(written.createdAt).toBeDefined();
-    expect(written.updatedAt).toBeDefined();
+    expect(supabase.from).toHaveBeenCalledWith('swimmers');
+    const written = __swimmersQuery.insert.mock.calls[0][0];
+    expect(written.first_name).toBe('Athlete001');
+    expect(written.last_name).toBe('TestGO');
+    expect(written.practice_group).toBe('Gold');
+    expect(written.created_by).toBe('coach-001');
+    expect(written).not.toHaveProperty('created_at'); // DB default
+    expect(written).not.toHaveProperty('updated_at'); // DB trigger
   });
 
   it('edge: roster of four produces stable, sorted ids', () => {
@@ -71,26 +77,26 @@ describe('roster.addSwimmer (critical op)', () => {
 });
 
 describe('roster.updateSwimmer (group reassignment)', () => {
-  it('happy path: rename writes the new firstName plus updatedAt', async () => {
+  it('happy path: rename writes the new firstName without a client-set updatedAt', async () => {
     const swimmer = buildSwimmer({ index: 2, group: 'Gold' });
     await updateSwimmer(swimmer.id, { firstName: 'Renamed' });
 
-    expect(firestore.doc).toHaveBeenCalledWith(expect.anything(), 'swimmers', swimmer.id);
-    const payload = firestore.updateDoc.mock.calls[0][1];
-    expect(payload.firstName).toBe('Renamed');
-    expect(payload.updatedAt).toBeDefined();
+    expect(__swimmersQuery.eq).toHaveBeenCalledWith('id', swimmer.id);
+    const payload = __swimmersQuery.update.mock.calls[0][0];
+    expect(payload.first_name).toBe('Renamed');
+    expect(payload).not.toHaveProperty('updated_at'); // DB trigger owns it
   });
 
-  it('edge: group reassignment from Gold to Diamond writes group field', async () => {
+  it('edge: group reassignment from Gold to Diamond writes the practice_group field', async () => {
     const swimmer = buildSwimmer({ index: 3, group: 'Gold' });
     await updateSwimmer(swimmer.id, { group: 'Diamond' });
 
-    const payload = firestore.updateDoc.mock.calls[0][1];
-    expect(payload.group).toBe('Diamond');
-    expect(payload.updatedAt).toBeDefined();
+    const payload = __swimmersQuery.update.mock.calls[0][0];
+    expect(payload.practice_group).toBe('Diamond');
+    expect(payload).not.toHaveProperty('updated_at');
   });
 
-  it('failure-shape: updateDoc resolves to undefined even when payload is empty', async () => {
+  it('failure-shape: updateSwimmer resolves to undefined even when payload is empty', async () => {
     const result = await updateSwimmer('swim-GO-001', {});
     expect(result).toBeUndefined();
   });
