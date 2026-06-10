@@ -6,13 +6,15 @@
  * half writes to Supabase swim_results — plain chunked INSERTs; the
  * maintain_personal_bests() trigger does ALL PR math (D-D5), so the
  * per-batch un-PR loop is gone and `result.prs` is recounted from the
- * post-insert is_personal_best truth (RD-9). The meets/{id}/entries
- * finalTime sync stays on Firestore until Phase H; import_jobs bookkeeping
- * stays on Firestore until its phase.
+ * post-insert is_personal_best truth (RD-9).
+ *
+ * Phase H (UNIFY/12 §5.5): the meets half moved too — the entries finalTime
+ * sync is one meet_entries UPDATE keyed (meet_id, swimmer_id, event_name)
+ * per record, hundredths verbatim; finalTimeDisplay + updatedAt drop
+ * (canonical has neither — displays derive on read, entries carry no stamp).
+ * import_jobs bookkeeping rides importJobs.ts (its own swap, §5.9).
  */
 
-import { collection, query, where, getDocs, serverTimestamp, updateDoc } from 'firebase/firestore';
-import { db } from '../config/firebase';
 import { supabase } from '../config/supabase';
 import type { Swimmer } from '../types/firestore.types';
 import type { SDIFRecord, MatchResult, ImportResult } from './meetImportTypes';
@@ -160,25 +162,22 @@ export async function importMatchedResults(
         }
       }
 
-      // If linked to a meet, update MeetEntry docs (Firestore until Phase H)
+      // If linked to a meet, patch the meet_entries rows: one UPDATE keyed
+      // (meet_id, swimmer_id, event_name) per record covers every matching
+      // row, exactly like the per-doc loop did. finalTimeDisplay + the
+      // updatedAt stamp drop — canonical has neither (displays derive on
+      // read; entries carry no stamp). Time stays HUNDREDTHS verbatim.
       if (meetId) {
         try {
           for (const match of swimmerMatches) {
             const rec = match.record;
-            // Find the MeetEntry for this swimmer + event
-            const entriesQ = query(
-              collection(db, 'meets', meetId, 'entries'),
-              where('swimmerId', '==', swimmerId),
-              where('event', '==', rec.event),
-            );
-            const entriesSnap = await getDocs(entriesQ);
-            for (const entryDoc of entriesSnap.docs) {
-              await updateDoc(entryDoc.ref, {
-                finalTime: rec.time,
-                finalTimeDisplay: rec.timeDisplay,
-                updatedAt: serverTimestamp(),
-              });
-            }
+            const { error: entryError } = await supabase
+              .from('meet_entries')
+              .update({ final_time_hundredths: rec.time })
+              .eq('meet_id', meetId)
+              .eq('swimmer_id', swimmerId)
+              .eq('event_name', rec.event);
+            if (entryError) throw new Error(entryError.message);
           }
         } catch (err: unknown) {
           // Intentionally swallowed: meet-entry sync failures should not discard imported times.

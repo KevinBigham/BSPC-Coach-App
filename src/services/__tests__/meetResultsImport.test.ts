@@ -1,24 +1,10 @@
 // Phase D split (UNIFY/08 §5d): the times half writes Supabase swim_results
 // with plain chunked INSERTs — no existing-times read, no un-PR loop (the
 // trigger owns PR truth, D-D5) — and result.prs is recounted from the
-// post-insert is_personal_best reads (RD-9). The meets/{id}/entries sync and
-// import_jobs bookkeeping stay on Firestore.
-jest.mock('../../config/firebase', () => ({
-  db: {},
-  auth: { currentUser: { uid: 'test-uid' } },
-  storage: {},
-  functions: {},
-}));
-
-jest.mock('firebase/firestore', () => ({
-  collection: jest.fn((...args: unknown[]) => ({ path: (args as string[]).slice(1).join('/') })),
-  query: jest.fn((ref: unknown) => ref),
-  where: jest.fn(),
-  getDocs: jest.fn().mockResolvedValue({ docs: [] }),
-  serverTimestamp: jest.fn(() => new Date()),
-  updateDoc: jest.fn().mockResolvedValue(undefined),
-}));
-
+// post-insert is_personal_best reads (RD-9). Phase H (UNIFY/12 §5.5): the
+// meets half moved too — the entries finalTime patch is one meet_entries
+// UPDATE keyed (meet_id, swimmer_id, event_name); display string + stamp
+// drop; swallow-and-report semantics verbatim. No firebase imports remain.
 jest.mock('../importJobs', () => ({
   createImportJob: jest.fn().mockResolvedValue('job-1'),
   updateImportJob: jest.fn().mockResolvedValue(undefined),
@@ -28,9 +14,11 @@ jest.mock('../../config/supabase', () => {
   const state: {
     insertQueue: { data: unknown; error: unknown }[];
     prRows: unknown[];
+    updateResult: { error: unknown };
   } = {
     insertQueue: [],
     prRows: [],
+    updateResult: { error: null },
   };
   const makeInsertChain = () => {
     const chain: Record<string, jest.Mock> & { then: unknown } = {
@@ -49,11 +37,24 @@ jest.mock('../../config/supabase', () => {
     then: (resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) =>
       Promise.resolve({ data: state.prRows, error: null }).then(resolve, reject),
   };
-  const insert = jest.fn(() => makeInsertChain());
-  const supabase = {
-    from: jest.fn(() => ({ ...readQuery, insert })),
+  const updateChain: Record<string, jest.Mock> & { then: unknown } = {
+    eq: jest.fn(() => updateChain),
+    then: (resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) =>
+      Promise.resolve(state.updateResult).then(resolve, reject),
   };
-  return { supabase, __state: state, __insert: insert, __readQuery: readQuery };
+  const insert = jest.fn(() => makeInsertChain());
+  const update = jest.fn(() => updateChain);
+  const supabase = {
+    from: jest.fn(() => ({ ...readQuery, insert, update })),
+  };
+  return {
+    supabase,
+    __state: state,
+    __insert: insert,
+    __readQuery: readQuery,
+    __update: update,
+    __updateChain: updateChain,
+  };
 });
 
 import { matchSwimmersToRoster, importMatchedResults } from '../meetResultsImport';
@@ -61,10 +62,9 @@ import type { SDIFRecord, MatchResult } from '../meetImportTypes';
 import { createImportJob, updateImportJob } from '../importJobs';
 import type { Swimmer } from '../../types/firestore.types';
 
-const firestore = require('firebase/firestore');
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const supabaseMock = require('../../config/supabase');
-const { supabase, __state, __insert, __readQuery } = supabaseMock;
+const { supabase, __state, __insert, __readQuery, __update, __updateChain } = supabaseMock;
 const mockedCreateImportJob = jest.mocked(createImportJob);
 const mockedUpdateImportJob = jest.mocked(updateImportJob);
 
@@ -72,7 +72,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   __state.insertQueue = [];
   __state.prRows = [];
-  firestore.getDocs.mockResolvedValue({ docs: [] });
+  __state.updateResult = { error: null };
 });
 
 type SwimmerWithId = Swimmer & { id: string };
@@ -278,25 +278,52 @@ describe('importMatchedResults', () => {
     expect(result.errors[0]).toContain('boom');
   });
 
-  it('still syncs meet entries through Firestore when meetId is provided (Phase H boundary)', async () => {
-    const entryRef = { id: 'entry-1' };
-    firestore.getDocs.mockResolvedValue({ docs: [{ ref: entryRef }] });
-
+  it('patches meet_entries with ONE update keyed (meet_id, swimmer_id, event_name) — Phase H', async () => {
     const matches: MatchResult[] = [
       { record: makeRecord(), matchedSwimmer: swimmers[0], confidence: 'exact' },
     ];
     await importMatchedResults(matches, 'coach-1', 'sdif_import', 'meet-1');
 
-    expect(firestore.collection).toHaveBeenCalledWith(
-      expect.anything(),
-      'meets',
-      'meet-1',
-      'entries',
-    );
-    expect(firestore.updateDoc).toHaveBeenCalledWith(
-      entryRef,
-      expect.objectContaining({ finalTime: 5500, finalTimeDisplay: '55.00' }),
-    );
+    expect(supabase.from).toHaveBeenCalledWith('meet_entries');
+    expect(__update).toHaveBeenCalledWith({ final_time_hundredths: 5500 }); // hundredths verbatim
+    expect(__updateChain.eq).toHaveBeenCalledWith('meet_id', 'meet-1');
+    expect(__updateChain.eq).toHaveBeenCalledWith('swimmer_id', 's1');
+    expect(__updateChain.eq).toHaveBeenCalledWith('event_name', '100 Free');
+  });
+
+  it('drops the display string and the updatedAt stamp — canonical has neither', async () => {
+    const matches: MatchResult[] = [
+      { record: makeRecord(), matchedSwimmer: swimmers[0], confidence: 'exact' },
+    ];
+    await importMatchedResults(matches, 'coach-1', 'sdif_import', 'meet-1');
+
+    const payload = __update.mock.calls[0][0];
+    expect(payload).not.toHaveProperty('finalTimeDisplay');
+    expect(payload).not.toHaveProperty('final_time_display');
+    expect(payload).not.toHaveProperty('updatedAt');
+    expect(payload).not.toHaveProperty('updated_at');
+  });
+
+  it('swallows an entry-patch failure into result.errors so imported times survive (verbatim semantics)', async () => {
+    __state.updateResult = { error: { message: 'entry boom' } };
+
+    const matches: MatchResult[] = [
+      { record: makeRecord(), matchedSwimmer: swimmers[0], confidence: 'exact' },
+    ];
+    const result = await importMatchedResults(matches, 'coach-1', 'sdif_import', 'meet-1');
+
+    expect(result.imported).toBe(1); // the times survived
+    expect(result.errors.some((e) => e.includes('Meet entry update failed'))).toBe(true);
+    expect(result.errors.some((e) => e.includes('entry boom'))).toBe(true);
+  });
+
+  it('touches meet_entries ONLY when a meetId is provided', async () => {
+    const matches: MatchResult[] = [
+      { record: makeRecord(), matchedSwimmer: swimmers[0], confidence: 'exact' },
+    ];
+    await importMatchedResults(matches, 'coach-1');
+
+    expect(__update).not.toHaveBeenCalled();
   });
 
   it('creates and completes an import job for meet-result imports', async () => {
