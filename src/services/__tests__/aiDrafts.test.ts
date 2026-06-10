@@ -1,3 +1,6 @@
+// Phase E split: note writes land in canonical swimmer_notes (typed
+// source_audio_draft_id pointer, no coachName denorm); draft reads and
+// mutations stay on Firestore until Phase F.
 jest.mock('../../config/firebase', () => ({
   db: {},
   auth: { currentUser: { uid: 'test-uid' } },
@@ -16,7 +19,6 @@ jest.mock('firebase/firestore', () => ({
     path: (args as string[]).slice(1).join('/'),
     id: (args as string[])[args.length - 1],
   })),
-  addDoc: jest.fn().mockResolvedValue({ id: 'new-note-id' }),
   updateDoc: jest.fn().mockResolvedValue(undefined),
   serverTimestamp: jest.fn(() => new Date()),
   writeBatch: jest.fn(() => ({
@@ -27,10 +29,23 @@ jest.mock('firebase/firestore', () => ({
   })),
 }));
 
+jest.mock('../../config/supabase', () => {
+  const query: Record<string, jest.Mock> & { then: unknown } = {
+    insert: jest.fn(() => query),
+    then: (resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) =>
+      Promise.resolve({ data: null, error: null }).then(resolve, reject),
+  };
+  const supabase = { from: jest.fn(() => query) };
+  return { supabase, __query: query };
+});
+
 import { approveDraft, rejectDraft, approveAllDrafts, checkAndCompleteSession } from '../aiDrafts';
 import type { AIDraft, Swimmer } from '../../types/firestore.types';
 
 const firestore = require('firebase/firestore');
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const supabaseMock = require('../../config/supabase');
+const { supabase, __query } = supabaseMock;
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -98,7 +113,7 @@ describe('approveDraft', () => {
     );
   });
 
-  it('creates a swimmer note with the observation', async () => {
+  it('creates a canonical swimmer_notes row with the typed draft pointer', async () => {
     await approveDraft(
       'session-1',
       'draft-1',
@@ -108,14 +123,20 @@ describe('approveDraft', () => {
       undefined,
       consentedSwimmer,
     );
-    expect(firestore.addDoc).toHaveBeenCalledWith(
-      expect.objectContaining({ path: 'swimmers/sw-1/notes' }),
+    expect(supabase.from).toHaveBeenCalledWith('swimmer_notes');
+    expect(__query.insert).toHaveBeenCalledWith(
       expect.objectContaining({
+        swimmer_id: 'sw-1',
         content: 'Good pull pattern',
         tags: ['technique'],
         source: 'audio_ai',
+        source_audio_draft_id: 'draft-1',
+        coach_id: 'coach-1',
       }),
     );
+    const noteData = __query.insert.mock.calls[0][0];
+    expect(noteData).not.toHaveProperty('coachName');
+    expect(noteData).not.toHaveProperty('sourceRefId');
   });
 
   it('uses edited content and tags when provided', async () => {
@@ -128,7 +149,7 @@ describe('approveDraft', () => {
       ['speed'],
       consentedSwimmer,
     );
-    const noteData = firestore.addDoc.mock.calls[0][1];
+    const noteData = __query.insert.mock.calls[0][0];
     expect(noteData.content).toBe('Edited observation');
     expect(noteData.tags).toEqual(['speed']);
   });
@@ -146,7 +167,7 @@ describe('approveDraft', () => {
       ),
     ).rejects.toThrow(/media consent|cannot tag/i);
     expect(firestore.updateDoc).not.toHaveBeenCalled();
-    expect(firestore.addDoc).not.toHaveBeenCalled();
+    expect(__query.insert).not.toHaveBeenCalled();
   });
 });
 
@@ -161,7 +182,7 @@ describe('rejectDraft', () => {
 });
 
 describe('approveAllDrafts', () => {
-  it('returns the count of approved drafts', async () => {
+  it('returns the count and inserts one canonical note row per draft', async () => {
     const drafts = [
       { ...mockDraft, id: 'd1', sessionId: 's1' },
       { ...mockDraft, id: 'd2', sessionId: 's1', swimmerId: 'sw-2' },
@@ -172,15 +193,31 @@ describe('approveAllDrafts', () => {
     ]);
     const count = await approveAllDrafts(drafts, 'coach-1', 'Coach Kevin', swimmersById);
     expect(count).toBe(2);
+
+    expect(__query.insert).toHaveBeenCalledTimes(1); // one chunk
+    const rows = __query.insert.mock.calls[0][0];
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toEqual(
+      expect.objectContaining({
+        swimmer_id: 'sw-1',
+        source: 'audio_ai',
+        source_audio_draft_id: 'd1',
+        coach_id: 'coach-1',
+      }),
+    );
+    expect(rows[1].source_audio_draft_id).toBe('d2');
+    expect(rows[0]).not.toHaveProperty('coachName');
   });
 
-  it('commits batch with updates for each draft', async () => {
+  it('commits the draft-update batch on Firestore; the notes go to swimmer_notes (F seam)', async () => {
     const drafts = [{ ...mockDraft, id: 'd1', sessionId: 's1' }];
     await approveAllDrafts(drafts, 'coach-1', 'Coach Kevin', new Map([['sw-1', consentedSwimmer]]));
     const batch = firestore.writeBatch.mock.results[0].value;
     expect(batch.update).toHaveBeenCalled();
-    expect(batch.set).toHaveBeenCalled();
+    // the note no longer rides the Firestore batch
+    expect(batch.set).not.toHaveBeenCalled();
     expect(batch.commit).toHaveBeenCalled();
+    expect(supabase.from).toHaveBeenCalledWith('swimmer_notes');
   });
 
   it('rejects before committing when the roster map lacks a draft swimmer', async () => {
@@ -190,6 +227,7 @@ describe('approveAllDrafts', () => {
       /roster context/i,
     );
     expect(firestore.writeBatch).not.toHaveBeenCalled();
+    expect(__query.insert).not.toHaveBeenCalled();
   });
 });
 

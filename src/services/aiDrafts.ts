@@ -1,3 +1,7 @@
+// Phase E split (UNIFY/04, the ratified csvImport pattern): the NOTE writes
+// land in canonical swimmer_notes (typed source_audio_draft_id pointer — a
+// bare UUID until Phase F creates audio_session_drafts and its FK); the
+// audio-session/draft reads and mutations stay on Firestore until Phase F.
 import {
   collection,
   query,
@@ -6,13 +10,13 @@ import {
   onSnapshot,
   getDocs,
   updateDoc,
-  addDoc,
   doc,
   serverTimestamp,
   writeBatch,
   type Unsubscribe,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
+import { supabase } from '../config/supabase';
 import type { AIDraft, AudioSession, Swimmer } from '../types/firestore.types';
 import { assertCanTagSwimmer } from '../utils/mediaConsent';
 
@@ -78,17 +82,17 @@ export async function approveDraft(
     reviewedAt: serverTimestamp(),
   });
 
-  // 2. Create real SwimmerNote
-  await addDoc(collection(db, 'swimmers', draft.swimmerId, 'notes'), {
+  // 2. Create real SwimmerNote (coachName denorm gone — derived on read)
+  const { error } = await supabase.from('swimmer_notes').insert({
+    swimmer_id: draft.swimmerId,
     content,
     tags,
     source: 'audio_ai',
-    sourceRefId: draftId,
-    coachId: coachUid,
-    coachName: '', // Will be filled by caller or context
-    practiceDate: new Date().toISOString().split('T')[0],
-    createdAt: serverTimestamp(),
+    source_audio_draft_id: draftId,
+    coach_id: coachUid,
+    practice_date: new Date().toISOString().split('T')[0],
   });
+  if (error) throw error;
 }
 
 export async function rejectDraft(
@@ -121,6 +125,8 @@ export async function approveAllDrafts(
     assertCanTagSwimmer(swimmer);
   }
 
+  void coachName; // denormalized in Firestore; canonical derives it from profiles on read
+
   let approved = 0;
 
   // Process in batches of 400
@@ -134,23 +140,28 @@ export async function approveAllDrafts(
         reviewedBy: coachUid,
         reviewedAt: serverTimestamp(),
       });
-
-      const noteRef = doc(collection(db, 'swimmers', draft.swimmerId, 'notes'));
-      batch.set(noteRef, {
-        content: draft.observation,
-        tags: draft.tags,
-        source: 'audio_ai',
-        sourceRefId: draft.id,
-        coachId: coachUid,
-        coachName,
-        practiceDate: new Date().toISOString().split('T')[0],
-        createdAt: serverTimestamp(),
-      });
-
-      approved++;
     }
 
+    // Drafts stay Firestore until Phase F; notes are canonical. The old
+    // one-batch atomicity splits across the two stores at this seam (the
+    // accepted meetResultsImport trade): draft updates land, then the
+    // chunk's notes in one insert.
     await batch.commit();
+
+    const today = new Date().toISOString().split('T')[0];
+    const noteRows = chunk.map((draft) => ({
+      swimmer_id: draft.swimmerId,
+      content: draft.observation,
+      tags: draft.tags,
+      source: 'audio_ai',
+      source_audio_draft_id: draft.id,
+      coach_id: coachUid,
+      practice_date: today,
+    }));
+    const { error } = await supabase.from('swimmer_notes').insert(noteRows);
+    if (error) throw error;
+
+    approved += chunk.length;
   }
 
   return approved;

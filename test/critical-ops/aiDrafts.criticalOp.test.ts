@@ -1,3 +1,7 @@
+// Phase E split: approved drafts post canonical swimmer_notes rows (typed
+// source_audio_draft_id pointer, no coachName denorm); the draft documents
+// themselves stay on Firestore until Phase F. The BUG #4 media-consent
+// assertions are unchanged word-for-word.
 jest.mock('../../src/config/firebase', () => ({
   db: {},
   auth: { currentUser: { uid: 'coach-001' } },
@@ -16,7 +20,6 @@ jest.mock('firebase/firestore', () => ({
     path: (args as string[]).slice(1).join('/'),
     id: (args as string[])[args.length - 1],
   })),
-  addDoc: jest.fn().mockResolvedValue({ id: 'fixture-note-doc' }),
   updateDoc: jest.fn().mockResolvedValue(undefined),
   getDocs: jest.fn(),
   onSnapshot: jest.fn(),
@@ -29,6 +32,16 @@ jest.mock('firebase/firestore', () => ({
   })),
 }));
 
+jest.mock('../../src/config/supabase', () => {
+  const query: Record<string, jest.Mock> & { then: unknown } = {
+    insert: jest.fn(() => query),
+    then: (resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) =>
+      Promise.resolve({ data: null, error: null }).then(resolve, reject),
+  };
+  const supabase = { from: jest.fn(() => query) };
+  return { supabase, __notesQuery: query };
+});
+
 import {
   approveDraft,
   rejectDraft,
@@ -38,6 +51,9 @@ import {
 import { buildAIDraft, buildSwimmer, buildMediaConsent } from '../fixtures/coach';
 
 const firestore = require('firebase/firestore');
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const supabaseMock = require('../../src/config/supabase');
+const { __notesQuery } = supabaseMock;
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -67,15 +83,19 @@ describe('aiDrafts.approveDraft (critical op)', () => {
       expect.objectContaining({ path: 'audio_sessions/sess-AUD-001/drafts/draft-AI-001' }),
       expect.objectContaining({ approved: true, reviewedBy: 'coach-001' }),
     );
-    expect(firestore.addDoc).toHaveBeenCalledWith(
-      expect.objectContaining({ path: 'swimmers/swim-GO-001/notes' }),
+    expect(__notesQuery.insert).toHaveBeenCalledWith(
       expect.objectContaining({
+        swimmer_id: 'swim-GO-001',
         content: payload.observation,
         tags: payload.tags,
         source: 'audio_ai',
-        sourceRefId: 'draft-AI-001',
+        source_audio_draft_id: 'draft-AI-001',
+        coach_id: 'coach-001',
       }),
     );
+    const noteData = __notesQuery.insert.mock.calls[0][0];
+    expect(noteData).not.toHaveProperty('coachName'); // derived on read
+    expect(noteData).not.toHaveProperty('sourceRefId'); // typed pointer now
   });
 
   it('edge: edited content and tags override the draft values', async () => {
@@ -97,7 +117,7 @@ describe('aiDrafts.approveDraft (critical op)', () => {
       swimmer,
     );
 
-    const noteData = firestore.addDoc.mock.calls[0][1];
+    const noteData = __notesQuery.insert.mock.calls[0][0];
     expect(noteData.content).toBe('Edited observation');
     expect(noteData.tags).toEqual(['speed']);
   });
@@ -126,7 +146,7 @@ describe('aiDrafts.approveDraft (critical op)', () => {
         swimmer,
       ),
     ).rejects.toThrow(/media consent|cannot tag/i);
-    expect(firestore.addDoc).not.toHaveBeenCalled();
+    expect(__notesQuery.insert).not.toHaveBeenCalled();
     expect(firestore.updateDoc).not.toHaveBeenCalled();
   });
 
@@ -153,7 +173,7 @@ describe('aiDrafts.approveDraft (critical op)', () => {
         swimmer,
       ),
     ).rejects.toThrow(/do_not_photograph|cannot tag/i);
-    expect(firestore.addDoc).not.toHaveBeenCalled();
+    expect(__notesQuery.insert).not.toHaveBeenCalled();
   });
 
   it('happy path with roster: passes through when supplied swimmer is consented', async () => {
@@ -176,7 +196,7 @@ describe('aiDrafts.approveDraft (critical op)', () => {
         swimmer,
       ),
     ).resolves.toBeUndefined();
-    expect(firestore.addDoc).toHaveBeenCalled();
+    expect(__notesQuery.insert).toHaveBeenCalled();
   });
 });
 
@@ -191,7 +211,7 @@ describe('aiDrafts.rejectDraft (critical op)', () => {
 
   it('failure-shape: rejecting MUST NOT post a swimmer note', async () => {
     await rejectDraft('sess-AUD-001', 'draft-AI-001', 'coach-001');
-    expect(firestore.addDoc).not.toHaveBeenCalled();
+    expect(__notesQuery.insert).not.toHaveBeenCalled();
   });
 
   it('edge: rejection records the reviewer uid', async () => {
@@ -203,7 +223,7 @@ describe('aiDrafts.rejectDraft (critical op)', () => {
 });
 
 describe('aiDrafts.approveAllDrafts (critical op)', () => {
-  it('happy path: 4 drafts batch into one commit with set+update per draft', async () => {
+  it('happy path: 4 drafts — one draft-update batch commit + one canonical notes insert', async () => {
     const mockBatch = {
       set: jest.fn(),
       update: jest.fn(),
@@ -229,11 +249,14 @@ describe('aiDrafts.approveAllDrafts (critical op)', () => {
 
     expect(count).toBe(4);
     expect(mockBatch.update).toHaveBeenCalledTimes(4);
-    expect(mockBatch.set).toHaveBeenCalledTimes(4);
+    // notes no longer ride the Firestore batch — one swimmer_notes insert
+    expect(mockBatch.set).not.toHaveBeenCalled();
     expect(mockBatch.commit).toHaveBeenCalledTimes(1);
+    expect(__notesQuery.insert).toHaveBeenCalledTimes(1);
+    expect(__notesQuery.insert.mock.calls[0][0]).toHaveLength(4);
   });
 
-  it('edge: 401 drafts chunk into two commits at the 400-item limit', async () => {
+  it('edge: 401 drafts chunk into two commits + two note inserts at the 400-item limit', async () => {
     const mockBatch = {
       set: jest.fn(),
       update: jest.fn(),
@@ -259,7 +282,9 @@ describe('aiDrafts.approveAllDrafts (critical op)', () => {
 
     expect(count).toBe(401);
     expect(mockBatch.commit).toHaveBeenCalledTimes(2);
-    expect(mockBatch.set).toHaveBeenCalledTimes(401);
+    expect(__notesQuery.insert).toHaveBeenCalledTimes(2);
+    expect(__notesQuery.insert.mock.calls[0][0]).toHaveLength(400);
+    expect(__notesQuery.insert.mock.calls[1][0]).toHaveLength(1);
   });
 
   it('failure mode (BUG #4): rejects without committing when one tagged swimmer lacks consent', async () => {
@@ -295,7 +320,7 @@ describe('aiDrafts.approveAllDrafts (critical op)', () => {
     await expect(
       approveAllDrafts(drafts as never, 'coach-001', 'Coach One', swimmersById),
     ).rejects.toThrow(/media consent|cannot tag/i);
-    expect(mockBatch.set).not.toHaveBeenCalled();
+    expect(__notesQuery.insert).not.toHaveBeenCalled();
     expect(mockBatch.commit).not.toHaveBeenCalled();
   });
 });
