@@ -1,27 +1,28 @@
-jest.mock('../../src/config/firebase', () => ({
-  db: {},
-  auth: { currentUser: { uid: 'coach-001' } },
-  storage: {},
-  functions: {},
-}));
-
-jest.mock('firebase/firestore', () => ({
-  collection: jest.fn((...args: unknown[]) => ({
-    path: (args as string[]).slice(1).join('/'),
-  })),
-  query: jest.fn((ref: unknown) => ref),
-  where: jest.fn(),
-  orderBy: jest.fn(),
-  doc: jest.fn((...args: unknown[]) => ({
-    path: (args as string[]).slice(1).join('/'),
-    id: (args as string[])[args.length - 1],
-  })),
-  addDoc: jest.fn().mockResolvedValue({ id: 'fixture-rule-id' }),
-  updateDoc: jest.fn().mockResolvedValue(undefined),
-  deleteDoc: jest.fn().mockResolvedValue(undefined),
-  onSnapshot: jest.fn(),
-  serverTimestamp: jest.fn(() => new Date('2026-04-28T12:00:00.000Z')),
-}));
+// Data layer migrated Firestore -> Supabase (Phase G): the critical-op
+// subjects are unchanged; the mock is re-pointed at the Supabase client.
+jest.mock('../../src/config/supabase', () => {
+  const query: Record<string, jest.Mock> & { then: unknown } = {
+    select: jest.fn(() => query),
+    order: jest.fn(() => query),
+    eq: jest.fn(() => query),
+    insert: jest.fn(() => query),
+    update: jest.fn(() => query),
+    delete: jest.fn(() => query),
+    single: jest.fn(() => Promise.resolve({ data: { id: 'fixture-rule-id' }, error: null })),
+    then: (resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) =>
+      Promise.resolve({ data: [], error: null }).then(resolve, reject),
+  };
+  const channel = {
+    on: jest.fn(() => channel),
+    subscribe: jest.fn(() => channel),
+  };
+  const supabase = {
+    from: jest.fn(() => query),
+    channel: jest.fn(() => channel),
+    removeChannel: jest.fn(),
+  };
+  return { supabase, __query: query };
+});
 
 import {
   createNotificationRule,
@@ -31,7 +32,8 @@ import {
 } from '../../src/services/notificationRules';
 import { buildNotificationRule, buildSwimmer, buildPracticeDates } from '../fixtures/coach';
 
-const firestore = require('firebase/firestore');
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { __query } = require('../../src/config/supabase');
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -43,7 +45,7 @@ describe('notificationRules.createNotificationRule (critical op)', () => {
     const { id: _id, createdAt: _c, updatedAt: _u, ...input } = rule;
     const id = await createNotificationRule(input as never);
 
-    const payload = firestore.addDoc.mock.calls[0][1];
+    const payload = __query.insert.mock.calls[0][0];
     expect(payload.name).toBe('Test rule 001');
     expect(payload.trigger).toBe('attendance_streak');
     expect(payload.config).toEqual({ threshold: 5, group: undefined });
@@ -58,7 +60,7 @@ describe('notificationRules.createNotificationRule (critical op)', () => {
     });
     const { id: _id, createdAt: _c, updatedAt: _u, ...input } = rule;
     await createNotificationRule(input as never);
-    const payload = firestore.addDoc.mock.calls[0][1];
+    const payload = __query.insert.mock.calls[0][0];
     expect(payload.config.group).toBe('Diamond');
   });
 
@@ -66,7 +68,7 @@ describe('notificationRules.createNotificationRule (critical op)', () => {
     const rule = buildNotificationRule({ index: 3, enabled: false });
     const { id: _id, createdAt: _c, updatedAt: _u, ...input } = rule;
     await createNotificationRule(input as never);
-    const payload = firestore.addDoc.mock.calls[0][1];
+    const payload = __query.insert.mock.calls[0][0];
     expect(payload.enabled).toBe(false);
   });
 });

@@ -1,25 +1,37 @@
-jest.mock('../../config/firebase', () => ({
-  db: {},
-  auth: { currentUser: { uid: 'test-uid' } },
-  storage: {},
-  functions: {},
-}));
-
-jest.mock('firebase/firestore', () => ({
-  collection: jest.fn((...args: unknown[]) => ({ path: (args as string[]).slice(1).join('/') })),
-  query: jest.fn((ref: unknown) => ref),
-  where: jest.fn(),
-  orderBy: jest.fn(),
-  doc: jest.fn((...args: unknown[]) => ({
-    path: (args as string[]).slice(1).join('/'),
-    id: (args as string[])[args.length - 1],
-  })),
-  addDoc: jest.fn().mockResolvedValue({ id: 'mock-new-id' }),
-  updateDoc: jest.fn().mockResolvedValue(undefined),
-  deleteDoc: jest.fn().mockResolvedValue(undefined),
-  onSnapshot: jest.fn(),
-  serverTimestamp: jest.fn(() => new Date()),
-}));
+// Data layer migrated Firestore -> Supabase (UNIFY/01_CANONICAL_SCHEMA.sql:
+// notification_rules, Phase G). Same behavioral contract as before; the mock
+// is re-pointed at the Supabase client. The pure evaluation tests are
+// untouched — that module has no data access and did not move.
+jest.mock('../../config/supabase', () => {
+  const state: { selectRows: unknown[]; onHandler: ((p: unknown) => void) | null } = {
+    selectRows: [],
+    onHandler: null,
+  };
+  const query: Record<string, jest.Mock> & { then: unknown } = {
+    select: jest.fn(() => query),
+    order: jest.fn(() => query),
+    eq: jest.fn(() => query),
+    insert: jest.fn(() => query),
+    update: jest.fn(() => query),
+    delete: jest.fn(() => query),
+    single: jest.fn(() => Promise.resolve({ data: { id: 'new-rule-id' }, error: null })),
+    then: (resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) =>
+      Promise.resolve({ data: state.selectRows, error: null }).then(resolve, reject),
+  };
+  const channel = {
+    on: jest.fn((_evt: unknown, _filter: unknown, handler: (p: unknown) => void) => {
+      state.onHandler = handler;
+      return channel;
+    }),
+    subscribe: jest.fn(() => channel),
+  };
+  const supabase = {
+    from: jest.fn(() => query),
+    channel: jest.fn(() => channel),
+    removeChannel: jest.fn(),
+  };
+  return { supabase, __state: state, __query: query, __channel: channel };
+});
 
 import {
   subscribeNotificationRules,
@@ -30,10 +42,28 @@ import {
   evaluateMissedPractice,
 } from '../notificationRules';
 
-const firestore = require('firebase/firestore');
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const mock = require('../../config/supabase');
+const { supabase, __state, __query, __channel } = mock;
+
+const flush = () => new Promise((resolve) => setImmediate(resolve));
+
+const makeRow = (over: Record<string, unknown> = {}) => ({
+  id: 'rule-1',
+  name: 'Streak Alert',
+  trigger: 'attendance_streak',
+  enabled: true,
+  config: { threshold: 5, group: 'Gold' },
+  coach_id: 'coach-1',
+  created_at: '2026-06-01T00:00:00.000Z',
+  updated_at: '2026-06-01T00:00:00.000Z',
+  ...over,
+});
 
 beforeEach(() => {
   jest.clearAllMocks();
+  __state.selectRows = [];
+  __state.onHandler = null;
 });
 
 // ---------------------------------------------------------------------------
@@ -41,50 +71,77 @@ beforeEach(() => {
 // ---------------------------------------------------------------------------
 
 describe('subscribeNotificationRules', () => {
-  it('creates a query filtered by coachId and ordered by createdAt', () => {
-    firestore.onSnapshot.mockImplementation(() => jest.fn());
+  it('queries rules scoped to the coach, ordered by createdAt, and opens a realtime channel', () => {
     subscribeNotificationRules('coach-1', jest.fn());
-
-    expect(firestore.collection).toHaveBeenCalledWith({}, 'notification_rules');
-    expect(firestore.where).toHaveBeenCalledWith('coachId', '==', 'coach-1');
-    expect(firestore.orderBy).toHaveBeenCalledWith('createdAt', 'desc');
+    expect(supabase.from).toHaveBeenCalledWith('notification_rules');
+    expect(__query.eq).toHaveBeenCalledWith('coach_id', 'coach-1');
+    expect(__query.order).toHaveBeenCalledWith('created_at', { ascending: false });
+    expect(supabase.channel).toHaveBeenCalled();
+    expect(__channel.on).toHaveBeenCalledWith(
+      'postgres_changes',
+      expect.objectContaining({ table: 'notification_rules', filter: 'coach_id=eq.coach-1' }),
+      expect.any(Function),
+    );
+    expect(__channel.subscribe).toHaveBeenCalled();
   });
 
-  it('calls callback with mapped rules from snapshot', () => {
-    const mockDoc = {
-      id: 'rule-1',
-      data: () => ({ name: 'Streak Alert', trigger: 'attendance_streak', enabled: true }),
-    };
-    firestore.onSnapshot.mockImplementation((_q: unknown, cb: (snap: unknown) => void) => {
-      cb({ docs: [mockDoc] });
-      return jest.fn();
-    });
-
+  it('calls callback with mapped rules (coach_id -> coachId, null config -> {})', async () => {
+    __state.selectRows = [makeRow(), makeRow({ id: 'rule-2', config: null })];
     const callback = jest.fn();
     subscribeNotificationRules('coach-1', callback);
-
+    await flush();
     expect(callback).toHaveBeenCalledWith([
-      { id: 'rule-1', name: 'Streak Alert', trigger: 'attendance_streak', enabled: true },
+      {
+        id: 'rule-1',
+        name: 'Streak Alert',
+        trigger: 'attendance_streak',
+        enabled: true,
+        config: { threshold: 5, group: 'Gold' },
+        coachId: 'coach-1',
+        createdAt: new Date('2026-06-01T00:00:00.000Z'),
+        updatedAt: new Date('2026-06-01T00:00:00.000Z'),
+      },
+      expect.objectContaining({ id: 'rule-2', config: {} }),
     ]);
   });
 
-  it('returns an unsubscribe function', () => {
-    const unsub = jest.fn();
-    firestore.onSnapshot.mockReturnValue(unsub);
-
-    const result = subscribeNotificationRules('coach-1', jest.fn());
-    expect(result).toBe(unsub);
-  });
-
-  it('handles empty snapshot', () => {
-    firestore.onSnapshot.mockImplementation((_q: unknown, cb: (snap: unknown) => void) => {
-      cb({ docs: [] });
-      return jest.fn();
-    });
-
+  it('handles an empty list', async () => {
+    __state.selectRows = [];
     const callback = jest.fn();
     subscribeNotificationRules('coach-1', callback);
+    await flush();
     expect(callback).toHaveBeenCalledWith([]);
+  });
+
+  it('re-emits the full list when a realtime change fires', async () => {
+    __state.selectRows = [makeRow()];
+    const cb = jest.fn();
+    subscribeNotificationRules('coach-1', cb);
+    await flush();
+    expect(cb).toHaveBeenCalledTimes(1);
+    __state.onHandler?.({ eventType: 'UPDATE' });
+    await flush();
+    expect(cb).toHaveBeenCalledTimes(2);
+  });
+
+  it('returns a synchronous unsubscribe that removes the channel', () => {
+    const unsub = subscribeNotificationRules('coach-1', jest.fn());
+    expect(typeof unsub).toBe('function');
+    unsub();
+    expect(supabase.removeChannel).toHaveBeenCalledWith(__channel);
+  });
+
+  it('stops emitting after unsubscribe', async () => {
+    __state.selectRows = [makeRow()];
+    const cb = jest.fn();
+    const unsub = subscribeNotificationRules('coach-1', cb);
+    await flush();
+    expect(cb).toHaveBeenCalledTimes(1);
+    cb.mockClear();
+    unsub();
+    __state.onHandler?.({ eventType: 'UPDATE' });
+    await flush();
+    expect(cb).not.toHaveBeenCalled();
   });
 });
 
@@ -93,40 +150,39 @@ describe('subscribeNotificationRules', () => {
 // ---------------------------------------------------------------------------
 
 describe('createNotificationRule', () => {
-  it('calls addDoc with correct collection and data', async () => {
-    const rule = {
-      name: 'PR Alert',
-      trigger: 'pr_achieved' as const,
-      enabled: true,
-      config: { message: 'New PR!' },
-      coachId: 'coach-1',
-    };
-
-    const id = await createNotificationRule(rule);
-
-    expect(firestore.addDoc).toHaveBeenCalled();
-    const callArgs = firestore.addDoc.mock.calls[0];
-    expect(callArgs[0]).toEqual({ path: 'notification_rules' });
-    expect(callArgs[1]).toMatchObject({
+  it('inserts the rule with canonical columns and returns the new id', async () => {
+    const id = await createNotificationRule({
       name: 'PR Alert',
       trigger: 'pr_achieved',
       enabled: true,
+      config: { message: 'New PR!' },
       coachId: 'coach-1',
     });
-    expect(callArgs[1].createdAt).toBeDefined();
-    expect(callArgs[1].updatedAt).toBeDefined();
-    expect(id).toBe('mock-new-id');
+
+    expect(supabase.from).toHaveBeenCalledWith('notification_rules');
+    expect(__query.insert).toHaveBeenCalledWith({
+      name: 'PR Alert',
+      trigger: 'pr_achieved',
+      enabled: true,
+      config: { message: 'New PR!' },
+      coach_id: 'coach-1',
+    });
+    expect(id).toBe('new-rule-id');
   });
 
-  it('returns the new document id', async () => {
-    const id = await createNotificationRule({
+  it('never sends createdAt/updatedAt — the DB owns the timestamps', async () => {
+    await createNotificationRule({
       name: 'Test',
       trigger: 'custom',
       enabled: false,
       config: {},
       coachId: 'c1',
     });
-    expect(id).toBe('mock-new-id');
+    const payload = __query.insert.mock.calls[0][0];
+    expect(payload).not.toHaveProperty('createdAt');
+    expect(payload).not.toHaveProperty('updatedAt');
+    expect(payload).not.toHaveProperty('created_at');
+    expect(payload).not.toHaveProperty('updated_at');
   });
 });
 
@@ -135,21 +191,18 @@ describe('createNotificationRule', () => {
 // ---------------------------------------------------------------------------
 
 describe('updateNotificationRule', () => {
-  it('calls updateDoc with the right doc ref and updates', async () => {
+  it('updates only the provided fields, addressed by id', async () => {
     await updateNotificationRule('rule-1', { enabled: false });
 
-    expect(firestore.doc).toHaveBeenCalledWith({}, 'notification_rules', 'rule-1');
-    expect(firestore.updateDoc).toHaveBeenCalled();
-    const callArgs = firestore.updateDoc.mock.calls[0];
-    expect(callArgs[1]).toMatchObject({ enabled: false });
-    expect(callArgs[1].updatedAt).toBeDefined();
+    expect(supabase.from).toHaveBeenCalledWith('notification_rules');
+    expect(__query.update).toHaveBeenCalledWith({ enabled: false });
+    expect(__query.eq).toHaveBeenCalledWith('id', 'rule-1');
   });
 
-  it('includes updatedAt timestamp', async () => {
+  it('never sends updated_at — the BEFORE UPDATE trigger owns it', async () => {
     await updateNotificationRule('rule-2', { name: 'Renamed' });
-
-    const callArgs = firestore.updateDoc.mock.calls[0];
-    expect(callArgs[1].updatedAt).toBeDefined();
+    const patch = __query.update.mock.calls[0][0];
+    expect(patch).toEqual({ name: 'Renamed' });
   });
 });
 
@@ -158,11 +211,11 @@ describe('updateNotificationRule', () => {
 // ---------------------------------------------------------------------------
 
 describe('deleteNotificationRule', () => {
-  it('calls deleteDoc with the right doc ref', async () => {
+  it('deletes the row by id', async () => {
     await deleteNotificationRule('rule-99');
-
-    expect(firestore.doc).toHaveBeenCalledWith({}, 'notification_rules', 'rule-99');
-    expect(firestore.deleteDoc).toHaveBeenCalled();
+    expect(supabase.from).toHaveBeenCalledWith('notification_rules');
+    expect(__query.delete).toHaveBeenCalled();
+    expect(__query.eq).toHaveBeenCalledWith('id', 'rule-99');
   });
 });
 
