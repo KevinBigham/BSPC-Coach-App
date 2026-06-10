@@ -1,49 +1,35 @@
-jest.mock('../../src/config/firebase', () => ({
-  db: {},
-  auth: { currentUser: { uid: 'coach-001' } },
-  storage: {},
-  functions: {},
-}));
-
-// Phase E split: approved drafts post canonical swimmer_notes rows; draft
-// documents stay on Firestore until Phase F. BUG #4 media-consent
-// assertions unchanged word-for-word.
-jest.mock('firebase/firestore', () => ({
-  collection: jest.fn((...args: unknown[]) => ({
-    path: (args as string[]).slice(1).join('/'),
-  })),
-  doc: jest.fn((...args: unknown[]) => ({
-    path: (args as string[]).slice(1).join('/'),
-    id: (args as string[])[args.length - 1],
-  })),
-  updateDoc: jest.fn().mockResolvedValue(undefined),
-  serverTimestamp: jest.fn(() => new Date('2026-04-28T12:00:00.000Z')),
-}));
-
+// Phase F: re-pointed at the atomic approve_session_draft RPC (D-F6) — the
+// Firestore draft-update half died with the subcollection. BUG #4
+// media-consent assertions unchanged word-for-word; every rejection still
+// proves NO write happened (target moved updateDoc/insert -> rpc).
 jest.mock('../../src/config/supabase', () => {
   const query: Record<string, jest.Mock> & { then: unknown } = {
     insert: jest.fn(() => query),
+    update: jest.fn(() => query),
+    eq: jest.fn(() => query),
     then: (resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) =>
       Promise.resolve({ data: null, error: null }).then(resolve, reject),
   };
-  const supabase = { from: jest.fn(() => query) };
-  return { supabase, __notesQuery: query };
+  const supabase = {
+    from: jest.fn(() => query),
+    rpc: jest.fn(() => Promise.resolve({ data: 'note-uuid-1', error: null })),
+  };
+  return { supabase, __query: query };
 });
 
 import { approveVideoDraft, rejectVideoDraft } from '../../src/services/videoDrafts';
 import { buildVideoDraft, buildSwimmer, buildMediaConsent } from '../fixtures/coach';
 
-const firestore = require('firebase/firestore');
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const supabaseMock = require('../../src/config/supabase');
-const { __notesQuery } = supabaseMock;
+const { supabase, __query } = supabaseMock;
 
 beforeEach(() => {
   jest.clearAllMocks();
 });
 
 describe('videoDrafts.approveVideoDraft (critical op)', () => {
-  it('happy path: flips draft to approved and writes a video_ai swimmer note', async () => {
+  it('happy path: one atomic RPC carries the video_ai approve (note + review-stamp together)', async () => {
     const swimmer = buildSwimmer({
       index: 1,
       group: 'Gold',
@@ -53,19 +39,15 @@ describe('videoDrafts.approveVideoDraft (critical op)', () => {
 
     await approveVideoDraft('sess-VID-001', draft as never, 'coach-001', 'Coach One', swimmer);
 
-    expect(firestore.updateDoc).toHaveBeenCalledWith(
-      expect.objectContaining({ path: 'video_sessions/sess-VID-001/drafts/draft-VID-001' }),
-      expect.objectContaining({ approved: true, reviewedBy: 'coach-001' }),
-    );
-    expect(__notesQuery.insert).toHaveBeenCalledWith(
+    expect(supabase.rpc).toHaveBeenCalledTimes(1);
+    expect(supabase.rpc).toHaveBeenCalledWith(
+      'approve_session_draft',
       expect.objectContaining({
-        swimmer_id: 'swim-GO-001',
-        source: 'video_ai',
-        coach_id: 'coach-001',
+        p_kind: 'video',
+        p_draft_id: 'draft-VID-001',
+        p_coach_id: 'coach-001',
       }),
     );
-    const noteData = __notesQuery.insert.mock.calls[0][0];
-    expect(noteData).not.toHaveProperty('coachName'); // derived on read
   });
 
   it('edge: note content joins observation, diagnosis, and drill with line breaks', async () => {
@@ -84,10 +66,10 @@ describe('videoDrafts.approveVideoDraft (critical op)', () => {
 
     await approveVideoDraft('sess-VID-001', draft as never, 'coach-001', 'Coach One', swimmer);
 
-    const noteData = __notesQuery.insert.mock.calls[0][0];
-    expect(noteData.content).toContain('Late catch');
-    expect(noteData.content).toContain('Diagnosis: Dropped elbow');
-    expect(noteData.content).toContain('Drill: Sculling 4x25');
+    const content = supabase.rpc.mock.calls[0][1].p_content;
+    expect(content).toContain('Late catch');
+    expect(content).toContain('Diagnosis: Dropped elbow');
+    expect(content).toContain('Drill: Sculling 4x25');
   });
 
   it('edge: omits empty diagnosis/drill lines from the joined note', async () => {
@@ -106,10 +88,10 @@ describe('videoDrafts.approveVideoDraft (critical op)', () => {
 
     await approveVideoDraft('sess-VID-001', draft as never, 'coach-001', 'Coach One', swimmer);
 
-    const noteData = __notesQuery.insert.mock.calls[0][0];
-    expect(noteData.content).toBe('Strong kick');
-    expect(noteData.content).not.toContain('Diagnosis:');
-    expect(noteData.content).not.toContain('Drill:');
+    const content = supabase.rpc.mock.calls[0][1].p_content;
+    expect(content).toBe('Strong kick');
+    expect(content).not.toContain('Diagnosis:');
+    expect(content).not.toContain('Drill:');
   });
 
   // ---------------------------------------------------------------------------
@@ -127,8 +109,8 @@ describe('videoDrafts.approveVideoDraft (critical op)', () => {
     await expect(
       approveVideoDraft('sess-VID-001', draft as never, 'coach-001', 'Coach One', swimmer),
     ).rejects.toThrow(/media consent|cannot tag/i);
-    expect(__notesQuery.insert).not.toHaveBeenCalled();
-    expect(firestore.updateDoc).not.toHaveBeenCalled();
+    expect(supabase.rpc).not.toHaveBeenCalled();
+    expect(__query.update).not.toHaveBeenCalled();
   });
 
   it('failure mode (BUG #4): rejects when supplied swimmer has doNotPhotograph=true', async () => {
@@ -145,28 +127,28 @@ describe('videoDrafts.approveVideoDraft (critical op)', () => {
     await expect(
       approveVideoDraft('sess-VID-001', draft as never, 'coach-001', 'Coach One', swimmer),
     ).rejects.toThrow(/do_not_photograph|cannot tag/i);
-    expect(__notesQuery.insert).not.toHaveBeenCalled();
+    expect(supabase.rpc).not.toHaveBeenCalled();
   });
 });
 
 describe('videoDrafts.rejectVideoDraft (critical op)', () => {
   it('happy path: flips draft to approved=false', async () => {
     await rejectVideoDraft('sess-VID-001', 'draft-VID-001', 'coach-001');
-    expect(firestore.updateDoc).toHaveBeenCalledWith(
-      expect.objectContaining({ path: 'video_sessions/sess-VID-001/drafts/draft-VID-001' }),
-      expect.objectContaining({ approved: false, reviewedBy: 'coach-001' }),
-    );
+    expect(supabase.from).toHaveBeenCalledWith('video_session_drafts');
+    expect(__query.update).toHaveBeenCalledWith(expect.objectContaining({ approved: false }));
+    expect(__query.eq).toHaveBeenCalledWith('id', 'draft-VID-001');
   });
 
   it('failure-shape: rejecting MUST NOT post a swimmer note', async () => {
     await rejectVideoDraft('sess-VID-001', 'draft-VID-001', 'coach-001');
-    expect(__notesQuery.insert).not.toHaveBeenCalled();
+    expect(supabase.rpc).not.toHaveBeenCalled();
+    expect(__query.insert).not.toHaveBeenCalled();
   });
 
   it('edge: rejection records reviewer uid', async () => {
     await rejectVideoDraft('sess-VID-002', 'draft-VID-099', 'coach-007');
-    const call = firestore.updateDoc.mock.calls[0][1];
-    expect(call.reviewedBy).toBe('coach-007');
-    expect(call.reviewedAt).toBeDefined();
+    const patch = __query.update.mock.calls[0][0];
+    expect(patch.reviewed_by).toBe('coach-007');
+    expect(patch.reviewed_at).toBeDefined();
   });
 });

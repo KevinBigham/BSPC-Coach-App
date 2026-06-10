@@ -1,40 +1,28 @@
-jest.mock('../../config/firebase', () => ({
-  db: {},
-  auth: { currentUser: { uid: 'test-uid' } },
-  storage: {},
-  functions: {},
-}));
-
-jest.mock('firebase/firestore', () => ({
-  collection: jest.fn((...args: unknown[]) => ({ path: (args as string[]).slice(1).join('/') })),
-  query: jest.fn((ref: unknown) => ref),
-  where: jest.fn(),
-  orderBy: jest.fn(),
-  doc: jest.fn((...args: unknown[]) => ({
-    path: (args as string[]).slice(1).join('/'),
-    id: (args as string[])[args.length - 1],
-  })),
-  updateDoc: jest.fn().mockResolvedValue(undefined),
-  serverTimestamp: jest.fn(() => new Date()),
-}));
-
+// Phase F: approve goes through the atomic approve_session_draft RPC (D-F6)
+// — the Firestore draft-update half is gone with the subcollection. The
+// content-composition and consent pins are unchanged in substance; the
+// assertion target moved (updateDoc/insert -> rpc payload).
 jest.mock('../../config/supabase', () => {
   const query: Record<string, jest.Mock> & { then: unknown } = {
     insert: jest.fn(() => query),
+    update: jest.fn(() => query),
+    eq: jest.fn(() => query),
     then: (resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) =>
       Promise.resolve({ data: null, error: null }).then(resolve, reject),
   };
-  const supabase = { from: jest.fn(() => query) };
-  return { supabase, __notesQuery: query };
+  const supabase = {
+    from: jest.fn(() => query),
+    rpc: jest.fn(() => Promise.resolve({ data: 'note-uuid-1', error: null })),
+  };
+  return { supabase, __query: query };
 });
 
 import { approveVideoDraft, rejectVideoDraft, type VideoDraft } from '../videoDrafts';
 import type { Swimmer } from '../../types/firestore.types';
 
-const firestore = require('firebase/firestore');
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const supabaseMock = require('../../config/supabase');
-const { supabase, __notesQuery } = supabaseMock;
+const { supabase, __query } = supabaseMock;
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -86,64 +74,58 @@ const assertApproveVideoDraftRequiresRosterContext = () => {
 void assertApproveVideoDraftRequiresRosterContext;
 
 describe('approveVideoDraft', () => {
-  it('marks the draft as approved in Firestore', async () => {
+  it('calls the atomic RPC as kind=video with the draft id and reviewer (D-F6)', async () => {
     await approveVideoDraft('session-1', makeDraft(), 'coach-1', 'Coach Kevin', consentedSwimmer);
-    expect(firestore.updateDoc).toHaveBeenCalledWith(
-      expect.objectContaining({ path: 'video_sessions/session-1/drafts/draft-1' }),
-      expect.objectContaining({ approved: true, reviewedBy: 'coach-1' }),
-    );
-  });
-
-  it('creates a canonical swimmer_notes row from the draft content', async () => {
-    const draft = makeDraft();
-    await approveVideoDraft('session-1', draft, 'coach-1', 'Coach Kevin', consentedSwimmer);
-    expect(supabase.from).toHaveBeenCalledWith('swimmer_notes');
-    expect(__notesQuery.insert).toHaveBeenCalledWith(
+    expect(supabase.rpc).toHaveBeenCalledWith(
+      'approve_session_draft',
       expect.objectContaining({
-        swimmer_id: 'sw-1',
-        source: 'video_ai',
-        coach_id: 'coach-1',
+        p_kind: 'video',
+        p_draft_id: 'draft-1',
+        p_coach_id: 'coach-1',
+        p_tags: ['technique'],
       }),
     );
-    const noteData = __notesQuery.insert.mock.calls[0][0];
-    expect(noteData).not.toHaveProperty('coachName'); // derived on read
-    // video notes carry NO note-side pointer (posted_note_id is draft-side, F)
-    expect(noteData).not.toHaveProperty('source_audio_draft_id');
-    expect(noteData).not.toHaveProperty('source_voice_note_id');
   });
 
   it('note content includes observation, diagnosis, and drill', async () => {
-    const draft = makeDraft();
-    await approveVideoDraft('session-1', draft, 'coach-1', 'Coach Kevin', consentedSwimmer);
-    const noteData = __notesQuery.insert.mock.calls[0][0];
-    expect(noteData.content).toContain('Elbow drops on recovery');
-    expect(noteData.content).toContain('Diagnosis: Shoulder fatigue');
-    expect(noteData.content).toContain('Drill: Catch-up drill');
+    await approveVideoDraft('session-1', makeDraft(), 'coach-1', 'Coach Kevin', consentedSwimmer);
+    const content = supabase.rpc.mock.calls[0][1].p_content;
+    expect(content).toContain('Elbow drops on recovery');
+    expect(content).toContain('Diagnosis: Shoulder fatigue');
+    expect(content).toContain('Drill: Catch-up drill');
   });
 
   it('omits empty diagnosis/drill lines', async () => {
     const draft = makeDraft({ diagnosis: '', drillRecommendation: '' });
     await approveVideoDraft('session-1', draft, 'coach-1', 'Coach Kevin', consentedSwimmer);
-    const noteData = __notesQuery.insert.mock.calls[0][0];
-    expect(noteData.content).not.toContain('Diagnosis:');
-    expect(noteData.content).not.toContain('Drill:');
+    const content = supabase.rpc.mock.calls[0][1].p_content;
+    expect(content).not.toContain('Diagnosis:');
+    expect(content).not.toContain('Drill:');
   });
 
   it('rejects when roster context is present but media consent is missing', async () => {
     await expect(
       approveVideoDraft('session-1', makeDraft(), 'coach-1', 'Coach Kevin', blockedSwimmer),
     ).rejects.toThrow(/media consent|cannot tag/i);
-    expect(firestore.updateDoc).not.toHaveBeenCalled();
-    expect(__notesQuery.insert).not.toHaveBeenCalled();
+    expect(supabase.rpc).not.toHaveBeenCalled();
+  });
+
+  it('surfaces an RPC error', async () => {
+    supabase.rpc.mockResolvedValueOnce({ data: null, error: new Error('draft not found') });
+    await expect(
+      approveVideoDraft('session-1', makeDraft(), 'coach-1', 'Coach Kevin', consentedSwimmer),
+    ).rejects.toThrow('draft not found');
   });
 });
 
 describe('rejectVideoDraft', () => {
-  it('marks the draft as rejected', async () => {
+  it('marks the draft as rejected with reviewer provenance — no RPC, no note', async () => {
     await rejectVideoDraft('session-1', 'draft-1', 'coach-1');
-    expect(firestore.updateDoc).toHaveBeenCalledWith(
-      expect.objectContaining({ path: 'video_sessions/session-1/drafts/draft-1' }),
-      expect.objectContaining({ approved: false, reviewedBy: 'coach-1' }),
+    expect(supabase.from).toHaveBeenCalledWith('video_session_drafts');
+    expect(__query.update).toHaveBeenCalledWith(
+      expect.objectContaining({ approved: false, reviewed_by: 'coach-1' }),
     );
+    expect(__query.eq).toHaveBeenCalledWith('id', 'draft-1');
+    expect(supabase.rpc).not.toHaveBeenCalled();
   });
 });
