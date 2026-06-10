@@ -10,8 +10,7 @@ import {
 import NetInfo from '@react-native-community/netinfo';
 import { Audio } from 'expo-av';
 import { Pause, Play, Mic, StopCircle } from 'lucide-react-native';
-import { getDownloadURL, ref } from 'firebase/storage';
-import { storage } from '../config/firebase';
+import { getSignedFileUrl } from '../services/mediaUpload';
 import { useToast } from '../contexts/ToastContext';
 import { colors, spacing, fontSize, borderRadius, fontFamily } from '../config/theme';
 import { getTodayString } from '../utils/time';
@@ -288,7 +287,8 @@ export default function VoiceNoteRecorder({
     }
 
     try {
-      const downloadUrl = await getDownloadURL(ref(storage, note.storagePath));
+      // Phase F: playback derives a fresh signed URL from the canonical path
+      const downloadUrl = await getSignedFileUrl('media-audio', note.storagePath, 3600);
       const { sound } = await Audio.Sound.createAsync(
         { uri: downloadUrl },
         { shouldPlay: true },

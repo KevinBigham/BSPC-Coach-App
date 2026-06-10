@@ -1,13 +1,12 @@
-// Data layer migrated Firestore -> Supabase (UNIFY/01:swimmer_voice_notes,
-// Phase E) — ROWS ONLY. The audio FILES, the upload path and the offline
-// AsyncStorage queue stay on Firebase Storage until Phase F (the Phase B
-// profilePhoto precedent): storage_path keeps holding a Firebase Storage
-// path string. The companion swimmer note still goes through notes.ts
-// (which now writes swimmer_notes with the typed source_voice_note_id).
+// Data layer fully canonical: rows since Phase E, audio FILES since Phase F
+// (D-F1) — uploads land in the 'media-audio' bucket under the UNCHANGED
+// path layout (audio/swimmers/{id}/{date}/{noteId}.m4a), so storage_path
+// stays host-agnostic. The offline AsyncStorage retry queue is untouched.
+// The companion swimmer note still goes through notes.ts (typed
+// source_voice_note_id pointer).
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
-import { storage } from '../config/firebase';
 import { supabase } from '../config/supabase';
+import { uploadFileToBucket, getSignedFileUrl } from './mediaUpload';
 import { addNote } from './notes';
 import type { QueuedSwimmerVoiceNoteUpload, SwimmerVoiceNote } from '../types/voiceNote';
 import { logger } from '../utils/logger';
@@ -199,27 +198,13 @@ export async function uploadSwimmerVoiceNote(
   noteId: string,
   onProgress?: (percent: number) => void,
 ): Promise<{ storagePath: string; downloadUrl: string }> {
-  const response = await fetch(uri);
-  const blob = await response.blob();
   const storagePath = `audio/swimmers/${swimmerId}/${practiceDate}/${noteId}.m4a`;
-  const storageRef = ref(storage, storagePath);
 
-  return new Promise((resolve, reject) => {
-    const uploadTask = uploadBytesResumable(storageRef, blob);
-
-    uploadTask.on(
-      'state_changed',
-      (snapshot) => {
-        const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-        onProgress?.(progress);
-      },
-      (error) => reject(error),
-      async () => {
-        const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
-        resolve({ storagePath, downloadUrl });
-      },
-    );
-  });
+  await uploadFileToBucket('media-audio', storagePath, uri, 'audio/mp4', onProgress);
+  // Contract parity: a fetchable URL comes back (signed, 1h) but is never
+  // persisted — playback derives fresh URLs from storage_path.
+  const downloadUrl = await getSignedFileUrl('media-audio', storagePath, 3600);
+  return { storagePath, downloadUrl };
 }
 
 export async function enqueueSwimmerVoiceNoteUpload(

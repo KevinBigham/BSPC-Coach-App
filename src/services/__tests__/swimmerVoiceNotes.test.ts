@@ -1,10 +1,9 @@
-// Data layer migrated Firestore -> Supabase (UNIFY/01:swimmer_voice_notes,
-// Phase E) — rows only. The audio files, upload path and AsyncStorage queue
-// stay on Firebase Storage until Phase F, so those tests keep their
-// firebase/storage mocks unchanged.
-jest.mock('../../config/firebase', () => ({
-  db: {},
-  storage: {},
+// Data layer fully canonical: rows since Phase E, audio FILES since Phase F
+// (the media-audio bucket, path layout UNCHANGED). The AsyncStorage retry
+// queue is untouched.
+jest.mock('../mediaUpload', () => ({
+  uploadFileToBucket: jest.fn().mockResolvedValue('mocked-path'),
+  getSignedFileUrl: jest.fn().mockResolvedValue('https://signed.url/voice-note.m4a'),
 }));
 
 jest.mock('../notes', () => ({
@@ -46,17 +45,6 @@ jest.mock('../../config/supabase', () => {
   };
   return { supabase, __state: state, __query: query, __channel: channel };
 });
-
-jest.mock('firebase/storage', () => ({
-  ref: jest.fn((_storage: unknown, path: string) => ({ path })),
-  uploadBytesResumable: jest.fn(() => ({
-    on: jest.fn((_event: string, _progress: unknown, _error: unknown, complete: () => void) =>
-      complete(),
-    ),
-    snapshot: { ref: { path: 'mock/path' } },
-  })),
-  getDownloadURL: jest.fn().mockResolvedValue('https://mock.url/voice-note.m4a'),
-}));
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
@@ -219,20 +207,27 @@ describe('updateSwimmerVoiceNote', () => {
 });
 
 describe('uploadSwimmerVoiceNote', () => {
-  it('uploads to the swimmer-scoped FIREBASE storage path (files stay until Phase F)', async () => {
-    global.fetch = jest
-      .fn()
-      .mockResolvedValue({ blob: jest.fn().mockResolvedValue(new Blob()) }) as jest.Mock;
-
+  it('uploads into media-audio under the UNCHANGED swimmer-scoped path (Phase F)', async () => {
+    const onProgress = jest.fn();
     const result = await uploadSwimmerVoiceNote(
       'file://voice-note.m4a',
       'sw-1',
       '2026-04-18',
       'voice-1',
+      onProgress,
     );
 
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { uploadFileToBucket } = require('../mediaUpload');
+    expect(uploadFileToBucket).toHaveBeenCalledWith(
+      'media-audio',
+      'audio/swimmers/sw-1/2026-04-18/voice-1.m4a',
+      'file://voice-note.m4a',
+      'audio/mp4',
+      onProgress,
+    );
     expect(result.storagePath).toBe('audio/swimmers/sw-1/2026-04-18/voice-1.m4a');
-    expect(result.downloadUrl).toBe('https://mock.url/voice-note.m4a');
+    expect(result.downloadUrl).toBe('https://signed.url/voice-note.m4a');
   });
 });
 

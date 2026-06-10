@@ -1,11 +1,12 @@
-import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
-import { storage } from '../config/firebase';
+// Phase F (D-F1/D-F3): photo binaries live in the PRIVATE 'profile-photos'
+// bucket. The persisted profile_photo_url becomes a LONG-LIVED SIGNED
+// capability URL — shape-identical to the Firebase token URL it replaces
+// (an unguessable link that renders without a login). That URL is the
+// parents' ONE media affordance, unchanged by the move. updated_at is owned
+// by the DB trigger.
 import { supabase } from '../config/supabase';
+import { uploadFileToBucket, getSignedFileUrl, LONG_LIVED_URL_SECONDS } from './mediaUpload';
 
-// Photo binaries stay on Firebase Storage until the media phase (UNIFY/04
-// Phase F); the swimmer row's photo URL now lives on canonical swimmers.
-// profile_photo_url is host-agnostic, so the stored download URL keeps
-// working across the cutover. updated_at is owned by the DB trigger.
 async function setSwimmerPhotoUrl(swimmerId: string, url: string | null): Promise<void> {
   const { error } = await supabase
     .from('swimmers')
@@ -19,40 +20,19 @@ export async function uploadProfilePhoto(
   uri: string,
   onProgress?: (percent: number) => void,
 ): Promise<string> {
-  const response = await fetch(uri);
-  const blob = await response.blob();
   const storagePath = `profiles/${swimmerId}/photo.jpg`;
-  const storageRef = ref(storage, storagePath);
 
-  return new Promise((resolve, reject) => {
-    const uploadTask = uploadBytesResumable(storageRef, blob);
-
-    uploadTask.on(
-      'state_changed',
-      (snapshot) => {
-        const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-        onProgress?.(progress);
-      },
-      (error) => reject(error),
-      async () => {
-        try {
-          const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
-          await setSwimmerPhotoUrl(swimmerId, downloadUrl);
-          resolve(downloadUrl);
-        } catch (error) {
-          reject(error);
-        }
-      },
-    );
-  });
+  // upsert: overwrite-by-path — the Firebase fixed-name semantics survive
+  await uploadFileToBucket('profile-photos', storagePath, uri, 'image/jpeg', onProgress, true);
+  const downloadUrl = await getSignedFileUrl('profile-photos', storagePath, LONG_LIVED_URL_SECONDS);
+  await setSwimmerPhotoUrl(swimmerId, downloadUrl);
+  return downloadUrl;
 }
 
 export async function deleteProfilePhoto(swimmerId: string): Promise<void> {
   const storagePath = `profiles/${swimmerId}/photo.jpg`;
-  try {
-    await deleteObject(ref(storage, storagePath));
-  } catch {
-    // Intentionally not logged: missing storage object still needs the profile field cleared.
-  }
+  // remove() reports a missing object as an error value, never a throw —
+  // either way the row field still gets cleared (the Firebase-era behavior).
+  await supabase.storage.from('profile-photos').remove([storagePath]);
   await setSwimmerPhotoUrl(swimmerId, null);
 }

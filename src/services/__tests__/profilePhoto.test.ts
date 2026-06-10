@@ -1,57 +1,55 @@
-// Photo binaries stay on Firebase Storage (UNIFY Phase F); the swimmer-row
-// photo URL write migrated to canonical swimmers (Phase B). Same behavioral
-// contract; the row-write mock is re-pointed at the Supabase client.
-jest.mock('../../config/firebase', () => ({
-  db: {},
-  auth: { currentUser: { uid: 'test-uid' } },
-  storage: {},
-  functions: {},
-}));
-
-const mockUploadOn = jest.fn(
-  (_event: string, _progress: unknown, _error: unknown, complete: () => void) => complete(),
-);
-
-jest.mock('firebase/storage', () => ({
-  ref: jest.fn((_s: unknown, path: string) => ({ path })),
-  uploadBytesResumable: jest.fn(() => ({
-    on: mockUploadOn,
-    snapshot: { ref: { path: 'mock/path' } },
-  })),
-  getDownloadURL: jest.fn().mockResolvedValue('https://storage.example.com/photo.jpg'),
-  deleteObject: jest.fn().mockResolvedValue(undefined),
+// Phase F: photo binaries live in the private profile-photos bucket; the
+// persisted profile_photo_url is a LONG-LIVED signed capability URL (D-F3 —
+// the parents' one media affordance, shape-identical to the Firebase token
+// URL it replaces). Same behavioral contract; the storage mock is re-pointed
+// at the shared mediaUpload helper.
+jest.mock('../mediaUpload', () => ({
+  uploadFileToBucket: jest.fn().mockResolvedValue('mocked-path'),
+  getSignedFileUrl: jest.fn().mockResolvedValue('https://signed.example.com/photo.jpg'),
+  LONG_LIVED_URL_SECONDS: 315360000,
 }));
 
 jest.mock('../../config/supabase', () => {
+  const storageApi = {
+    remove: jest.fn().mockResolvedValue({ data: null, error: null }),
+  };
   const query: Record<string, jest.Mock> = {
     update: jest.fn(() => query),
     eq: jest.fn(() => Promise.resolve({ error: null })),
   };
-  const supabase = { from: jest.fn(() => query) };
-  return { supabase, __query: query };
+  const supabase = { from: jest.fn(() => query), storage: { from: jest.fn(() => storageApi) } };
+  return { supabase, __query: query, __storageApi: storageApi };
 });
 
-// Mock fetch for blob creation
-global.fetch = jest.fn().mockResolvedValue({
-  blob: jest.fn().mockResolvedValue(new Blob(['photo'])),
-}) as any;
-
 import { uploadProfilePhoto, deleteProfilePhoto } from '../profilePhoto';
-import { deleteObject } from 'firebase/storage';
+import { uploadFileToBucket, getSignedFileUrl } from '../mediaUpload';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-const { supabase, __query } = require('../../config/supabase');
+const { supabase, __query, __storageApi } = require('../../config/supabase');
 
 describe('profilePhoto', () => {
   beforeEach(() => jest.clearAllMocks());
 
   describe('uploadProfilePhoto', () => {
-    it('uploads the photo and writes the URL to the swimmer row', async () => {
+    it('uploads with upsert (overwrite-by-path) and writes the LONG-LIVED signed URL to the swimmer row', async () => {
       const url = await uploadProfilePhoto('sw1', 'file:///photo.jpg');
-      expect(url).toBe('https://storage.example.com/photo.jpg');
+      expect(uploadFileToBucket).toHaveBeenCalledWith(
+        'profile-photos',
+        'profiles/sw1/photo.jpg',
+        'file:///photo.jpg',
+        'image/jpeg',
+        undefined,
+        true, // upsert — the Firebase fixed-name overwrite semantics
+      );
+      expect(getSignedFileUrl).toHaveBeenCalledWith(
+        'profile-photos',
+        'profiles/sw1/photo.jpg',
+        315360000, // ~10y capability URL, parity with Firebase token URLs
+      );
+      expect(url).toBe('https://signed.example.com/photo.jpg');
       expect(supabase.from).toHaveBeenCalledWith('swimmers');
       expect(__query.update).toHaveBeenCalledWith({
-        profile_photo_url: 'https://storage.example.com/photo.jpg',
+        profile_photo_url: 'https://signed.example.com/photo.jpg',
       });
       expect(__query.eq).toHaveBeenCalledWith('id', 'sw1');
     });
@@ -61,32 +59,32 @@ describe('profilePhoto', () => {
       expect(__query.update.mock.calls[0][0]).not.toHaveProperty('updated_at');
     });
 
-    it('calls onProgress callback', async () => {
-      // Override the on mock to call progress
-      mockUploadOn.mockImplementationOnce(
-        (_event: string, progress: any, _error: unknown, complete: () => void) => {
-          progress({ bytesTransferred: 50, totalBytes: 100 });
-          complete();
-        },
-      );
+    it('threads the onProgress callback through to the upload helper', async () => {
       const onProgress = jest.fn();
       await uploadProfilePhoto('sw1', 'file:///photo.jpg', onProgress);
-      expect(onProgress).toHaveBeenCalledWith(50);
+      expect(uploadFileToBucket).toHaveBeenCalledWith(
+        'profile-photos',
+        'profiles/sw1/photo.jpg',
+        'file:///photo.jpg',
+        'image/jpeg',
+        onProgress,
+        true,
+      );
     });
   });
 
   describe('deleteProfilePhoto', () => {
-    it('deletes the storage file and clears the swimmer row field', async () => {
+    it('removes the storage object and clears the swimmer row field', async () => {
       await deleteProfilePhoto('sw1');
-      expect(deleteObject).toHaveBeenCalled();
+      expect(supabase.storage.from).toHaveBeenCalledWith('profile-photos');
+      expect(__storageApi.remove).toHaveBeenCalledWith(['profiles/sw1/photo.jpg']);
       expect(__query.update).toHaveBeenCalledWith({ profile_photo_url: null });
       expect(__query.eq).toHaveBeenCalledWith('id', 'sw1');
     });
 
-    it('handles missing storage file gracefully', async () => {
-      (deleteObject as jest.Mock).mockRejectedValueOnce(new Error('not found'));
+    it('still clears the row field when the storage object is missing', async () => {
+      __storageApi.remove.mockResolvedValueOnce({ data: null, error: new Error('not found') });
       await deleteProfilePhoto('sw1');
-      // Should still clear the row field
       expect(__query.update).toHaveBeenCalledWith({ profile_photo_url: null });
     });
   });
