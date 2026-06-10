@@ -1,45 +1,40 @@
-jest.mock('../../src/config/firebase', () => ({
-  db: {},
-  auth: { currentUser: { uid: 'coach-001' } },
-  storage: {},
-  functions: {},
-}));
+// Phase F: re-pointed at canonical audio_sessions (Supabase). Same critical
+// subjects — session creation shape, lifecycle walking — plus the D-F2 pin:
+// the pipeline kick fires exactly once, on the flip to 'uploaded'.
+jest.mock('../../src/config/supabase', () => {
+  const query: Record<string, jest.Mock> & { then: unknown } = {
+    select: jest.fn(() => query),
+    eq: jest.fn(() => query),
+    order: jest.fn(() => query),
+    limit: jest.fn(() => query),
+    insert: jest.fn(() => query),
+    update: jest.fn(() => query),
+    single: jest.fn(() => Promise.resolve({ data: { id: 'sess-AUD-fixture' }, error: null })),
+    then: (resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) =>
+      Promise.resolve({ data: [], error: null }).then(resolve, reject),
+  };
+  const supabase = { from: jest.fn(() => query) };
+  return { supabase, __query: query };
+});
 
-jest.mock('firebase/firestore', () => ({
-  collection: jest.fn((...args: unknown[]) => ({
-    path: (args as string[]).slice(1).join('/'),
-  })),
-  query: jest.fn((ref: unknown) => ref),
-  where: jest.fn(),
-  orderBy: jest.fn(),
-  limit: jest.fn(),
-  doc: jest.fn((...args: unknown[]) => ({
-    path: (args as string[]).slice(1).join('/'),
-    id: (args as string[])[args.length - 1],
-  })),
-  addDoc: jest.fn().mockResolvedValue({ id: 'sess-AUD-fixture' }),
-  updateDoc: jest.fn().mockResolvedValue(undefined),
-  onSnapshot: jest.fn(),
-  serverTimestamp: jest.fn(() => new Date('2026-04-28T12:00:00.000Z')),
-}));
-
-jest.mock('firebase/storage', () => ({
-  ref: jest.fn((_s: unknown, path: string) => ({ path })),
-  uploadBytesResumable: jest.fn(),
-  getDownloadURL: jest.fn(),
+jest.mock('../../src/services/mediaPipeline', () => ({
+  requestSessionProcessing: jest.fn().mockResolvedValue(undefined),
 }));
 
 import { createAudioSession, updateAudioSession } from '../../src/services/audio';
+import { requestSessionProcessing } from '../../src/services/mediaPipeline';
 import { buildAudioSession, buildCoach } from '../fixtures/coach';
 
-const firestore = require('firebase/firestore');
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const mock = require('../../src/config/supabase');
+const { supabase, __query } = mock;
 
 beforeEach(() => {
   jest.clearAllMocks();
 });
 
 describe('audio.createAudioSession (critical op)', () => {
-  it('happy path: writes a session in the uploading state with empty storagePath', async () => {
+  it('happy path: writes the session in the uploading state and the P1-4 junction rows', async () => {
     const coach = buildCoach();
     const id = await createAudioSession(
       coach.uid,
@@ -51,39 +46,40 @@ describe('audio.createAudioSession (critical op)', () => {
     );
 
     expect(id).toBe('sess-AUD-fixture');
-    const payload = firestore.addDoc.mock.calls[0][1];
-    expect(payload).toMatchObject({
-      coachId: coach.uid,
-      coachName: coach.displayName,
-      duration: 600,
-      practiceDate: '2026-04-28',
-      group: 'Gold',
-      selectedSwimmerIds: ['swimmer-001'],
+    expect(supabase.from).toHaveBeenCalledWith('audio_sessions');
+    expect(supabase.from).toHaveBeenCalledWith('audio_session_swimmers');
+    expect(__query.insert.mock.calls[0][0]).toMatchObject({
+      coach_id: coach.uid,
+      duration_sec: 600,
+      practice_date: '2026-04-28',
+      practice_group: 'Gold',
       status: 'uploading',
-      storagePath: '',
-      transcription: null,
-      errorMessage: null,
+      storage_path: '',
     });
+    expect(__query.insert.mock.calls[1][0]).toEqual([
+      { session_id: 'sess-AUD-fixture', swimmer_id: 'swimmer-001' },
+    ]);
   });
 
-  it('edge: defaults group to null when omitted', async () => {
+  it('edge: defaults practice_group to null when omitted', async () => {
     const coach = buildCoach();
     await createAudioSession(coach.uid, coach.displayName, 300, '2026-04-28', ['swimmer-001']);
-    const payload = firestore.addDoc.mock.calls[0][1];
-    expect(payload.group).toBeNull();
+    expect(__query.insert.mock.calls[0][0].practice_group).toBeNull();
   });
 
-  it('failure-shape: createdAt and updatedAt are both stamped at write time', async () => {
+  it('failure-shape: timestamps and the coach-name denorm are NOT client-written (DB-owned / derived on read)', async () => {
     const coach = buildCoach();
     await createAudioSession(coach.uid, coach.displayName, 60, '2026-04-28', ['swimmer-001']);
-    const payload = firestore.addDoc.mock.calls[0][1];
-    expect(payload.createdAt).toBeDefined();
-    expect(payload.updatedAt).toBeDefined();
+    const payload = __query.insert.mock.calls[0][0];
+    expect(payload).not.toHaveProperty('created_at');
+    expect(payload).not.toHaveProperty('updated_at');
+    expect(payload).not.toHaveProperty('coachName');
+    expect(payload).not.toHaveProperty('coach_name');
   });
 });
 
 describe('audio session lifecycle', () => {
-  it('walks the documented status sequence via updateAudioSession', async () => {
+  it('walks the documented status sequence and kicks the pipeline exactly once — on uploaded (D-F2)', async () => {
     const session = buildAudioSession({ index: 1, status: 'uploading' });
     const sequence: Array<typeof session.status> = [
       'uploaded',
@@ -97,11 +93,11 @@ describe('audio session lifecycle', () => {
       await updateAudioSession(session.id, { status });
     }
 
-    expect(firestore.updateDoc).toHaveBeenCalledTimes(sequence.length);
+    expect(__query.update).toHaveBeenCalledTimes(sequence.length);
     sequence.forEach((status, i) => {
-      const [, payload] = firestore.updateDoc.mock.calls[i];
-      expect(payload.status).toBe(status);
-      expect(payload.updatedAt).toBeDefined();
+      expect(__query.update.mock.calls[i][0]).toEqual({ status });
     });
+    expect(requestSessionProcessing).toHaveBeenCalledTimes(1);
+    expect(requestSessionProcessing).toHaveBeenCalledWith('audio', session.id);
   });
 });

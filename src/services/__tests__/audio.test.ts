@@ -1,35 +1,45 @@
-jest.mock('../../config/firebase', () => ({
-  db: {},
-  auth: { currentUser: { uid: 'test-uid' } },
-  storage: {},
-  functions: {},
+// Data layer migrated Firestore -> Supabase (UNIFY/01:audio_sessions, Phase F).
+// Same behavioral contract; the mock is re-pointed at the Supabase client.
+// New pins: the P1-4 junction write/read, the coachName embed derivation, and
+// the D-F2 pipeline kick on the status flip to 'uploaded'.
+jest.mock('../../config/supabase', () => {
+  const state: { selectRows: unknown[]; onHandler: ((p: unknown) => void) | null } = {
+    selectRows: [],
+    onHandler: null,
+  };
+  const query: Record<string, jest.Mock> & { then: unknown } = {
+    select: jest.fn(() => query),
+    eq: jest.fn(() => query),
+    order: jest.fn(() => query),
+    limit: jest.fn(() => query),
+    insert: jest.fn(() => query),
+    update: jest.fn(() => query),
+    single: jest.fn(() => Promise.resolve({ data: { id: 'new-audio-session-id' }, error: null })),
+    then: (resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) =>
+      Promise.resolve({ data: state.selectRows, error: null }).then(resolve, reject),
+  };
+  const channel = {
+    on: jest.fn((_evt: unknown, _filter: unknown, handler: (p: unknown) => void) => {
+      state.onHandler = handler;
+      return channel;
+    }),
+    subscribe: jest.fn(() => channel),
+  };
+  const supabase = {
+    from: jest.fn(() => query),
+    channel: jest.fn(() => channel),
+    removeChannel: jest.fn(),
+  };
+  return { supabase, __state: state, __query: query, __channel: channel };
+});
+
+jest.mock('../mediaUpload', () => ({
+  uploadFileToBucket: jest.fn().mockResolvedValue('mocked-path'),
+  getSignedFileUrl: jest.fn().mockResolvedValue('https://signed.url/audio.m4a'),
 }));
 
-jest.mock('firebase/firestore', () => ({
-  collection: jest.fn((...args: unknown[]) => ({ path: (args as string[]).slice(1).join('/') })),
-  query: jest.fn((ref: unknown) => ref),
-  where: jest.fn(),
-  orderBy: jest.fn(),
-  limit: jest.fn(),
-  doc: jest.fn((...args: unknown[]) => ({
-    path: (args as string[]).slice(1).join('/'),
-    id: (args as string[])[args.length - 1],
-  })),
-  addDoc: jest.fn().mockResolvedValue({ id: 'new-audio-id' }),
-  updateDoc: jest.fn().mockResolvedValue(undefined),
-  onSnapshot: jest.fn(),
-  serverTimestamp: jest.fn(() => new Date()),
-}));
-
-jest.mock('firebase/storage', () => ({
-  ref: jest.fn((_s: unknown, path: string) => ({ path })),
-  uploadBytesResumable: jest.fn(() => ({
-    on: jest.fn((_event: string, _progress: unknown, _error: unknown, complete: () => void) =>
-      complete(),
-    ),
-    snapshot: { ref: { path: 'mock/path' } },
-  })),
-  getDownloadURL: jest.fn().mockResolvedValue('https://mock.url/audio.m4a'),
+jest.mock('../mediaPipeline', () => ({
+  requestSessionProcessing: jest.fn().mockResolvedValue(undefined),
 }));
 
 import {
@@ -38,83 +48,189 @@ import {
   updateAudioSession,
   uploadAudio,
 } from '../audio';
+import { uploadFileToBucket, getSignedFileUrl } from '../mediaUpload';
+import { requestSessionProcessing } from '../mediaPipeline';
 
-const firestore = require('firebase/firestore');
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const mock = require('../../config/supabase');
+const { supabase, __state, __query, __channel } = mock;
+
+const flush = () => new Promise((resolve) => setImmediate(resolve));
+
+const makeRow = (over: Record<string, unknown> = {}) => ({
+  id: 'a-1',
+  coach_id: 'coach-profile-1',
+  storage_path: 'audio/c1/2026-06-09/audio_1.m4a',
+  duration_sec: 180,
+  practice_date: '2026-06-09',
+  practice_group: 'Gold',
+  status: 'review',
+  transcription: 'Transcribed text',
+  error_message: null,
+  created_at: '2026-06-09T18:00:00.000Z',
+  updated_at: '2026-06-09T18:05:00.000Z',
+  coach: { full_name: 'Coach K' },
+  swimmers: [{ swimmer_id: 'sw-1' }, { swimmer_id: 'sw-2' }],
+  ...over,
+});
 
 beforeEach(() => {
   jest.clearAllMocks();
+  __state.selectRows = [];
+  __state.onHandler = null;
 });
 
 describe('subscribeAudioSessions', () => {
-  it('queries audio_sessions for the coach', () => {
-    const cb = jest.fn();
-    subscribeAudioSessions('coach-1', cb, 15);
-    expect(firestore.collection).toHaveBeenCalledWith({}, 'audio_sessions');
-    expect(firestore.where).toHaveBeenCalledWith('coachId', '==', 'coach-1');
-    expect(firestore.limit).toHaveBeenCalledWith(15);
-    expect(firestore.onSnapshot).toHaveBeenCalled();
+  it('queries audio_sessions scoped to the coach, newest first, and opens a realtime channel', () => {
+    subscribeAudioSessions('coach-1', jest.fn(), 15);
+    expect(supabase.from).toHaveBeenCalledWith('audio_sessions');
+    expect(__query.eq).toHaveBeenCalledWith('coach_id', 'coach-1');
+    expect(__query.order).toHaveBeenCalledWith('created_at', { ascending: false });
+    expect(__query.limit).toHaveBeenCalledWith(15);
+    expect(supabase.channel).toHaveBeenCalled();
+    expect(__channel.subscribe).toHaveBeenCalled();
   });
 
-  it('maps snapshot docs with id', () => {
+  it('defaults the window to 20', () => {
+    subscribeAudioSessions('coach-1', jest.fn());
+    expect(__query.limit).toHaveBeenCalledWith(20);
+  });
+
+  it('fires immediately with mapped sessions — junction rows become selectedSwimmerIds, the embed serves coachName', async () => {
+    __state.selectRows = [makeRow()];
     const cb = jest.fn();
-    firestore.onSnapshot.mockImplementation((_q: unknown, handler: (snap: unknown) => void) => {
-      handler({
-        docs: [{ id: 'a1', data: () => ({ coachId: 'c1', status: 'uploaded' }) }],
-      });
-      return jest.fn();
+    subscribeAudioSessions('coach-profile-1', cb);
+    await flush();
+    expect(cb).toHaveBeenCalledTimes(1);
+    const session = cb.mock.calls[0][0][0];
+    expect(session).toMatchObject({
+      id: 'a-1',
+      coachId: 'coach-profile-1',
+      coachName: 'Coach K',
+      storagePath: 'audio/c1/2026-06-09/audio_1.m4a',
+      duration: 180,
+      practiceDate: '2026-06-09',
+      group: 'Gold',
+      selectedSwimmerIds: ['sw-1', 'sw-2'],
+      status: 'review',
+      transcription: 'Transcribed text',
     });
-    subscribeAudioSessions('c1', cb);
-    expect(cb).toHaveBeenCalledWith([{ id: 'a1', coachId: 'c1', status: 'uploaded' }]);
+  });
+
+  it('re-emits the full window on a postgres_changes event', async () => {
+    const cb = jest.fn();
+    subscribeAudioSessions('coach-1', cb);
+    await flush();
+    __state.selectRows = [makeRow()];
+    __state.onHandler?.({});
+    await flush();
+    expect(cb).toHaveBeenCalledTimes(2);
+    expect(cb.mock.calls[1][0]).toHaveLength(1);
+  });
+
+  it('stops emitting after unsubscribe (sync teardown)', async () => {
+    const cb = jest.fn();
+    const unsub = subscribeAudioSessions('coach-1', cb);
+    await flush();
+    unsub();
+    __state.selectRows = [makeRow()];
+    __state.onHandler?.({});
+    await flush();
+    expect(cb).toHaveBeenCalledTimes(1);
+    expect(supabase.removeChannel).toHaveBeenCalled();
   });
 });
 
 describe('createAudioSession', () => {
-  it('creates an audio session and returns its id', async () => {
+  it('inserts the session row then the P1-4 junction rows, and returns the id', async () => {
     const id = await createAudioSession('c1', 'Coach K', 300, '2026-04-01', ['s1', 's2'], 'Gold');
-    expect(id).toBe('new-audio-id');
-    expect(firestore.addDoc).toHaveBeenCalledWith(
-      expect.anything(),
+    expect(id).toBe('new-audio-session-id');
+    expect(supabase.from).toHaveBeenCalledWith('audio_sessions');
+    expect(supabase.from).toHaveBeenCalledWith('audio_session_swimmers');
+    expect(__query.insert).toHaveBeenNthCalledWith(
+      1,
       expect.objectContaining({
-        coachId: 'c1',
-        duration: 300,
+        coach_id: 'c1',
+        storage_path: '',
+        duration_sec: 300,
+        practice_date: '2026-04-01',
+        practice_group: 'Gold',
         status: 'uploading',
-        selectedSwimmerIds: ['s1', 's2'],
-        group: 'Gold',
       }),
     );
+    expect(__query.insert).toHaveBeenNthCalledWith(2, [
+      { session_id: 'new-audio-session-id', swimmer_id: 's1' },
+      { session_id: 'new-audio-session-id', swimmer_id: 's2' },
+    ]);
   });
 
-  it('defaults group to null when not provided', async () => {
+  it('does NOT send a coachName denorm — the name is derived on read', async () => {
     await createAudioSession('c1', 'Coach K', 300, '2026-04-01', ['s1']);
-    const call = firestore.addDoc.mock.calls[0][1];
-    expect(call.group).toBeNull();
+    const payload = __query.insert.mock.calls[0][0];
+    expect(payload).not.toHaveProperty('coachName');
+    expect(payload).not.toHaveProperty('coach_name');
+  });
+
+  it('defaults practice_group to null when not provided', async () => {
+    await createAudioSession('c1', 'Coach K', 300, '2026-04-01', ['s1']);
+    expect(__query.insert.mock.calls[0][0].practice_group).toBeNull();
   });
 
   it('rejects creation without selected swimmer ids', async () => {
-    await expect((createAudioSession as any)('c1', 'Coach K', 300, '2026-04-01')).rejects.toThrow(
-      /selected swimmer/i,
-    );
-    expect(firestore.addDoc).not.toHaveBeenCalled();
+    await expect(
+      (createAudioSession as unknown as (...args: unknown[]) => Promise<string>)(
+        'c1',
+        'Coach K',
+        300,
+        '2026-04-01',
+      ),
+    ).rejects.toThrow(/selected swimmer/i);
+    expect(__query.insert).not.toHaveBeenCalled();
   });
 });
 
 describe('updateAudioSession', () => {
-  it('updates the session doc with updatedAt', async () => {
-    await updateAudioSession('s1', { status: 'posted' } as any);
-    expect(firestore.updateDoc).toHaveBeenCalledWith(
-      expect.objectContaining({ path: 'audio_sessions/s1' }),
-      expect.objectContaining({ status: 'posted' }),
-    );
+  it('maps camelCase fields to columns and updates by id', async () => {
+    await updateAudioSession('a-1', { storagePath: 'audio/x.m4a', status: 'uploaded' });
+    expect(__query.update).toHaveBeenCalledWith({
+      storage_path: 'audio/x.m4a',
+      status: 'uploaded',
+    });
+    expect(__query.eq).toHaveBeenCalledWith('id', 'a-1');
   });
+
+  it("kicks the pipeline when the patch flips status to 'uploaded' (D-F2)", async () => {
+    await updateAudioSession('a-1', { status: 'uploaded' });
+    expect(requestSessionProcessing).toHaveBeenCalledWith('audio', 'a-1');
+  });
+
+  it('does NOT kick the pipeline on other status writes', async () => {
+    await updateAudioSession('a-1', { status: 'posted' });
+    await updateAudioSession('a-1', { transcription: 'words' });
+    expect(requestSessionProcessing).not.toHaveBeenCalled();
+  });
+
+  // a failed kick never failing the update is requestSessionProcessing's own
+  // contract (it never rejects) — pinned in mediaPipeline.test.ts
 });
 
 describe('uploadAudio', () => {
-  it('fetches blob, uploads, and resolves with path and url', async () => {
-    global.fetch = jest
-      .fn()
-      .mockResolvedValue({ blob: jest.fn().mockResolvedValue(new Blob()) }) as jest.Mock;
-    const result = await uploadAudio('file://audio.m4a', 'c1', '2026-04-01');
-    expect(result.downloadUrl).toBe('https://mock.url/audio.m4a');
+  it('uploads into media-audio under the frozen path layout and returns path + signed url', async () => {
+    const onProgress = jest.fn();
+    const result = await uploadAudio('file://audio.m4a', 'c1', '2026-04-01', onProgress);
+    expect(uploadFileToBucket).toHaveBeenCalledWith(
+      'media-audio',
+      expect.stringContaining('audio/c1/2026-04-01/'),
+      'file://audio.m4a',
+      'audio/mp4',
+      onProgress,
+    );
+    expect(getSignedFileUrl).toHaveBeenCalledWith(
+      'media-audio',
+      expect.stringContaining('audio/c1/2026-04-01/'),
+      3600,
+    );
     expect(result.storagePath).toContain('audio/c1/2026-04-01/');
+    expect(result.downloadUrl).toBe('https://signed.url/audio.m4a');
   });
 });
