@@ -1,344 +1,230 @@
-jest.mock('../../config/firebase', () => ({
-  db: {},
-  auth: { currentUser: { uid: 'test-uid' } },
-  storage: {},
-  functions: {},
-}));
-
-jest.mock('../../utils/time', () => ({
-  formatTimeDisplay: jest.fn((t: number) => `${t}s`),
-}));
-
-jest.mock('firebase/firestore', () => ({
-  collection: jest.fn((...args: unknown[]) => ({ path: (args as string[]).slice(1).join('/') })),
-  query: jest.fn((ref: unknown) => ref),
-  where: jest.fn(),
-  orderBy: jest.fn(),
-  limit: jest.fn(),
-  doc: jest.fn((...args: unknown[]) => ({
-    path: (args as string[]).slice(1).join('/'),
-    id: (args as string[])[args.length - 1],
-  })),
-  getDocs: jest.fn(),
-  getDoc: jest.fn(),
-  addDoc: jest.fn().mockResolvedValue({ id: 'new-time-id' }),
-  updateDoc: jest.fn().mockResolvedValue(undefined),
-  deleteDoc: jest.fn().mockResolvedValue(undefined),
-  setDoc: jest.fn().mockResolvedValue(undefined),
-  onSnapshot: jest.fn(),
-  serverTimestamp: jest.fn(() => new Date()),
-  writeBatch: jest.fn(() => ({
-    set: jest.fn(),
-    update: jest.fn(),
-    delete: jest.fn(),
-    commit: jest.fn().mockResolvedValue(undefined),
-  })),
-  Timestamp: { fromDate: jest.fn((d: unknown) => d) },
-}));
+// Data layer migrated Firestore -> Supabase (UNIFY/01:swim_results, Phase D).
+// PR truth is owned by the database trigger (D-D5): the old client-side
+// un-PR/promote assertions are replaced by "writes exactly one insert/delete
+// and trusts the DB" payload pins — pgTAP 008 carries the actual PR math.
+jest.mock('../../config/supabase', () => {
+  const state: { selectRows: unknown[]; onHandler: ((p: unknown) => void) | null } = {
+    selectRows: [],
+    onHandler: null,
+  };
+  const query: Record<string, jest.Mock> & { then: unknown } = {
+    select: jest.fn(() => query),
+    eq: jest.fn(() => query),
+    order: jest.fn(() => query),
+    limit: jest.fn(() => query),
+    insert: jest.fn(() => query),
+    delete: jest.fn(() => query),
+    single: jest.fn(() => Promise.resolve({ data: { id: 'new-time-id' }, error: null })),
+    then: (resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) =>
+      Promise.resolve({ data: state.selectRows, error: null }).then(resolve, reject),
+  };
+  const channel = {
+    on: jest.fn((_evt: unknown, _filter: unknown, handler: (p: unknown) => void) => {
+      state.onHandler = handler;
+      return channel;
+    }),
+    subscribe: jest.fn(() => channel),
+  };
+  const supabase = {
+    from: jest.fn(() => query),
+    channel: jest.fn(() => channel),
+    removeChannel: jest.fn(),
+  };
+  return { supabase, __state: state, __query: query, __channel: channel };
+});
 
 import { subscribeTimes, addTime, deleteTime } from '../times';
 
-const firestore = require('firebase/firestore');
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const mock = require('../../config/supabase');
+const { supabase, __state, __query, __channel } = mock;
+
+const flush = () => new Promise((resolve) => setImmediate(resolve));
+
+// Stored row has hundredths + is_personal_best but NO display strings —
+// timeDisplay is derived on read.
+const makeRow = (over: Record<string, unknown> = {}) => ({
+  id: 't-1',
+  swimmer_id: 'sw-1',
+  event_name: '100 Free',
+  course: 'SCY',
+  time_hundredths: 6523, // -> "1:05.23"
+  splits: null,
+  meet_id: null,
+  meet_name: 'Spring Invite',
+  date: '2026-05-01',
+  is_personal_best: true,
+  source: 'manual',
+  created_by: 'coach-001',
+  created_at: '2026-05-01T12:00:00.000Z',
+  ...over,
+});
 
 beforeEach(() => {
   jest.clearAllMocks();
+  __state.selectRows = [];
+  __state.onHandler = null;
 });
 
 describe('subscribeTimes', () => {
-  it('subscribes to swimmer times subcollection', () => {
-    const mockUnsub = jest.fn();
-    firestore.onSnapshot.mockReturnValue(mockUnsub);
-
-    const unsub = subscribeTimes('sw-1', jest.fn());
-
-    expect(firestore.collection).toHaveBeenCalledWith(
-      expect.anything(),
-      'swimmers',
-      'sw-1',
-      'times',
-    );
-    expect(firestore.orderBy).toHaveBeenCalledWith('createdAt', 'desc');
-    expect(unsub).toBe(mockUnsub);
-  });
-
-  it('applies default limit of 50', () => {
-    firestore.onSnapshot.mockReturnValue(jest.fn());
+  it('queries swim_results scoped to the swimmer, newest entry first, and opens a realtime channel', () => {
     subscribeTimes('sw-1', jest.fn());
-    expect(firestore.limit).toHaveBeenCalledWith(50);
+    expect(supabase.from).toHaveBeenCalledWith('swim_results');
+    expect(__query.eq).toHaveBeenCalledWith('swimmer_id', 'sw-1');
+    expect(__query.order).toHaveBeenCalledWith('created_at', { ascending: false });
+    expect(__query.limit).toHaveBeenCalledWith(50);
+    expect(supabase.channel).toHaveBeenCalled();
+    expect(__channel.subscribe).toHaveBeenCalled();
   });
 
-  it('applies custom limit when provided', () => {
-    firestore.onSnapshot.mockReturnValue(jest.fn());
+  it('applies a custom limit when provided', () => {
     subscribeTimes('sw-1', jest.fn(), 10);
-    expect(firestore.limit).toHaveBeenCalledWith(10);
+    expect(__query.limit).toHaveBeenCalledWith(10);
   });
 
-  it('maps snapshot docs into callback', () => {
-    firestore.onSnapshot.mockImplementation((_q: unknown, cb: (snap: unknown) => void) => {
-      cb({
-        docs: [{ id: 't-1', data: () => ({ event: '50 Free', time: 25.5 }) }],
-      });
-      return jest.fn();
-    });
+  it('maps rows to SwimTimes, deriving timeDisplay from the stored hundredths', async () => {
+    // The stored row carries no display string...
+    expect(makeRow()).not.toHaveProperty('timeDisplay');
+    __state.selectRows = [makeRow()];
+    const cb = jest.fn();
+    subscribeTimes('sw-1', cb);
+    await flush();
+    // ...yet the callback receives it, recomputed via formatTimeDisplay.
+    expect(cb).toHaveBeenCalledWith([
+      {
+        id: 't-1',
+        event: '100 Free',
+        course: 'SCY',
+        time: 6523,
+        splits: undefined,
+        timeDisplay: '1:05.23',
+        isPR: true,
+        meetName: 'Spring Invite',
+        meetDate: new Date('2026-05-01T12:00:00'),
+        source: 'manual',
+        createdAt: new Date('2026-05-01T12:00:00.000Z'),
+        createdBy: 'coach-001',
+      },
+    ]);
+  });
 
-    const callback = jest.fn();
-    subscribeTimes('sw-1', callback);
+  it('surfaces undated manual rows with meetDate undefined', async () => {
+    __state.selectRows = [makeRow({ date: null, meet_name: null })];
+    const cb = jest.fn();
+    subscribeTimes('sw-1', cb);
+    await flush();
+    const [time] = cb.mock.calls[0][0];
+    expect(time.meetDate).toBeUndefined();
+    expect(time.meetName).toBeUndefined();
+  });
 
-    expect(callback).toHaveBeenCalledWith([{ id: 't-1', event: '50 Free', time: 25.5 }]);
+  it('re-emits the full list when a realtime change fires', async () => {
+    __state.selectRows = [makeRow()];
+    const cb = jest.fn();
+    subscribeTimes('sw-1', cb);
+    await flush();
+    expect(cb).toHaveBeenCalledTimes(1);
+    __state.onHandler?.({ eventType: 'INSERT' });
+    await flush();
+    expect(cb).toHaveBeenCalledTimes(2);
+  });
+
+  it('teardown removes the channel and is synchronous', () => {
+    const unsub = subscribeTimes('sw-1', jest.fn());
+    expect(typeof unsub).toBe('function');
+    unsub();
+    expect(supabase.removeChannel).toHaveBeenCalledWith(__channel);
+  });
+
+  it('stops emitting after unsubscribe', async () => {
+    __state.selectRows = [makeRow()];
+    const cb = jest.fn();
+    const unsub = subscribeTimes('sw-1', cb);
+    await flush();
+    expect(cb).toHaveBeenCalledTimes(1);
+    cb.mockClear();
+    unsub();
+    __state.onHandler?.({ eventType: 'UPDATE' });
+    await flush();
+    expect(cb).not.toHaveBeenCalled();
   });
 });
 
-describe('addTime - PR detection logic', () => {
-  it('marks as PR when no existing times for same event/course', async () => {
-    firestore.getDocs.mockResolvedValue({ docs: [] });
-
-    await addTime('sw-1', { event: '50 Free', course: 'SCY', time: 25.0 }, [], 'coach-1');
-
-    const calledData = firestore.addDoc.mock.calls[0][1];
-    expect(calledData.isPR).toBe(true);
-  });
-
-  it('marks as PR when new time is faster than all existing times', async () => {
-    firestore.getDocs.mockResolvedValue({ docs: [] });
-
-    const existing = [
-      { id: 't-old', event: '50 Free', course: 'SCY', time: 26.0, isPR: true },
-    ] as any;
-
-    await addTime('sw-1', { event: '50 Free', course: 'SCY', time: 25.0 }, existing, 'coach-1');
-
-    const calledData = firestore.addDoc.mock.calls[0][1];
-    expect(calledData.isPR).toBe(true);
-  });
-
-  it('does NOT mark as PR when existing time is faster', async () => {
-    const existing = [
-      { id: 't-old', event: '50 Free', course: 'SCY', time: 24.0, isPR: true },
-    ] as any;
-
-    await addTime('sw-1', { event: '50 Free', course: 'SCY', time: 25.0 }, existing, 'coach-1');
-
-    const calledData = firestore.addDoc.mock.calls[0][1];
-    expect(calledData.isPR).toBe(false);
-  });
-
-  it('does NOT treat different courses as same event for PR', async () => {
-    const existing = [
-      { id: 't-old', event: '50 Free', course: 'LCM', time: 30.0, isPR: true },
-    ] as any;
-
-    await addTime('sw-1', { event: '50 Free', course: 'SCY', time: 31.0 }, existing, 'coach-1');
-
-    // No existing SCY times, so this is a PR for SCY
-    const calledData = firestore.addDoc.mock.calls[0][1];
-    expect(calledData.isPR).toBe(true);
-  });
-
-  it('does NOT treat different events as same for PR', async () => {
-    const existing = [
-      { id: 't-old', event: '100 Free', course: 'SCY', time: 20.0, isPR: true },
-    ] as any;
-
-    await addTime('sw-1', { event: '50 Free', course: 'SCY', time: 25.0 }, existing, 'coach-1');
-
-    const calledData = firestore.addDoc.mock.calls[0][1];
-    expect(calledData.isPR).toBe(true);
-  });
-
-  it('un-PRs old records when new PR is set', async () => {
-    const oldDocRef = { id: 'old-pr', ref: { id: 'old-pr' } };
-    firestore.getDocs.mockResolvedValue({ docs: [oldDocRef] });
-    firestore.addDoc.mockResolvedValueOnce({ id: 'new-time-id' });
-
-    const existing = [
-      { id: 'old-pr', event: '50 Free', course: 'SCY', time: 26.0, isPR: true },
-    ] as any;
-
-    await addTime('sw-1', { event: '50 Free', course: 'SCY', time: 25.0 }, existing, 'coach-1');
-
-    expect(firestore.updateDoc).toHaveBeenCalledWith(oldDocRef.ref, { isPR: false });
-  });
-
-  it('does not un-PR the newly created doc itself', async () => {
-    const newDocRef = { id: 'new-time-id', ref: { id: 'new-time-id' } };
-    firestore.getDocs.mockResolvedValue({ docs: [newDocRef] });
-    firestore.addDoc.mockResolvedValueOnce({ id: 'new-time-id' });
-
-    const existing = [
-      { id: 'some-old', event: '50 Free', course: 'SCY', time: 26.0, isPR: true },
-    ] as any;
-
-    await addTime('sw-1', { event: '50 Free', course: 'SCY', time: 25.0 }, existing, 'coach-1');
-
-    // updateDoc should NOT have been called for the new doc
-    for (const call of firestore.updateDoc.mock.calls) {
-      expect(call[0].id).not.toBe('new-time-id');
-    }
-  });
-
-  it('includes meetName when provided', async () => {
-    await addTime(
-      'sw-1',
-      { event: '50 Free', course: 'SCY', time: 25.0, meetName: 'State Finals' },
-      [],
-      'coach-1',
-    );
-
-    const calledData = firestore.addDoc.mock.calls[0][1];
-    expect(calledData.meetName).toBe('State Finals');
-  });
-
-  it('sets meetName to null when not provided', async () => {
-    await addTime('sw-1', { event: '50 Free', course: 'SCY', time: 25.0 }, [], 'coach-1');
-
-    const calledData = firestore.addDoc.mock.calls[0][1];
-    expect(calledData.meetName).toBeNull();
-  });
-
-  it('sets source to manual', async () => {
-    await addTime('sw-1', { event: '50 Free', course: 'SCY', time: 25.0 }, [], 'coach-1');
-
-    const calledData = firestore.addDoc.mock.calls[0][1];
-    expect(calledData.source).toBe('manual');
-  });
-
-  it('returns the new document id', async () => {
-    firestore.addDoc.mockResolvedValueOnce({ id: 'returned-id' });
+describe('addTime', () => {
+  it('inserts one mapped row and returns its id', async () => {
     const id = await addTime(
       'sw-1',
-      { event: '50 Free', course: 'SCY', time: 25.0 },
+      { event: '50 Free', course: 'SCY', time: 2500, meetName: 'State Finals' },
       [],
-      'coach-1',
+      'coach-001',
     );
-    expect(id).toBe('returned-id');
+    expect(id).toBe('new-time-id');
+    expect(supabase.from).toHaveBeenCalledWith('swim_results');
+    expect(__query.insert).toHaveBeenCalledWith({
+      swimmer_id: 'sw-1',
+      event_name: '50 Free',
+      course: 'SCY',
+      time_hundredths: 2500,
+      meet_name: 'State Finals',
+      date: null,
+      source: 'manual',
+      created_by: 'coach-001',
+    });
+  });
+
+  it('sets meet_name to null when not provided', async () => {
+    await addTime('sw-1', { event: '50 Free', course: 'SCY', time: 2500 }, [], 'coach-001');
+    const payload = __query.insert.mock.calls[0][0];
+    expect(payload.meet_name).toBeNull();
+  });
+
+  it('never sends PR state or display strings — the trigger owns them (D-D5)', async () => {
+    await addTime('sw-1', { event: '50 Free', course: 'SCY', time: 2500 }, [], 'coach-001');
+    const payload = __query.insert.mock.calls[0][0];
+    expect(payload).not.toHaveProperty('isPR');
+    expect(payload).not.toHaveProperty('is_personal_best');
+    expect(payload).not.toHaveProperty('timeDisplay');
+    expect(payload).not.toHaveProperty('createdAt');
+    expect(payload).not.toHaveProperty('created_at');
+  });
+
+  it('a faster existing PR changes nothing: one insert, no un-PR writes', async () => {
+    const existing = [
+      {
+        id: 't-old',
+        event: '50 Free',
+        course: 'SCY',
+        time: 2400,
+        isPR: true,
+      },
+    ];
+    await addTime(
+      'sw-1',
+      { event: '50 Free', course: 'SCY', time: 2500 },
+      existing as never,
+      'coach-001',
+    );
+    // The Firestore version read back and updated prior PRs; the trigger does
+    // that in the database now. Exactly one table touch: the insert.
+    expect(supabase.from).toHaveBeenCalledTimes(1);
+    expect(__query.insert).toHaveBeenCalledTimes(1);
+    expect(__query.select).toHaveBeenCalledWith('id'); // only the returning id
   });
 });
 
 describe('deleteTime', () => {
-  function mockExistingTime(data: { event: string; course: string; time: number; isPR: boolean }) {
-    firestore.getDoc.mockResolvedValueOnce({
-      exists: () => true,
-      data: () => data,
-    });
-  }
-
-  it('reads the time at the swimmer/time path before deciding the next move', async () => {
-    mockExistingTime({ event: '50 Free', course: 'SCY', time: 2500, isPR: false });
+  it('deletes the row by id — no read-first, no companion writes', async () => {
     await deleteTime('sw-1', 't-1');
-
-    expect(firestore.doc).toHaveBeenCalledWith(
-      expect.anything(),
-      'swimmers',
-      'sw-1',
-      'times',
-      't-1',
-    );
-    expect(firestore.getDoc).toHaveBeenCalled();
+    expect(supabase.from).toHaveBeenCalledTimes(1);
+    expect(supabase.from).toHaveBeenCalledWith('swim_results');
+    expect(__query.delete).toHaveBeenCalledTimes(1);
+    expect(__query.eq).toHaveBeenCalledWith('id', 't-1');
+    // The promote-on-delete dance lives in the trigger now.
+    expect(__query.select).not.toHaveBeenCalled();
   });
 
-  it('non-existent doc is a no-op: no batch is committed', async () => {
-    firestore.getDoc.mockResolvedValueOnce({
-      exists: () => false,
-      data: () => undefined,
-    });
-    await deleteTime('sw-1', 't-gone');
-
-    expect(firestore.writeBatch).not.toHaveBeenCalled();
-  });
-
-  it('non-PR delete commits a batch with delete only — no companion update', async () => {
-    const mockBatch = {
-      set: jest.fn(),
-      update: jest.fn(),
-      delete: jest.fn(),
-      commit: jest.fn().mockResolvedValue(undefined),
-    };
-    firestore.writeBatch.mockReturnValueOnce(mockBatch);
-    mockExistingTime({ event: '50 Free', course: 'SCY', time: 2500, isPR: false });
-
-    await deleteTime('sw-1', 't-1');
-
-    expect(mockBatch.delete).toHaveBeenCalled();
-    expect(mockBatch.update).not.toHaveBeenCalled();
-    expect(mockBatch.commit).toHaveBeenCalledTimes(1);
-  });
-
-  it('deleting a PR with one other remaining time promotes that other as the new PR', async () => {
-    const mockBatch = {
-      set: jest.fn(),
-      update: jest.fn(),
-      delete: jest.fn(),
-      commit: jest.fn().mockResolvedValue(undefined),
-    };
-    firestore.writeBatch.mockReturnValueOnce(mockBatch);
-    mockExistingTime({ event: '50 Free', course: 'SCY', time: 2400, isPR: true });
-
-    const otherRef = { id: 't-other' };
-    firestore.getDocs.mockResolvedValueOnce({
-      docs: [
-        {
-          id: 't-other',
-          ref: otherRef,
-          data: () => ({ event: '50 Free', course: 'SCY', time: 2500, isPR: false }),
-        },
-      ],
-    });
-
-    await deleteTime('sw-1', 't-1');
-
-    expect(mockBatch.delete).toHaveBeenCalled();
-    expect(mockBatch.update).toHaveBeenCalledWith(otherRef, { isPR: true });
-    expect(mockBatch.commit).toHaveBeenCalledTimes(1);
-  });
-
-  it('deleting a PR with multiple remaining times promotes the fastest', async () => {
-    const mockBatch = {
-      set: jest.fn(),
-      update: jest.fn(),
-      delete: jest.fn(),
-      commit: jest.fn().mockResolvedValue(undefined),
-    };
-    firestore.writeBatch.mockReturnValueOnce(mockBatch);
-    mockExistingTime({ event: '50 Free', course: 'SCY', time: 2400, isPR: true });
-
-    const fastRef = { id: 't-fast' };
-    const slowRef = { id: 't-slow' };
-    firestore.getDocs.mockResolvedValueOnce({
-      docs: [
-        {
-          id: 't-slow',
-          ref: slowRef,
-          data: () => ({ event: '50 Free', course: 'SCY', time: 2700, isPR: false }),
-        },
-        {
-          id: 't-fast',
-          ref: fastRef,
-          data: () => ({ event: '50 Free', course: 'SCY', time: 2500, isPR: false }),
-        },
-      ],
-    });
-
-    await deleteTime('sw-1', 't-1');
-
-    expect(mockBatch.update).toHaveBeenCalledWith(fastRef, { isPR: true });
-    expect(mockBatch.update).toHaveBeenCalledTimes(1);
-  });
-
-  it('deleting a PR with no other times leaves no successor', async () => {
-    const mockBatch = {
-      set: jest.fn(),
-      update: jest.fn(),
-      delete: jest.fn(),
-      commit: jest.fn().mockResolvedValue(undefined),
-    };
-    firestore.writeBatch.mockReturnValueOnce(mockBatch);
-    mockExistingTime({ event: '50 Free', course: 'SCY', time: 2400, isPR: true });
-    firestore.getDocs.mockResolvedValueOnce({ docs: [] });
-
-    await deleteTime('sw-1', 't-1');
-
-    expect(mockBatch.delete).toHaveBeenCalled();
-    expect(mockBatch.update).not.toHaveBeenCalled();
-    expect(mockBatch.commit).toHaveBeenCalledTimes(1);
+  it('a missing id is the same observable no-op as before (RD-13)', async () => {
+    // PostgREST reports zero affected rows without an error.
+    await expect(deleteTime('sw-1', 't-gone')).resolves.toBeUndefined();
   });
 });

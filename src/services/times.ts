@@ -1,39 +1,110 @@
-import {
-  collection,
-  query,
-  where,
-  orderBy,
-  onSnapshot,
-  addDoc,
-  updateDoc,
-  getDoc,
-  getDocs,
-  doc,
-  serverTimestamp,
-  writeBatch,
-  limit as firestoreLimit,
-  type Unsubscribe,
-} from 'firebase/firestore';
-import { db } from '../config/firebase';
+// Data layer migrated Firestore -> Supabase (UNIFY/01:swim_results as merged
+// by UNIFY/08 Phase D). Same behavioral contract. PR truth is owned by the
+// database's maintain_personal_bests() trigger [D-D5]: addTime is one plain
+// INSERT and deleteTime one plain DELETE — the un-PR/promote bookkeeping the
+// Firestore version hand-built with reads and batches happens atomically in
+// the trigger, identically for every writer (manual adds, imports, backfill).
+// timeDisplay is derived on read (canonical stores no display strings);
+// isPR := is_personal_best.
+import { supabase } from '../config/supabase';
 import type { SwimTime } from '../types/firestore.types';
 import type { Course } from '../config/constants';
 import { formatTimeDisplay } from '../utils/time';
 
 type TimeWithId = SwimTime & { id: string };
 
+// Structurally identical to firebase's Unsubscribe (() => void); the data layer
+// no longer imports firebase, but the public return type is unchanged.
+type Unsubscribe = () => void;
+
+interface TimeRow {
+  id: string;
+  swimmer_id: string;
+  event_name: string;
+  // NULL only possible on legacy BSPC rows that predate the course column;
+  // every Coach writer sends it.
+  course: Course | null;
+  time_hundredths: number;
+  splits: number[] | null;
+  meet_id: string | null;
+  meet_name: string | null;
+  date: string | null;
+  is_personal_best: boolean;
+  source: string;
+  created_by: string | null;
+  created_at: string;
+}
+
+const TIME_SELECT =
+  'id, swimmer_id, event_name, course, time_hundredths, splits, meet_id, ' +
+  'meet_name, date, is_personal_best, source, created_by, created_at';
+
+function rowToTime(row: TimeRow): TimeWithId {
+  return {
+    id: row.id,
+    event: row.event_name,
+    course: row.course as Course,
+    // Same number the app already holds — Coach has always spoken hundredths.
+    time: row.time_hundredths,
+    splits: row.splits ?? undefined,
+    // Display strings are normalized out of the canonical schema; recompute on
+    // read from the stored hundredths (never persisted).
+    timeDisplay: formatTimeDisplay(row.time_hundredths),
+    isPR: row.is_personal_best,
+    meetName: row.meet_name ?? undefined,
+    // date is a calendar string; noon anchor avoids day-flips in any timezone
+    // (the meets timezone-flake lesson).
+    meetDate: row.date ? new Date(`${row.date}T12:00:00`) : undefined,
+    source: row.source as SwimTime['source'],
+    createdAt: new Date(row.created_at),
+    createdBy: row.created_by ?? '',
+  };
+}
+
+let channelSeq = 0;
+
 export function subscribeTimes(
   swimmerId: string,
   callback: (times: TimeWithId[]) => void,
   max: number = 50,
 ): Unsubscribe {
-  const q = query(
-    collection(db, 'swimmers', swimmerId, 'times'),
-    orderBy('createdAt', 'desc'),
-    firestoreLimit(max),
-  );
-  return onSnapshot(q, (snapshot) => {
-    callback(snapshot.docs.map((d) => ({ id: d.id, ...d.data() }) as TimeWithId));
-  });
+  let live = true;
+
+  // Fetch the full current list and emit it — mirrors onSnapshot, which always
+  // hands the callback the whole ordered/limited snapshot rather than deltas.
+  const emit = async (): Promise<void> => {
+    const { data, error } = await supabase
+      .from('swim_results')
+      .select(TIME_SELECT)
+      .eq('swimmer_id', swimmerId)
+      .order('created_at', { ascending: false })
+      .limit(max);
+    if (!live || error || !data) return;
+    callback((data as unknown as TimeRow[]).map(rowToTime));
+  };
+
+  void emit(); // immediate first fire, like onSnapshot
+
+  const channel = supabase
+    .channel(`times:${swimmerId}:${channelSeq++}`)
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'swim_results',
+        filter: `swimmer_id=eq.${swimmerId}`,
+      },
+      () => {
+        void emit();
+      },
+    )
+    .subscribe();
+
+  return () => {
+    live = false;
+    void supabase.removeChannel(channel);
+  };
 }
 
 export async function addTime(
@@ -47,83 +118,36 @@ export async function addTime(
   existingTimes: TimeWithId[],
   coachUid: string,
 ): Promise<string> {
+  // PR math moved into the database (D-D5): existingTimes stays in the frozen
+  // signature but no longer drives anything.
+  void existingTimes;
   const { event, course, time, meetName } = data;
 
-  // Check if this is a PR
-  const sameTimes = existingTimes.filter((t) => t.event === event && t.course === course);
-  const isPR = sameTimes.length === 0 || sameTimes.every((t) => time < t.time);
-
-  const docRef = await addDoc(collection(db, 'swimmers', swimmerId, 'times'), {
-    event,
-    course,
-    time,
-    timeDisplay: formatTimeDisplay(time),
-    isPR,
-    meetName: meetName || null,
-    meetDate: null,
-    source: 'manual',
-    createdAt: serverTimestamp(),
-    createdBy: coachUid,
-  });
-
-  // Un-PR old records if this is a new PR
-  if (isPR && sameTimes.length > 0) {
-    const timesRef = collection(db, 'swimmers', swimmerId, 'times');
-    const q = query(
-      timesRef,
-      where('event', '==', event),
-      where('course', '==', course),
-      where('isPR', '==', true),
-    );
-    const snap = await getDocs(q);
-    for (const d of snap.docs) {
-      if (d.id !== docRef.id) {
-        await updateDoc(d.ref, { isPR: false });
-      }
-    }
-  }
-
-  return docRef.id;
+  const { data: row, error } = await supabase
+    .from('swim_results')
+    .insert({
+      swimmer_id: swimmerId,
+      event_name: event,
+      course,
+      time_hundredths: time,
+      meet_name: meetName || null,
+      date: null,
+      source: 'manual',
+      created_by: coachUid,
+      // is_personal_best is trigger-owned; created_at is the column default
+    })
+    .select('id')
+    .single();
+  if (error) throw error;
+  return (row as { id: string }).id;
 }
 
 export async function deleteTime(swimmerId: string, timeId: string): Promise<void> {
-  // Read the doc first so we know whether deleting it leaves an event/course
-  // pair without a PR. If it does, promote the next-fastest remaining time
-  // in a single batch so the UI never sees a "no PR" intermediate state.
-  const timeRef = doc(db, 'swimmers', swimmerId, 'times', timeId);
-  const snap = await getDoc(timeRef);
-
-  if (!snap.exists()) {
-    // Already deleted by another writer — nothing to do.
-    return;
-  }
-
-  const time = snap.data() as SwimTime;
-  const batch = writeBatch(db);
-  batch.delete(timeRef);
-
-  if (time.isPR) {
-    // Find the next-fastest remaining time in the same event/course pair and
-    // flag it as the new PR. Done in the same batch as the delete so a
-    // listener never observes a transient "no PR" window.
-    const remainingQuery = query(
-      collection(db, 'swimmers', swimmerId, 'times'),
-      where('event', '==', time.event),
-      where('course', '==', time.course),
-    );
-    const remaining = await getDocs(remainingQuery);
-    let nextPR: { ref: (typeof remaining.docs)[number]['ref']; time: number } | null = null;
-    for (const d of remaining.docs) {
-      if (d.id === timeId) continue;
-      const t = d.data() as SwimTime;
-      if (nextPR === null || t.time < nextPR.time) {
-        nextPR = { ref: d.ref, time: t.time };
-      }
-    }
-    if (nextPR) {
-      batch.update(nextPR.ref, { isPR: true });
-    }
-  }
-
-  await batch.commit();
+  void swimmerId; // row addressed by PK; param kept for signature compat
+  // The trigger promotes the next-fastest and updates personal_bests in the
+  // same transaction as the DELETE — the "no transient no-PR window" guarantee
+  // the Firestore version hand-built with a batch. Deleting a missing id
+  // affects zero rows: the same observable no-op as before (RD-13).
+  const { error } = await supabase.from('swim_results').delete().eq('id', timeId);
+  if (error) throw error;
 }
