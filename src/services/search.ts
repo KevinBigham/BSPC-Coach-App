@@ -1,18 +1,11 @@
-import {
-  collection,
-  collectionGroup,
-  query,
-  orderBy,
-  limit as firestoreLimit,
-  getDocs,
-} from 'firebase/firestore';
+// Phase E: the notes search reads canonical swimmer_notes — the Firestore
+// collectionGroup gymnastics (parent-path extraction for swimmerId) are gone;
+// swimmer_id is just a column on the flat table. Meet and calendar-event
+// searches stay on Firestore until Phase H.
+import { collection, query, orderBy, limit as firestoreLimit, getDocs } from 'firebase/firestore';
 import { db } from '../config/firebase';
-import type {
-  Swimmer,
-  SwimmerNote,
-  CalendarEvent,
-  FirebaseTimestamp,
-} from '../types/firestore.types';
+import { supabase } from '../config/supabase';
+import type { Swimmer, CalendarEvent, FirebaseTimestamp } from '../types/firestore.types';
 import type { Meet } from '../types/meet.types';
 
 type SwimmerWithId = Swimmer & { id: string };
@@ -58,33 +51,48 @@ export function searchSwimmers(term: string, swimmers: SwimmerWithId[]): Swimmer
   return results;
 }
 
+interface SearchNoteRow {
+  id: string;
+  swimmer_id: string;
+  content: string;
+  tags: string[] | null;
+  practice_date: string;
+  created_at: string;
+  coach: { full_name: string } | null;
+}
+
+const SEARCH_NOTE_SELECT =
+  'id, swimmer_id, content, tags, practice_date, created_at, coach:profiles(full_name)';
+
 export async function searchNotes(term: string, max: number = 100): Promise<NoteSearchResult[]> {
   if (!term.trim()) return [];
   const lower = term.toLowerCase();
 
-  const q = query(collectionGroup(db, 'notes'), orderBy('createdAt', 'desc'), firestoreLimit(max));
+  // Frozen semantics: fetch the most recent `max` notes, THEN filter client-
+  // side — exactly the Firestore behavior (no substring queries there); a
+  // match older than the window stays invisible, same as before.
+  const { data, error } = await supabase
+    .from('swimmer_notes')
+    .select(SEARCH_NOTE_SELECT)
+    .order('created_at', { ascending: false })
+    .limit(max);
+  if (error) throw error;
 
-  const snapshot = await getDocs(q);
   const results: NoteSearchResult[] = [];
 
-  for (const docSnap of snapshot.docs) {
-    const data = docSnap.data() as SwimmerNote;
-    const matchesContent = (data.content || '').toLowerCase().includes(lower);
-    const matchesTags = data.tags?.some((t) => t.toLowerCase().includes(lower));
+  for (const row of (data ?? []) as unknown as SearchNoteRow[]) {
+    const matchesContent = (row.content || '').toLowerCase().includes(lower);
+    const matchesTags = row.tags?.some((t) => t.toLowerCase().includes(lower));
 
     if (matchesContent || matchesTags) {
-      // Extract swimmerId from the parent path: swimmers/{swimmerId}/notes/{noteId}
-      const parentPath = docSnap.ref.parent.parent;
-      const swimmerId = parentPath?.id || '';
-
       results.push({
-        noteId: docSnap.id,
-        swimmerId,
-        content: data.content,
-        tags: data.tags || [],
-        coachName: data.coachName,
-        practiceDate: String(data.practiceDate),
-        createdAt: data.createdAt,
+        noteId: row.id,
+        swimmerId: row.swimmer_id,
+        content: row.content,
+        tags: row.tags || [],
+        coachName: row.coach?.full_name ?? '',
+        practiceDate: String(row.practice_date),
+        createdAt: new Date(row.created_at),
       });
     }
   }

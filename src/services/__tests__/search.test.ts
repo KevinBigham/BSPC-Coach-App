@@ -1,3 +1,5 @@
+// Phase E: notes search reads canonical swimmer_notes (flat table, no
+// collectionGroup); meet/calendar searches stay Firestore until Phase H.
 jest.mock('../../config/firebase', () => ({
   db: {},
   auth: { currentUser: { uid: 'test-uid' } },
@@ -7,17 +9,34 @@ jest.mock('../../config/firebase', () => ({
 
 jest.mock('firebase/firestore', () => ({
   collection: jest.fn((...args: unknown[]) => ({ path: (args as string[]).slice(1).join('/') })),
-  collectionGroup: jest.fn((_db: unknown, id: string) => ({ path: id })),
   query: jest.fn((ref: unknown) => ref),
   orderBy: jest.fn(),
   limit: jest.fn(),
   getDocs: jest.fn(),
 }));
 
-import { searchSwimmers } from '../search';
+jest.mock('../../config/supabase', () => {
+  const state: { selectRows: unknown[] } = { selectRows: [] };
+  const query: Record<string, jest.Mock> & { then: unknown } = {
+    select: jest.fn(() => query),
+    order: jest.fn(() => query),
+    limit: jest.fn(() => query),
+    then: (resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) =>
+      Promise.resolve({ data: state.selectRows, error: null }).then(resolve, reject),
+  };
+  const supabase = { from: jest.fn(() => query) };
+  return { supabase, __state: state, __query: query };
+});
+
+import { searchSwimmers, searchNotes } from '../search';
+
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const supabaseMock = require('../../config/supabase');
+const { supabase, __state, __query } = supabaseMock;
 
 beforeEach(() => {
   jest.clearAllMocks();
+  __state.selectRows = [];
 });
 
 const swimmers = [
@@ -91,5 +110,66 @@ describe('searchSwimmers', () => {
   it('returns empty for no-match term', () => {
     const results = searchSwimmers('zzzzz', swimmers);
     expect(results).toHaveLength(0);
+  });
+});
+
+describe('searchNotes', () => {
+  const makeRow = (over: Record<string, unknown> = {}) => ({
+    id: 'n-1',
+    swimmer_id: 'sw-1',
+    content: 'Worked on breakouts',
+    tags: ['breakouts'],
+    practice_date: '2026-06-08',
+    created_at: '2026-06-08T18:00:00.000Z',
+    coach: { full_name: 'Coach K' },
+    ...over,
+  });
+
+  it('returns empty array for empty search term without querying', async () => {
+    const results = await searchNotes('  ');
+    expect(results).toEqual([]);
+    expect(supabase.from).not.toHaveBeenCalled();
+  });
+
+  it('fetches the most recent window from swimmer_notes, THEN filters client-side (frozen semantics)', async () => {
+    __state.selectRows = [makeRow()];
+    await searchNotes('breakout', 25);
+
+    expect(supabase.from).toHaveBeenCalledWith('swimmer_notes');
+    expect(__query.order).toHaveBeenCalledWith('created_at', { ascending: false });
+    expect(__query.limit).toHaveBeenCalledWith(25);
+  });
+
+  it('matches on content or tags and keeps the frozen result shape', async () => {
+    __state.selectRows = [
+      makeRow(),
+      makeRow({ id: 'n-2', content: 'Kick timing', tags: ['kick'] }),
+      makeRow({ id: 'n-3', content: 'Unrelated', tags: ['general'] }),
+    ];
+
+    const results = await searchNotes('kick');
+
+    expect(results).toHaveLength(1);
+    expect(results[0]).toEqual({
+      noteId: 'n-2',
+      swimmerId: 'sw-1',
+      content: 'Kick timing',
+      tags: ['kick'],
+      coachName: 'Coach K',
+      practiceDate: '2026-06-08',
+      createdAt: new Date('2026-06-08T18:00:00.000Z'),
+    });
+  });
+
+  it('reads swimmerId from the flat column (no parent-path extraction)', async () => {
+    __state.selectRows = [makeRow({ swimmer_id: 'sw-42' })];
+    const results = await searchNotes('breakout');
+    expect(results[0].swimmerId).toBe('sw-42');
+  });
+
+  it('is case-insensitive across content and tags', async () => {
+    __state.selectRows = [makeRow({ content: 'BREAKOUTS were sharp', tags: [] })];
+    const results = await searchNotes('breakouts');
+    expect(results).toHaveLength(1);
   });
 });
