@@ -1,3 +1,6 @@
+// Photo binaries stay on Firebase Storage (UNIFY Phase F); the swimmer-row
+// photo URL write migrated to canonical swimmers (Phase B). Same behavioral
+// contract; the row-write mock is re-pointed at the Supabase client.
 jest.mock('../../config/firebase', () => ({
   db: {},
   auth: { currentUser: { uid: 'test-uid' } },
@@ -19,13 +22,14 @@ jest.mock('firebase/storage', () => ({
   deleteObject: jest.fn().mockResolvedValue(undefined),
 }));
 
-jest.mock('firebase/firestore', () => ({
-  doc: jest.fn((...args: unknown[]) => ({
-    path: (args as string[]).slice(1).join('/'),
-  })),
-  updateDoc: jest.fn().mockResolvedValue(undefined),
-  serverTimestamp: jest.fn(() => new Date()),
-}));
+jest.mock('../../config/supabase', () => {
+  const query: Record<string, jest.Mock> = {
+    update: jest.fn(() => query),
+    eq: jest.fn(() => Promise.resolve({ error: null })),
+  };
+  const supabase = { from: jest.fn(() => query) };
+  return { supabase, __query: query };
+});
 
 // Mock fetch for blob creation
 global.fetch = jest.fn().mockResolvedValue({
@@ -33,20 +37,28 @@ global.fetch = jest.fn().mockResolvedValue({
 }) as any;
 
 import { uploadProfilePhoto, deleteProfilePhoto } from '../profilePhoto';
-import { updateDoc } from 'firebase/firestore';
 import { deleteObject } from 'firebase/storage';
+
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { supabase, __query } = require('../../config/supabase');
 
 describe('profilePhoto', () => {
   beforeEach(() => jest.clearAllMocks());
 
   describe('uploadProfilePhoto', () => {
-    it('uploads photo and updates swimmer doc', async () => {
+    it('uploads the photo and writes the URL to the swimmer row', async () => {
       const url = await uploadProfilePhoto('sw1', 'file:///photo.jpg');
       expect(url).toBe('https://storage.example.com/photo.jpg');
-      expect(updateDoc).toHaveBeenCalledWith(
-        expect.objectContaining({ path: 'swimmers/sw1' }),
-        expect.objectContaining({ profilePhotoUrl: 'https://storage.example.com/photo.jpg' }),
-      );
+      expect(supabase.from).toHaveBeenCalledWith('swimmers');
+      expect(__query.update).toHaveBeenCalledWith({
+        profile_photo_url: 'https://storage.example.com/photo.jpg',
+      });
+      expect(__query.eq).toHaveBeenCalledWith('id', 'sw1');
+    });
+
+    it('never sends updated_at (DB trigger owns it)', async () => {
+      await uploadProfilePhoto('sw1', 'file:///photo.jpg');
+      expect(__query.update.mock.calls[0][0]).not.toHaveProperty('updated_at');
     });
 
     it('calls onProgress callback', async () => {
@@ -64,20 +76,18 @@ describe('profilePhoto', () => {
   });
 
   describe('deleteProfilePhoto', () => {
-    it('deletes storage file and clears swimmer doc field', async () => {
+    it('deletes the storage file and clears the swimmer row field', async () => {
       await deleteProfilePhoto('sw1');
       expect(deleteObject).toHaveBeenCalled();
-      expect(updateDoc).toHaveBeenCalledWith(
-        expect.objectContaining({ path: 'swimmers/sw1' }),
-        expect.objectContaining({ profilePhotoUrl: null }),
-      );
+      expect(__query.update).toHaveBeenCalledWith({ profile_photo_url: null });
+      expect(__query.eq).toHaveBeenCalledWith('id', 'sw1');
     });
 
     it('handles missing storage file gracefully', async () => {
       (deleteObject as jest.Mock).mockRejectedValueOnce(new Error('not found'));
       await deleteProfilePhoto('sw1');
-      // Should still update the doc
-      expect(updateDoc).toHaveBeenCalled();
+      // Should still clear the row field
+      expect(__query.update).toHaveBeenCalledWith({ profile_photo_url: null });
     });
   });
 });

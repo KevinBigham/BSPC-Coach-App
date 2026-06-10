@@ -1,6 +1,18 @@
 import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
-import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { db, storage } from '../config/firebase';
+import { storage } from '../config/firebase';
+import { supabase } from '../config/supabase';
+
+// Photo binaries stay on Firebase Storage until the media phase (UNIFY/04
+// Phase F); the swimmer row's photo URL now lives on canonical swimmers.
+// profile_photo_url is host-agnostic, so the stored download URL keeps
+// working across the cutover. updated_at is owned by the DB trigger.
+async function setSwimmerPhotoUrl(swimmerId: string, url: string | null): Promise<void> {
+  const { error } = await supabase
+    .from('swimmers')
+    .update({ profile_photo_url: url })
+    .eq('id', swimmerId);
+  if (error) throw error;
+}
 
 export async function uploadProfilePhoto(
   swimmerId: string,
@@ -23,12 +35,13 @@ export async function uploadProfilePhoto(
       },
       (error) => reject(error),
       async () => {
-        const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
-        await updateDoc(doc(db, 'swimmers', swimmerId), {
-          profilePhotoUrl: downloadUrl,
-          updatedAt: serverTimestamp(),
-        });
-        resolve(downloadUrl);
+        try {
+          const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
+          await setSwimmerPhotoUrl(swimmerId, downloadUrl);
+          resolve(downloadUrl);
+        } catch (error) {
+          reject(error);
+        }
       },
     );
   });
@@ -41,8 +54,5 @@ export async function deleteProfilePhoto(swimmerId: string): Promise<void> {
   } catch {
     // Intentionally not logged: missing storage object still needs the profile field cleared.
   }
-  await updateDoc(doc(db, 'swimmers', swimmerId), {
-    profilePhotoUrl: null,
-    updatedAt: serverTimestamp(),
-  });
+  await setSwimmerPhotoUrl(swimmerId, null);
 }
