@@ -1,6 +1,47 @@
-import { collection, query, where, orderBy, getDocs, Timestamp } from 'firebase/firestore';
-import { db } from '../config/firebase';
+// Data layer migrated Firestore -> Supabase (UNIFY/08 Phase D §5c). One-shot
+// cross-table reads; the computation logic is unchanged. The attendance read
+// applies the D-C5 absent-exclusion [RD-4]: under the merged table,
+// BSPC-marked 'absent' rows are attendance ROWS too — counting them would
+// inflate attendancePercent. In analytics, attendance means "was there".
+import { supabase } from '../config/supabase';
 import type { Group } from '../config/constants';
+
+// [D-C5] keep NULL (checked-in) explicitly — SQL `neq` alone drops NULLs.
+const NOT_ABSENT = 'status.is.null,status.neq.absent';
+
+interface SwimmerRow {
+  id: string;
+  first_name: string;
+  last_name: string | null;
+  practice_group: string;
+}
+
+interface TimeRow {
+  event_name: string;
+  course: string | null;
+  time_hundredths: number;
+  created_at: string;
+}
+
+interface AttendanceCountRow {
+  swimmer_id: string;
+  practice_date: string;
+}
+
+async function fetchActiveSwimmers(group?: Group): Promise<SwimmerRow[]> {
+  let q = supabase
+    .from('swimmers')
+    .select('id, first_name, last_name, practice_group')
+    .eq('is_active', true);
+  if (group) q = q.eq('practice_group', group);
+  const { data, error } = await q;
+  if (error) throw error;
+  return (data ?? []) as SwimmerRow[];
+}
+
+function swimmerName(row: SwimmerRow): string {
+  return `${row.first_name} ${row.last_name ?? ''}`.trim();
+}
 
 // ── Time Drop Analysis ──────────────────────────────────────────────────
 
@@ -31,20 +72,13 @@ export async function getTimeDrops(
     return getSwimmerTimeDrops(swimmerId, rangeStart, rangeEnd);
   }
 
-  const swimmerSnap = await getDocs(
-    query(
-      collection(db, 'swimmers'),
-      where('active', '==', true),
-      ...(group ? [where('group', '==', group)] : []),
-    ),
-  );
+  const swimmers = await fetchActiveSwimmers(group);
 
   const allDrops: TimeDrop[] = [];
-  for (const swimmerDoc of swimmerSnap.docs) {
-    const data = swimmerDoc.data();
-    const drops = await getSwimmerTimeDrops(swimmerDoc.id, rangeStart, rangeEnd);
+  for (const swimmer of swimmers) {
+    const drops = await getSwimmerTimeDrops(swimmer.id, rangeStart, rangeEnd);
     for (const drop of drops) {
-      drop.swimmerName = `${data.firstName} ${data.lastName}`;
+      drop.swimmerName = swimmerName(swimmer);
       allDrops.push(drop);
     }
   }
@@ -57,18 +91,22 @@ async function getSwimmerTimeDrops(
   rangeStart?: string,
   rangeEnd?: string,
 ): Promise<TimeDrop[]> {
-  const timesRef = collection(db, 'swimmers', swimmerId, 'times');
-  const q = query(timesRef, orderBy('createdAt', 'asc'));
-  const snap = await getDocs(q);
+  // Chronology-of-entry semantics preserved: ordered by created_at ASC, a
+  // "drop" is a time entered later that beats the best entered before it.
+  const { data, error } = await supabase
+    .from('swim_results')
+    .select('event_name, course, time_hundredths, created_at')
+    .eq('swimmer_id', swimmerId)
+    .order('created_at', { ascending: true });
+  if (error) throw error;
 
   const bestByEvent: Record<string, number> = {};
   const drops: TimeDrop[] = [];
 
-  for (const d of snap.docs) {
-    const data = d.data();
-    const key = `${data.event}_${data.course}`;
-    const time = data.time as number;
-    const created = data.createdAt instanceof Timestamp ? data.createdAt.toDate() : new Date();
+  for (const row of (data ?? []) as TimeRow[]) {
+    const key = `${row.event_name}_${row.course}`;
+    const time = row.time_hundredths;
+    const created = new Date(row.created_at);
 
     if (rangeStart && created < new Date(rangeStart)) {
       bestByEvent[key] = Math.min(bestByEvent[key] ?? Infinity, time);
@@ -80,8 +118,8 @@ async function getSwimmerTimeDrops(
       drops.push({
         swimmerId,
         swimmerName: '',
-        event: data.event,
-        course: data.course,
+        event: row.event_name,
+        course: row.course ?? '',
         oldTime: bestByEvent[key],
         newTime: time,
         dropHundredths: bestByEvent[key] - time,
@@ -116,47 +154,40 @@ export async function getAttendanceCorrelation(
   cutoff.setDate(cutoff.getDate() - rangeDays);
   const cutoffStr = cutoff.toISOString().split('T')[0];
 
-  const swimmerSnap = await getDocs(
-    query(
-      collection(db, 'swimmers'),
-      where('active', '==', true),
-      ...(group ? [where('group', '==', group)] : []),
-    ),
-  );
+  const swimmers = await fetchActiveSwimmers(group);
 
-  const attendanceSnap = await getDocs(
-    query(
-      collection(db, 'attendance'),
-      where('practiceDate', '>=', cutoffStr),
-      orderBy('practiceDate', 'desc'),
-    ),
-  );
+  // [D-C5/RD-4] exclude BSPC-marked absences or they count as attendance.
+  const { data: attendanceData, error: attendanceError } = await supabase
+    .from('attendance')
+    .select('swimmer_id, practice_date')
+    .gte('practice_date', cutoffStr)
+    .or(NOT_ABSENT)
+    .order('practice_date', { ascending: false });
+  if (attendanceError) throw attendanceError;
+  const attendanceRows = (attendanceData ?? []) as AttendanceCountRow[];
 
   const attendanceBySwimmer: Record<string, number> = {};
-  for (const d of attendanceSnap.docs) {
-    const sid = d.data().swimmerId as string;
-    attendanceBySwimmer[sid] = (attendanceBySwimmer[sid] || 0) + 1;
+  for (const row of attendanceRows) {
+    attendanceBySwimmer[row.swimmer_id] = (attendanceBySwimmer[row.swimmer_id] || 0) + 1;
   }
 
   // Denominator = distinct practice dates, not total records.
-  const uniqueDates = new Set(attendanceSnap.docs.map((d) => d.data().practiceDate));
+  const uniqueDates = new Set(attendanceRows.map((row) => row.practice_date));
   const totalPractices = Math.max(uniqueDates.size, 1);
 
   const results: AttendanceCorrelation[] = [];
 
-  for (const swimmerDoc of swimmerSnap.docs) {
-    const data = swimmerDoc.data();
-    const sid = swimmerDoc.id;
-    const count = attendanceBySwimmer[sid] || 0;
+  for (const swimmer of swimmers) {
+    const count = attendanceBySwimmer[swimmer.id] || 0;
 
-    const drops = await getSwimmerTimeDrops(sid, cutoffStr);
+    const drops = await getSwimmerTimeDrops(swimmer.id, cutoffStr);
     const avgDrop =
       drops.length > 0 ? drops.reduce((sum, d) => sum + d.dropPercent, 0) / drops.length : 0;
 
     results.push({
-      swimmerId: sid,
-      swimmerName: `${data.firstName} ${data.lastName}`,
-      group: data.group,
+      swimmerId: swimmer.id,
+      swimmerName: swimmerName(swimmer),
+      group: swimmer.practice_group,
       attendancePercent: (count / totalPractices) * 100,
       practiceCount: count,
       timeDropPercent: avgDrop,
