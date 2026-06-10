@@ -1,23 +1,28 @@
-jest.mock('firebase/firestore', () => ({
-  getFirestore: jest.fn(),
-  collection: jest.fn(() => ({ path: 'mock' })),
-  query: jest.fn((ref: unknown) => ref),
-  where: jest.fn(),
-  orderBy: jest.fn(),
-  onSnapshot: jest.fn((_query: unknown, callback: (snap: unknown) => void) => {
-    callback({ docs: [] });
-    return jest.fn();
-  }),
-  addDoc: jest.fn().mockResolvedValue({ id: 'mock-new-id' }),
-  updateDoc: jest.fn().mockResolvedValue(undefined),
-  deleteDoc: jest.fn().mockResolvedValue(undefined),
-  doc: jest.fn(() => ({ path: 'mock/doc' })),
-  getDocs: jest.fn().mockResolvedValue({ docs: [] }),
-  serverTimestamp: jest.fn(),
-}));
-jest.mock('../../config/firebase', () => ({
-  db: {},
-}));
+// The store rides the real seasonPlanning service; Phase H re-pointed the
+// mock from firebase/firestore to the Supabase client (same store subjects).
+jest.mock('../../config/supabase', () => {
+  const query: Record<string, jest.Mock> & { then: unknown } = {
+    select: jest.fn(() => query),
+    eq: jest.fn(() => query),
+    order: jest.fn(() => query),
+    insert: jest.fn(() => query),
+    update: jest.fn(() => query),
+    delete: jest.fn(() => query),
+    single: jest.fn(() => Promise.resolve({ data: { id: 'mock-new-id' }, error: null })),
+    then: (resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) =>
+      Promise.resolve({ data: [], error: null }).then(resolve, reject),
+  };
+  const channel = {
+    on: jest.fn(() => channel),
+    subscribe: jest.fn(() => channel),
+  };
+  const supabase = {
+    from: jest.fn(() => query),
+    channel: jest.fn(() => channel),
+    removeChannel: jest.fn(),
+  };
+  return { supabase };
+});
 
 import { useSeasonStore } from '../seasonStore';
 import type { SeasonPlan } from '../../types/firestore.types';
