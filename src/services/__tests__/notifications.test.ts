@@ -1,34 +1,60 @@
-jest.mock('../../config/firebase', () => ({
-  db: {},
-  auth: { currentUser: { uid: 'test-uid' } },
-  storage: {},
-  functions: { app: {} },
-}));
-
-const mockCallable = jest.fn().mockResolvedValue({ data: { success: true } });
-jest.mock('firebase/functions', () => ({
-  httpsCallable: jest.fn(() => mockCallable),
-}));
-
-jest.mock('../../utils/logger', () => ({
-  logger: { warn: jest.fn(), info: jest.fn(), error: jest.fn(), debug: jest.fn() },
-}));
-
-jest.mock('firebase/firestore', () => ({
-  collection: jest.fn((...args: unknown[]) => ({ path: (args as string[]).slice(1).join('/') })),
-  query: jest.fn((ref: unknown) => ref),
-  where: jest.fn(),
-  orderBy: jest.fn(),
-  limit: jest.fn(),
-  doc: jest.fn((...args: unknown[]) => ({
-    path: (args as string[]).slice(1).join('/'),
-    id: (args as string[])[args.length - 1],
-  })),
-  updateDoc: jest.fn().mockResolvedValue(undefined),
-  onSnapshot: jest.fn(),
-  arrayUnion: jest.fn((val: string) => ({ _arrayUnion: val })),
-  arrayRemove: jest.fn((val: string) => ({ _arrayRemove: val })),
-}));
+// Data layer migrated Firestore -> Supabase (Phase G). The notification list
+// and unread badge read in_app_notifications; scoping is the RLS own-row wall
+// (no client-side user filter exists to get wrong). Push-token storage moved
+// to its canonical home, push_tokens (D-G2: storage parity only — coach push
+// delivery is a named post-cutover product line item).
+//
+// DELETED with their subject (manageTopics / FCM topic machinery, retired in
+// Phase G — Expo push has no topics; group fan-out is sender-side):
+//   - "subscribes to group topics + broadcast_all"
+//   - "continues on individual topic failure"
+//   - "unsubscribes from group topics + broadcast_all"
+// Replacement proofs: pgTAP 011 walls (delivery scope lives in the database),
+// push_tokens storage pins below.
+jest.mock('../../config/supabase', () => {
+  const state: {
+    selectRows: unknown[];
+    count: number;
+    user: { id: string } | null;
+    onHandler: ((p: unknown) => void) | null;
+  } = {
+    selectRows: [],
+    count: 0,
+    user: { id: 'auth-user-1' },
+    onHandler: null,
+  };
+  const query: Record<string, jest.Mock> & { then: unknown } = {
+    select: jest.fn(() => query),
+    order: jest.fn(() => query),
+    eq: jest.fn(() => query),
+    limit: jest.fn(() => query),
+    insert: jest.fn(() => query),
+    upsert: jest.fn(() => query),
+    update: jest.fn(() => query),
+    delete: jest.fn(() => query),
+    then: (resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) =>
+      Promise.resolve({ data: state.selectRows, count: state.count, error: null }).then(
+        resolve,
+        reject,
+      ),
+  };
+  const channel = {
+    on: jest.fn((_evt: unknown, _filter: unknown, handler: (p: unknown) => void) => {
+      state.onHandler = handler;
+      return channel;
+    }),
+    subscribe: jest.fn(() => channel),
+  };
+  const supabase = {
+    from: jest.fn(() => query),
+    channel: jest.fn(() => channel),
+    removeChannel: jest.fn(),
+    auth: {
+      getUser: jest.fn(() => Promise.resolve({ data: { user: state.user }, error: null })),
+    },
+  };
+  return { supabase, __state: state, __query: query, __channel: channel };
+});
 
 jest.mock('expo-notifications', () => ({
   setNotificationHandler: jest.fn(),
@@ -50,16 +76,33 @@ import {
   getUnreadCount,
   subscribeNotifications,
   markNotificationRead,
-  subscribeToGroupTopics,
-  unsubscribeFromAllTopics,
 } from '../notifications';
-import type { Group } from '../../config/constants';
 
-const firestore = require('firebase/firestore');
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const mock = require('../../config/supabase');
+const { supabase, __state, __query, __channel } = mock;
 const ExpoNotifications = require('expo-notifications');
+
+const flush = () => new Promise((resolve) => setImmediate(resolve));
+
+const makeRow = (over: Record<string, unknown> = {}) => ({
+  id: 'n-1',
+  user_id: 'auth-user-1',
+  title: 'Streak Alert',
+  body: 'Swimmer One hit a 5-practice streak.',
+  category: 'general',
+  data: { trigger: 'attendance_streak' },
+  is_read: false,
+  created_at: '2026-06-10T00:00:00.000Z',
+  ...over,
+});
 
 beforeEach(() => {
   jest.clearAllMocks();
+  __state.selectRows = [];
+  __state.count = 0;
+  __state.user = { id: 'auth-user-1' };
+  __state.onHandler = null;
 });
 
 describe('registerForPushNotifications', () => {
@@ -68,11 +111,17 @@ describe('registerForPushNotifications', () => {
     expect(token).toBe('ExponentPushToken[xxx]');
   });
 
-  it('stores token in Firestore', async () => {
+  it('stores the token in push_tokens, its canonical home (upsert by user+token)', async () => {
     await registerForPushNotifications('coach-1');
-    expect(firestore.updateDoc).toHaveBeenCalledWith(
-      expect.objectContaining({ path: 'coaches/coach-1' }),
-      expect.objectContaining({ fcmTokens: expect.anything() }),
+    expect(supabase.from).toHaveBeenCalledWith('push_tokens');
+    expect(__query.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        user_id: 'auth-user-1',
+        expo_push_token: 'ExponentPushToken[xxx]',
+        platform: 'ios',
+        is_active: true,
+      }),
+      { onConflict: 'user_id,expo_push_token' },
     );
   });
 
@@ -82,15 +131,22 @@ describe('registerForPushNotifications', () => {
     const token = await registerForPushNotifications('coach-1');
     expect(token).toBeNull();
   });
+
+  it('returns null without storing when there is no session', async () => {
+    __state.user = null;
+    const token = await registerForPushNotifications('coach-1');
+    expect(token).toBeNull();
+    expect(__query.upsert).not.toHaveBeenCalled();
+  });
 });
 
 describe('unregisterPushToken', () => {
-  it('removes token from coach doc', async () => {
+  it('deletes exactly the supplied token row for the signed-in user', async () => {
     await unregisterPushToken('coach-1', 'ExponentPushToken[xxx]');
-    expect(firestore.updateDoc).toHaveBeenCalledWith(
-      expect.objectContaining({ path: 'coaches/coach-1' }),
-      expect.objectContaining({ fcmTokens: expect.anything() }),
-    );
+    expect(supabase.from).toHaveBeenCalledWith('push_tokens');
+    expect(__query.delete).toHaveBeenCalled();
+    expect(__query.eq).toHaveBeenCalledWith('user_id', 'auth-user-1');
+    expect(__query.eq).toHaveBeenCalledWith('expo_push_token', 'ExponentPushToken[xxx]');
   });
 });
 
@@ -102,88 +158,89 @@ describe('getNotificationPermissionStatus', () => {
 });
 
 describe('subscribeNotifications', () => {
-  it('queries notifications collection for the coach', () => {
+  it('reads the newest N rows with NO user filter — the RLS own-row wall IS the scope', () => {
+    subscribeNotifications('coach-1', jest.fn(), 20);
+    expect(supabase.from).toHaveBeenCalledWith('in_app_notifications');
+    expect(__query.order).toHaveBeenCalledWith('created_at', { ascending: false });
+    expect(__query.limit).toHaveBeenCalledWith(20);
+    expect(__query.eq).not.toHaveBeenCalled();
+    expect(supabase.channel).toHaveBeenCalled();
+    expect(__channel.on).toHaveBeenCalledWith(
+      'postgres_changes',
+      expect.objectContaining({ table: 'in_app_notifications' }),
+      expect.any(Function),
+    );
+    expect(__channel.subscribe).toHaveBeenCalled();
+  });
+
+  it('maps rows to the frozen Notification shape (user_id->coachId, category->type, is_read->read)', async () => {
+    __state.selectRows = [makeRow(), makeRow({ id: 'n-2', category: null, data: null })];
     const cb = jest.fn();
-    subscribeNotifications('coach-1', cb, 20);
-    expect(firestore.collection).toHaveBeenCalledWith({}, 'notifications');
-    expect(firestore.where).toHaveBeenCalledWith('coachId', '==', 'coach-1');
-    expect(firestore.limit).toHaveBeenCalledWith(20);
-    expect(firestore.onSnapshot).toHaveBeenCalled();
+    subscribeNotifications('coach-1', cb);
+    await flush();
+    expect(cb).toHaveBeenCalledWith([
+      {
+        id: 'n-1',
+        coachId: 'auth-user-1',
+        title: 'Streak Alert',
+        body: 'Swimmer One hit a 5-practice streak.',
+        type: 'general',
+        data: { trigger: 'attendance_streak' },
+        read: false,
+        createdAt: new Date('2026-06-10T00:00:00.000Z'),
+      },
+      expect.objectContaining({ id: 'n-2', type: 'general', data: undefined }),
+    ]);
+  });
+
+  it('re-emits the full list when a realtime change fires', async () => {
+    __state.selectRows = [makeRow()];
+    const cb = jest.fn();
+    subscribeNotifications('coach-1', cb);
+    await flush();
+    expect(cb).toHaveBeenCalledTimes(1);
+    __state.onHandler?.({ eventType: 'INSERT' });
+    await flush();
+    expect(cb).toHaveBeenCalledTimes(2);
+  });
+
+  it('returns a synchronous unsubscribe that removes the channel', () => {
+    const unsub = subscribeNotifications('coach-1', jest.fn());
+    expect(typeof unsub).toBe('function');
+    unsub();
+    expect(supabase.removeChannel).toHaveBeenCalledWith(__channel);
   });
 });
 
 describe('getUnreadCount', () => {
-  it('subscribes to unread notifications for the coach', () => {
+  it('counts unread rows (RLS-scoped) and reports the count', async () => {
+    __state.count = 3;
     const callback = jest.fn();
     getUnreadCount('coach-1', callback);
+    await flush();
+    expect(supabase.from).toHaveBeenCalledWith('in_app_notifications');
+    expect(__query.select).toHaveBeenCalledWith('*', { count: 'exact', head: true });
+    expect(__query.eq).toHaveBeenCalledWith('is_read', false);
+    expect(callback).toHaveBeenCalledWith(3);
+  });
 
-    expect(firestore.collection).toHaveBeenCalledWith({}, 'notifications');
-    expect(firestore.where).toHaveBeenCalledWith('coachId', '==', 'coach-1');
-    expect(firestore.where).toHaveBeenCalledWith('read', '==', false);
-    expect(firestore.onSnapshot).toHaveBeenCalled();
+  it('re-counts when a realtime change fires', async () => {
+    const callback = jest.fn();
+    getUnreadCount('coach-1', callback);
+    await flush();
+    expect(callback).toHaveBeenCalledTimes(1);
+    __state.count = 1;
+    __state.onHandler?.({ eventType: 'UPDATE' });
+    await flush();
+    expect(callback).toHaveBeenLastCalledWith(1);
   });
 });
 
 describe('markNotificationRead', () => {
-  it('updates the notification doc with read: true', async () => {
+  it('updates is_read by id (the one own-row write)', async () => {
     await markNotificationRead('notif-1');
-    expect(firestore.updateDoc).toHaveBeenCalledWith(
-      expect.objectContaining({ path: 'notifications/notif-1' }),
-      { read: true },
-    );
-  });
-});
-
-describe('subscribeToGroupTopics', () => {
-  beforeEach(() => {
-    mockCallable.mockClear();
-  });
-
-  it('subscribes to group topics + broadcast_all', async () => {
-    await subscribeToGroupTopics('token-abc', ['Gold', 'Advanced'] as Group[]);
-    expect(mockCallable).toHaveBeenCalledTimes(3);
-    expect(mockCallable).toHaveBeenCalledWith({
-      action: 'subscribe',
-      topic: 'group_Gold',
-      token: 'token-abc',
-    });
-    expect(mockCallable).toHaveBeenCalledWith({
-      action: 'subscribe',
-      topic: 'group_Advanced',
-      token: 'token-abc',
-    });
-    expect(mockCallable).toHaveBeenCalledWith({
-      action: 'subscribe',
-      topic: 'broadcast_all',
-      token: 'token-abc',
-    });
-  });
-
-  it('continues on individual topic failure', async () => {
-    mockCallable.mockRejectedValueOnce(new Error('network'));
-    await subscribeToGroupTopics('token-abc', ['Gold', 'Silver'] as Group[]);
-    // Should still attempt all 3 topics (Gold fails, Silver + broadcast_all proceed)
-    expect(mockCallable).toHaveBeenCalledTimes(3);
-  });
-});
-
-describe('unsubscribeFromAllTopics', () => {
-  beforeEach(() => {
-    mockCallable.mockClear();
-  });
-
-  it('unsubscribes from group topics + broadcast_all', async () => {
-    await unsubscribeFromAllTopics('token-abc', ['Bronze'] as Group[]);
-    expect(mockCallable).toHaveBeenCalledTimes(2);
-    expect(mockCallable).toHaveBeenCalledWith({
-      action: 'unsubscribe',
-      topic: 'group_Bronze',
-      token: 'token-abc',
-    });
-    expect(mockCallable).toHaveBeenCalledWith({
-      action: 'unsubscribe',
-      topic: 'broadcast_all',
-      token: 'token-abc',
-    });
+    expect(supabase.from).toHaveBeenCalledWith('in_app_notifications');
+    expect(__query.update).toHaveBeenCalledWith({ is_read: true });
+    expect(__query.eq).toHaveBeenCalledWith('id', 'notif-1');
   });
 });

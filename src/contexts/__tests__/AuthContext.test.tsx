@@ -30,11 +30,11 @@ jest.mock('expo-notifications', () => ({
 }));
 
 const mockUnregisterPushToken = jest.fn().mockResolvedValue(undefined);
-const mockUnsubscribeFromAllTopics = jest.fn().mockResolvedValue(undefined);
 
+// FCM topic machinery retired in Phase G (Expo push has no topics); sign-out
+// cleanup is now token-row removal only.
 jest.mock('../../services/notifications', () => ({
   unregisterPushToken: (...args: unknown[]) => mockUnregisterPushToken(...args),
-  unsubscribeFromAllTopics: (...args: unknown[]) => mockUnsubscribeFromAllTopics(...args),
 }));
 
 jest.mock('../../utils/logger', () => ({
@@ -103,9 +103,6 @@ describe('AuthContext', () => {
     fireEvent.press(await findByText('TRIGGER SIGN OUT'));
 
     await waitFor(() => {
-      expect(mockUnsubscribeFromAllTopics).toHaveBeenCalledWith('ExponentPushToken[mock]', [
-        'Gold',
-      ]);
       expect(mockUnregisterPushToken).toHaveBeenCalledWith('coach-1', 'ExponentPushToken[mock]');
       expect(mockFirebaseSignOut).toHaveBeenCalled();
     });

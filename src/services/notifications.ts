@@ -1,23 +1,11 @@
 import * as Notifications from 'expo-notifications';
-import {
-  collection,
-  query,
-  where,
-  orderBy,
-  limit,
-  onSnapshot,
-  doc,
-  updateDoc,
-  arrayUnion,
-  arrayRemove,
-  type Unsubscribe,
-} from 'firebase/firestore';
-import { httpsCallable } from 'firebase/functions';
-import { db, functions } from '../config/firebase';
 import { Platform } from 'react-native';
+import { supabase } from '../config/supabase';
 import type { Notification } from '../types/firestore.types';
-import type { Group } from '../config/constants';
-import { logger } from '../utils/logger';
+
+// Structurally identical to firebase's Unsubscribe (() => void); the data layer
+// no longer imports firebase, but the public return type is unchanged.
+type Unsubscribe = () => void;
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -29,7 +17,40 @@ Notifications.setNotificationHandler({
   }),
 });
 
+interface InAppNotificationRow {
+  id: string;
+  user_id: string;
+  title: string;
+  body: string;
+  category: Notification['type'] | null;
+  data: Record<string, string> | null;
+  is_read: boolean;
+  created_at: string;
+}
+
+const NOTIFICATION_SELECT = 'id, user_id, title, body, category, data, is_read, created_at';
+
+function rowToNotification(row: InAppNotificationRow): Notification & { id: string } {
+  return {
+    id: row.id,
+    coachId: row.user_id,
+    title: row.title,
+    body: row.body,
+    type: row.category ?? 'general',
+    data: row.data ?? undefined,
+    read: row.is_read,
+    createdAt: new Date(row.created_at),
+  } as Notification & { id: string };
+}
+
+/**
+ * Register this device for push and store the Expo token in its canonical
+ * home, push_tokens (D-G2: storage parity — registration has no caller yet;
+ * coach push delivery is a named post-cutover product line item).
+ */
 export async function registerForPushNotifications(coachUid: string): Promise<string | null> {
+  void coachUid; // own-row table is keyed by the auth user; param kept for signature compat
+
   const { status: existingStatus } = await Notifications.getPermissionsAsync();
   let finalStatus = existingStatus;
 
@@ -53,17 +74,38 @@ export async function registerForPushNotifications(coachUid: string): Promise<st
   const tokenData = await Notifications.getExpoPushTokenAsync();
   const token = tokenData.data;
 
-  await updateDoc(doc(db, 'coaches', coachUid), {
-    fcmTokens: arrayUnion(token),
-  });
+  const { data: userData } = await supabase.auth.getUser();
+  const userId = userData?.user?.id;
+  if (!userId) return null;
+
+  const { error } = await supabase.from('push_tokens').upsert(
+    {
+      user_id: userId,
+      expo_push_token: token,
+      platform: Platform.OS === 'ios' ? 'ios' : 'android',
+      is_active: true,
+      // push_tokens has no update trigger; the canonical-native client stamps it
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: 'user_id,expo_push_token' },
+  );
+  if (error) throw error;
 
   return token;
 }
 
 export async function unregisterPushToken(coachUid: string, token: string): Promise<void> {
-  await updateDoc(doc(db, 'coaches', coachUid), {
-    fcmTokens: arrayRemove(token),
-  });
+  void coachUid; // own-row table is keyed by the auth user; param kept for signature compat
+  const { data: userData } = await supabase.auth.getUser();
+  const userId = userData?.user?.id;
+  if (!userId) return;
+
+  const { error } = await supabase
+    .from('push_tokens')
+    .delete()
+    .eq('user_id', userId)
+    .eq('expo_push_token', token);
+  if (error) throw error;
 }
 
 export async function getNotificationPermissionStatus(): Promise<string> {
@@ -71,65 +113,77 @@ export async function getNotificationPermissionStatus(): Promise<string> {
   return status;
 }
 
+let channelSeq = 0;
+
+/**
+ * Live list of the signed-in user's notifications. Scoping is the RLS
+ * own-row wall itself: the select returns only the caller's rows and
+ * realtime delivers only rows the subscriber can read — no client-side
+ * user filter exists to get wrong.
+ */
 export function subscribeNotifications(
   coachId: string,
   callback: (notifications: (Notification & { id: string })[]) => void,
   max = 30,
 ): Unsubscribe {
-  const q = query(
-    collection(db, 'notifications'),
-    where('coachId', '==', coachId),
-    orderBy('createdAt', 'desc'),
-    limit(max),
-  );
-  return onSnapshot(q, (snapshot) => {
-    callback(
-      snapshot.docs.map((d) => ({ id: d.id, ...d.data() }) as Notification & { id: string }),
-    );
-  });
+  let active = true;
+
+  const emit = async (): Promise<void> => {
+    const { data, error } = await supabase
+      .from('in_app_notifications')
+      .select(NOTIFICATION_SELECT)
+      .order('created_at', { ascending: false })
+      .limit(max);
+    if (!active || error || !data) return;
+    callback((data as unknown as InAppNotificationRow[]).map(rowToNotification));
+  };
+
+  void emit(); // immediate first fire, like onSnapshot
+
+  const channel = supabase
+    .channel(`in_app_notifications:${coachId}:${channelSeq++}`)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'in_app_notifications' }, () => {
+      void emit();
+    })
+    .subscribe();
+
+  return () => {
+    active = false;
+    void supabase.removeChannel(channel);
+  };
 }
 
 export function getUnreadCount(coachId: string, callback: (count: number) => void): Unsubscribe {
-  const q = query(
-    collection(db, 'notifications'),
-    where('coachId', '==', coachId),
-    where('read', '==', false),
-  );
-  return onSnapshot(q, (snapshot) => {
-    callback(snapshot.size);
-  });
+  let active = true;
+
+  const emit = async (): Promise<void> => {
+    const { count, error } = await supabase
+      .from('in_app_notifications')
+      .select('*', { count: 'exact', head: true })
+      .eq('is_read', false);
+    if (!active || error) return;
+    callback(count ?? 0);
+  };
+
+  void emit();
+
+  const channel = supabase
+    .channel(`in_app_notifications:unread:${coachId}:${channelSeq++}`)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'in_app_notifications' }, () => {
+      void emit();
+    })
+    .subscribe();
+
+  return () => {
+    active = false;
+    void supabase.removeChannel(channel);
+  };
 }
 
 export async function markNotificationRead(notificationId: string): Promise<void> {
-  await updateDoc(doc(db, 'notifications', notificationId), { read: true });
-}
-
-/** Called after successful push token registration. */
-export async function subscribeToGroupTopics(token: string, groups: Group[]): Promise<void> {
-  const callable = httpsCallable(functions, 'manageTopicSubscription');
-  const topics = [...groups.map((g) => `group_${g}`), 'broadcast_all'];
-
-  for (const topic of topics) {
-    try {
-      await callable({ action: 'subscribe', topic, token });
-    } catch (err) {
-      // Intentionally swallowed: one topic failure should not block the remaining subscriptions.
-      logger.warn(`Failed to subscribe to topic ${topic}`, err as Record<string, unknown>);
-    }
-  }
-}
-
-/** Called on sign-out or when a token is invalidated. */
-export async function unsubscribeFromAllTopics(token: string, groups: Group[]): Promise<void> {
-  const callable = httpsCallable(functions, 'manageTopicSubscription');
-  const topics = [...groups.map((g) => `group_${g}`), 'broadcast_all'];
-
-  for (const topic of topics) {
-    try {
-      await callable({ action: 'unsubscribe', topic, token });
-    } catch (err) {
-      // Intentionally swallowed: one topic failure should not block the remaining unsubscriptions.
-      logger.warn(`Failed to unsubscribe from topic ${topic}`, err as Record<string, unknown>);
-    }
-  }
+  const { error } = await supabase
+    .from('in_app_notifications')
+    .update({ is_read: true })
+    .eq('id', notificationId);
+  if (error) throw error;
 }

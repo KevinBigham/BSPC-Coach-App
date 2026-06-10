@@ -9,7 +9,7 @@ import {
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../config/firebase';
 import type { Coach, CoachRole } from '../types/firestore.types';
-import { unregisterPushToken, unsubscribeFromAllTopics } from '../services/notifications';
+import { unregisterPushToken } from '../services/notifications';
 import { logger } from '../utils/logger';
 
 interface AuthState {
@@ -125,7 +125,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const tokenResult = await Notifications.getExpoPushTokenAsync();
           const currentToken = tokenResult.data;
 
-          await unsubscribeFromAllTopics(currentToken, state.coach.groups);
           await unregisterPushToken(state.coach.uid, currentToken);
         }
       } catch (error) {
