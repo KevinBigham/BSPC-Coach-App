@@ -136,11 +136,25 @@ function sanitizeTime(id: string, data: DocData): ParentSwimTime {
   };
 }
 
-function sanitizeAttendance(id: string, data: DocData): ParentAttendanceSummary {
+interface PortalAttendanceRow {
+  id: string;
+  practice_date: string;
+  status: string | null;
+}
+
+const PORTAL_ATTENDANCE_SELECT = 'id, practice_date, status';
+
+// [D-C4] one wall, one rule: guardians get the SAME present/absent collapse
+// as attendance_parent_view — absent/excused/sick/injured read as 'absent',
+// everything else (including NULL = checked-in and left_early) as 'present'.
+// Raw statuses, coach notes and marker identity never leave the staff side.
+const ABSENT_STATUSES = new Set(['absent', 'excused', 'sick', 'injured']);
+
+function sanitizeAttendance(row: PortalAttendanceRow): ParentAttendanceSummary {
   return {
-    id,
-    practiceDate: asString(data.practiceDate),
-    status: asString(data.status) || null,
+    id: row.id,
+    practiceDate: row.practice_date,
+    status: row.status !== null && ABSENT_STATUSES.has(row.status) ? 'absent' : 'present',
   };
 }
 
@@ -207,8 +221,7 @@ export const getParentSwimmerPortalData = onCall(
       throw new HttpsError('not-found', 'Swimmer not found');
     }
 
-    // times + attendance intentionally stay on Firestore until their own
-    // phases (UNIFY/04 C/D)
+    // times intentionally stays on Firestore until its own phase (UNIFY/04 D)
     const db = getFirestore();
     const timesSnap = await db
       .collection('swimmers')
@@ -218,17 +231,20 @@ export const getParentSwimmerPortalData = onCall(
       .limit(50)
       .get();
 
-    const attendanceSnap = await db
-      .collection('attendance')
-      .where('swimmerId', '==', swimmerId)
-      .orderBy('practiceDate', 'desc')
-      .limit(30)
-      .get();
+    // Service role bypasses RLS: authorization is the linkedSwimmerIds gate
+    // above, and the sanitizer collapses to the parent-safe shape (Phase C).
+    const { data: attendanceRows, error: attendanceError } = await supabase
+      .from('attendance')
+      .select(PORTAL_ATTENDANCE_SELECT)
+      .eq('swimmer_id', swimmerId)
+      .order('practice_date', { ascending: false })
+      .limit(30);
+    if (attendanceError) throw attendanceError;
 
     return {
       swimmer: sanitizeSwimmerDetail(swimmerRow as unknown as PortalSwimmerRow),
       times: timesSnap.docs.map((doc) => sanitizeTime(doc.id, doc.data() ?? {})),
-      attendance: attendanceSnap.docs.map((doc) => sanitizeAttendance(doc.id, doc.data() ?? {})),
+      attendance: ((attendanceRows ?? []) as PortalAttendanceRow[]).map(sanitizeAttendance),
       schedule: [] as ParentScheduleEvent[],
     };
   },

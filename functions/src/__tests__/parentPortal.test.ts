@@ -1,15 +1,8 @@
 import { createMockDoc, createMockQuerySnapshot } from '../__mocks__/firebaseAdmin';
 
-// times + attendance payloads intentionally stay on Firestore until their own
-// phases (UNIFY/04 C/D); only those reads keep firestore mocks.
+// times intentionally stays on Firestore until its own phase (UNIFY/04 D);
+// only that read keeps a firestore mock.
 const mockTimesCollection = {
-  orderBy: jest.fn().mockReturnThis(),
-  limit: jest.fn().mockReturnThis(),
-  get: jest.fn(),
-};
-
-const mockAttendanceQuery = {
-  where: jest.fn().mockReturnThis(),
   orderBy: jest.fn().mockReturnThis(),
   limit: jest.fn().mockReturnThis(),
   get: jest.fn(),
@@ -19,9 +12,6 @@ const mockDb = {
   collection: jest.fn().mockImplementation((path: string) => {
     if (path === 'swimmers') {
       return { doc: jest.fn(() => ({ collection: jest.fn(() => mockTimesCollection) })) };
-    }
-    if (path === 'attendance') {
-      return mockAttendanceQuery;
     }
     return { doc: jest.fn() };
   }),
@@ -58,9 +48,18 @@ const swimmersBuilder = {
   maybeSingle: jest.fn(),
 };
 
+// Attendance is canonical as of Phase C: select/eq/order chain, limit resolves.
+const attendanceBuilder = {
+  select: jest.fn().mockReturnThis(),
+  eq: jest.fn().mockReturnThis(),
+  order: jest.fn().mockReturnThis(),
+  limit: jest.fn(),
+};
+
 const mockSupabaseFrom = jest.fn((table: string) => {
   if (table === 'profiles') return profilesBuilder;
   if (table === 'swimmers') return swimmersBuilder;
+  if (table === 'attendance') return attendanceBuilder;
   return guardianshipsBuilder;
 });
 
@@ -139,18 +138,20 @@ describe('parent portal callables', () => {
         }),
       ]),
     );
-    mockAttendanceQuery.get.mockResolvedValue(
-      createMockQuerySnapshot([
-        createMockDoc('att-1', {
-          swimmerId: 'swimmer-1',
-          swimmerName: 'Jane Smith',
-          group: 'Gold',
-          practiceDate: '2026-04-15',
-          status: 'normal',
+    // Canonical attendance row; the extra staff-only columns prove the
+    // sanitizer drops anything beyond id/practiceDate/status.
+    attendanceBuilder.limit.mockResolvedValue({
+      data: [
+        {
+          id: 'att-1',
+          practice_date: '2026-04-15',
+          status: null, // checked-in
           note: 'private coach note',
-        }),
-      ]),
-    );
+          marked_by: 'coach-uuid-private',
+        },
+      ],
+      error: null,
+    });
   });
 
   it('rejects unauthenticated parent portal dashboard requests', async () => {
@@ -224,12 +225,59 @@ describe('parent portal callables', () => {
         {
           id: 'att-1',
           practiceDate: '2026-04-15',
-          status: 'normal',
+          status: 'present', // NULL = checked-in collapses to 'present' [D-C4]
         },
       ],
       schedule: [],
     });
     expect(JSON.stringify(result)).not.toContain('private');
+  });
+
+  it('reads attendance from canonical attendance scoped to the swimmer, newest first, capped at 30', async () => {
+    const handler = handlerOf(getParentSwimmerPortalData) as (request: unknown) => Promise<unknown>;
+    await handler(makeRequest({ swimmerId: 'swimmer-1' }));
+
+    expect(mockSupabaseFrom).toHaveBeenCalledWith('attendance');
+    expect(attendanceBuilder.select).toHaveBeenCalledWith('id, practice_date, status');
+    expect(attendanceBuilder.eq).toHaveBeenCalledWith('swimmer_id', 'swimmer-1');
+    expect(attendanceBuilder.order).toHaveBeenCalledWith('practice_date', { ascending: false });
+    expect(attendanceBuilder.limit).toHaveBeenCalledWith(30);
+  });
+
+  it('collapses every raw status to present/absent for guardians (D-C4: one wall, one rule)', async () => {
+    attendanceBuilder.limit.mockResolvedValue({
+      data: [
+        { id: 'a-1', practice_date: '2026-04-15', status: 'sick' },
+        { id: 'a-2', practice_date: '2026-04-14', status: 'left_early' },
+        { id: 'a-3', practice_date: '2026-04-13', status: null },
+        { id: 'a-4', practice_date: '2026-04-12', status: 'present' },
+        { id: 'a-5', practice_date: '2026-04-11', status: 'absent' },
+      ],
+      error: null,
+    });
+
+    const handler = handlerOf(getParentSwimmerPortalData) as (request: unknown) => Promise<unknown>;
+    const result = (await handler(makeRequest({ swimmerId: 'swimmer-1' }))) as {
+      attendance: { id: string; status: string }[];
+    };
+
+    expect(result.attendance.map((a) => a.status)).toEqual([
+      'absent', // sick
+      'present', // left_early
+      'present', // checked-in (NULL)
+      'present', // present
+      'absent', // absent
+    ]);
+  });
+
+  it('never surfaces coach notes or marker identity in the attendance payload', async () => {
+    const handler = handlerOf(getParentSwimmerPortalData) as (request: unknown) => Promise<unknown>;
+    const result = (await handler(makeRequest({ swimmerId: 'swimmer-1' }))) as {
+      attendance: Record<string, unknown>[];
+    };
+
+    expect(Object.keys(result.attendance[0]).sort()).toEqual(['id', 'practiceDate', 'status']);
+    expect(JSON.stringify(result)).not.toContain('coach-uuid-private');
   });
 
   it('resolves the caller via profiles.user_id and authorizes via guardianships', async () => {
