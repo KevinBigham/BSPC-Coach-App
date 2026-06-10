@@ -1,38 +1,30 @@
-jest.mock('../../src/config/firebase', () => ({
-  db: {},
-  auth: { currentUser: { uid: 'coach-001' } },
-  storage: {},
-  functions: {},
-}));
-
-jest.mock('firebase/firestore', () => ({
-  collection: jest.fn((...args: unknown[]) => ({
-    path: (args as string[]).slice(1).join('/'),
-  })),
-  query: jest.fn((ref: unknown) => ref),
-  where: jest.fn(),
-  doc: jest.fn((...args: unknown[]) => ({
-    path: (args as string[]).slice(1).join('/'),
-    id: (args as string[])[args.length - 1],
-  })),
-  addDoc: jest.fn().mockResolvedValue({ id: 'invite-fixture-doc' }),
-  updateDoc: jest.fn().mockResolvedValue(undefined),
-  onSnapshot: jest.fn(),
-  serverTimestamp: jest.fn(() => new Date('2026-04-28T12:00:00.000Z')),
-  Timestamp: { fromDate: jest.fn((d: Date) => ({ toMillis: () => d.getTime() })) },
-}));
+// Phase I: the client write is a Supabase insert (UNIFY/01:parent_invites);
+// the mock re-points accordingly. Subjects preserved verbatim: payload
+// shape, code format, 7-day expiry, alphabet. redeemed rides the column
+// DEFAULT (false) — it left the payload; the name denorms derive on read.
+jest.mock('../../src/config/supabase', () => {
+  const query: Record<string, jest.Mock> = {
+    insert: jest.fn(() => query),
+    select: jest.fn(() => query),
+    single: jest.fn(() => Promise.resolve({ data: { id: 'invite-fixture-row' }, error: null })),
+  };
+  const supabase = { from: jest.fn(() => query) };
+  return { supabase, __query: query };
+});
 
 import { createParentInvite } from '../../src/services/parentInvites';
 import { buildSwimmer, buildParentInvite } from '../fixtures/coach';
 
-const firestore = require('firebase/firestore');
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const mock = require('../../src/config/supabase');
+const { supabase, __query } = mock;
 
 beforeEach(() => {
   jest.clearAllMocks();
 });
 
 describe('parentInvites.createParentInvite (critical op)', () => {
-  it('happy path: writes to parent_invites with redeemed=false and a 9-char code (8 + dash)', async () => {
+  it('happy path: inserts into parent_invites with a 9-char code (8 + dash); redeemed is the DB DEFAULT false', async () => {
     const swimmer = buildSwimmer({ index: 1, group: 'Gold' });
     const code = await createParentInvite(
       swimmer.id,
@@ -42,28 +34,31 @@ describe('parentInvites.createParentInvite (critical op)', () => {
     );
 
     expect(code).toMatch(/^[A-HJ-NP-Z2-9]{4}-[A-HJ-NP-Z2-9]{4}$/);
-    expect(firestore.addDoc).toHaveBeenCalledWith(
-      expect.objectContaining({ path: 'parent_invites' }),
+    expect(supabase.from).toHaveBeenCalledWith('parent_invites');
+    expect(__query.insert).toHaveBeenCalledWith(
       expect.objectContaining({
-        swimmerId: swimmer.id,
-        swimmerName: swimmer.displayName,
-        coachId: 'coach-001',
-        coachName: 'Coach One',
-        redeemed: false,
+        code,
+        swimmer_id: swimmer.id,
+        coach_id: 'coach-001',
       }),
     );
+    const payload = __query.insert.mock.calls[0][0];
+    expect(payload).not.toHaveProperty('redeemed'); // column DEFAULT false
+    expect(payload).not.toHaveProperty('swimmerName'); // denorms derive on read
+    expect(payload).not.toHaveProperty('coachName');
   });
 
-  it('edge: invite expiresAt is exactly 7 days from now', async () => {
+  it('edge: invite expires_at is exactly 7 days from now', async () => {
     const swimmer = buildSwimmer({ index: 1, group: 'Gold' });
     const before = Date.now();
     await createParentInvite(swimmer.id, swimmer.displayName, 'coach-001', 'Coach One');
     const after = Date.now();
 
-    const expiresAtArg = firestore.Timestamp.fromDate.mock.calls[0][0] as Date;
+    const payload = __query.insert.mock.calls[0][0] as { expires_at: string };
+    const expiresAtMs = new Date(payload.expires_at).getTime();
     const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000;
-    expect(expiresAtArg.getTime()).toBeGreaterThanOrEqual(before + SEVEN_DAYS - 1000);
-    expect(expiresAtArg.getTime()).toBeLessThanOrEqual(after + SEVEN_DAYS + 1000);
+    expect(expiresAtMs).toBeGreaterThanOrEqual(before + SEVEN_DAYS - 1000);
+    expect(expiresAtMs).toBeLessThanOrEqual(after + SEVEN_DAYS + 1000);
   });
 
   it('failure-shape: invite codes never use the ambiguous chars I/O/0/1', async () => {
