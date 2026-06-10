@@ -1,12 +1,13 @@
 // Phase E: the notes search reads canonical swimmer_notes — the Firestore
 // collectionGroup gymnastics (parent-path extraction for swimmerId) are gone;
-// swimmer_id is just a column on the flat table. Meet and calendar-event
-// searches stay on Firestore until Phase H.
-import { collection, query, orderBy, limit as firestoreLimit, getDocs } from 'firebase/firestore';
-import { db } from '../config/firebase';
+// swimmer_id is just a column on the flat table.
+// Phase H: the meet + calendar halves moved too — same frozen fetch-then-
+// filter semantics (newest `max` rows, THEN substring-match client-side; a
+// match older than the window stays invisible, exactly as before). BSPC-origin
+// meets surface NULL course/status as '' — the frozen result shape (FYI,
+// accepted). No firebase imports remain.
 import { supabase } from '../config/supabase';
-import type { Swimmer, CalendarEvent, FirebaseTimestamp } from '../types/firestore.types';
-import type { Meet } from '../types/meet.types';
+import type { Swimmer, FirebaseTimestamp } from '../types/firestore.types';
 
 type SwimmerWithId = Swimmer & { id: string };
 
@@ -111,25 +112,36 @@ export interface MeetSearchResult {
   status: string;
 }
 
+interface SearchMeetRow {
+  id: string;
+  name: string;
+  location: string;
+  course: string | null;
+  start_date: string;
+  status: string | null;
+}
+
 export async function searchMeets(term: string, max: number = 50): Promise<MeetSearchResult[]> {
   if (!term.trim()) return [];
   const lower = term.toLowerCase();
 
-  const q = query(collection(db, 'meets'), orderBy('startDate', 'desc'), firestoreLimit(max));
+  const { data, error } = await supabase
+    .from('meets')
+    .select('id, name, location, course, start_date, status')
+    .order('start_date', { ascending: false })
+    .limit(max);
+  if (error) throw error;
 
-  const snapshot = await getDocs(q);
-  return snapshot.docs
-    .map((d) => {
-      const data = d.data() as Meet;
-      return {
-        id: d.id,
-        name: data.name,
-        location: data.location,
-        course: data.course,
-        startDate: data.startDate,
-        status: data.status,
-      };
-    })
+  return ((data ?? []) as SearchMeetRow[])
+    .map((row) => ({
+      id: row.id,
+      name: row.name,
+      location: row.location,
+      // BSPC-origin rows carry NULL course/status → '' (frozen result shape)
+      course: row.course ?? '',
+      startDate: row.start_date,
+      status: row.status ?? '',
+    }))
     .filter(
       (m) => m.name.toLowerCase().includes(lower) || m.location.toLowerCase().includes(lower),
     );
@@ -146,6 +158,15 @@ export interface CalendarSearchResult {
   location?: string;
 }
 
+interface SearchEventRow {
+  id: string;
+  title: string;
+  type: string;
+  start_date: string;
+  start_time: string | null;
+  location: string | null;
+}
+
 export async function searchCalendarEvents(
   term: string,
   max: number = 50,
@@ -153,25 +174,22 @@ export async function searchCalendarEvents(
   if (!term.trim()) return [];
   const lower = term.toLowerCase();
 
-  const q = query(
-    collection(db, 'calendar_events'),
-    orderBy('startDate', 'desc'),
-    firestoreLimit(max),
-  );
+  const { data, error } = await supabase
+    .from('calendar_events')
+    .select('id, title, type, start_date, start_time, location')
+    .order('start_date', { ascending: false })
+    .limit(max);
+  if (error) throw error;
 
-  const snapshot = await getDocs(q);
-  return snapshot.docs
-    .map((d) => {
-      const data = d.data() as CalendarEvent;
-      return {
-        id: d.id,
-        title: data.title,
-        type: data.type,
-        startDate: data.startDate,
-        startTime: data.startTime,
-        location: data.location,
-      };
-    })
+  return ((data ?? []) as SearchEventRow[])
+    .map((row) => ({
+      id: row.id,
+      title: row.title,
+      type: row.type,
+      startDate: row.start_date,
+      startTime: row.start_time ?? undefined,
+      location: row.location ?? undefined,
+    }))
     .filter(
       (e) =>
         e.title.toLowerCase().includes(lower) ||
