@@ -14,15 +14,27 @@ jest.mock('firebase/firestore', () => ({
     path: (args as string[]).slice(1).join('/'),
     id: (args as string[])[args.length - 1],
   })),
-  addDoc: jest.fn().mockResolvedValue({ id: 'new-note-id' }),
   updateDoc: jest.fn().mockResolvedValue(undefined),
   serverTimestamp: jest.fn(() => new Date()),
 }));
+
+jest.mock('../../config/supabase', () => {
+  const query: Record<string, jest.Mock> & { then: unknown } = {
+    insert: jest.fn(() => query),
+    then: (resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) =>
+      Promise.resolve({ data: null, error: null }).then(resolve, reject),
+  };
+  const supabase = { from: jest.fn(() => query) };
+  return { supabase, __notesQuery: query };
+});
 
 import { approveVideoDraft, rejectVideoDraft, type VideoDraft } from '../videoDrafts';
 import type { Swimmer } from '../../types/firestore.types';
 
 const firestore = require('firebase/firestore');
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const supabaseMock = require('../../config/supabase');
+const { supabase, __notesQuery } = supabaseMock;
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -82,23 +94,28 @@ describe('approveVideoDraft', () => {
     );
   });
 
-  it('creates a swimmer note from the draft content', async () => {
+  it('creates a canonical swimmer_notes row from the draft content', async () => {
     const draft = makeDraft();
     await approveVideoDraft('session-1', draft, 'coach-1', 'Coach Kevin', consentedSwimmer);
-    expect(firestore.addDoc).toHaveBeenCalledWith(
-      expect.objectContaining({ path: 'swimmers/sw-1/notes' }),
+    expect(supabase.from).toHaveBeenCalledWith('swimmer_notes');
+    expect(__notesQuery.insert).toHaveBeenCalledWith(
       expect.objectContaining({
+        swimmer_id: 'sw-1',
         source: 'video_ai',
-        coachId: 'coach-1',
-        coachName: 'Coach Kevin',
+        coach_id: 'coach-1',
       }),
     );
+    const noteData = __notesQuery.insert.mock.calls[0][0];
+    expect(noteData).not.toHaveProperty('coachName'); // derived on read
+    // video notes carry NO note-side pointer (posted_note_id is draft-side, F)
+    expect(noteData).not.toHaveProperty('source_audio_draft_id');
+    expect(noteData).not.toHaveProperty('source_voice_note_id');
   });
 
   it('note content includes observation, diagnosis, and drill', async () => {
     const draft = makeDraft();
     await approveVideoDraft('session-1', draft, 'coach-1', 'Coach Kevin', consentedSwimmer);
-    const noteData = firestore.addDoc.mock.calls[0][1];
+    const noteData = __notesQuery.insert.mock.calls[0][0];
     expect(noteData.content).toContain('Elbow drops on recovery');
     expect(noteData.content).toContain('Diagnosis: Shoulder fatigue');
     expect(noteData.content).toContain('Drill: Catch-up drill');
@@ -107,7 +124,7 @@ describe('approveVideoDraft', () => {
   it('omits empty diagnosis/drill lines', async () => {
     const draft = makeDraft({ diagnosis: '', drillRecommendation: '' });
     await approveVideoDraft('session-1', draft, 'coach-1', 'Coach Kevin', consentedSwimmer);
-    const noteData = firestore.addDoc.mock.calls[0][1];
+    const noteData = __notesQuery.insert.mock.calls[0][0];
     expect(noteData.content).not.toContain('Diagnosis:');
     expect(noteData.content).not.toContain('Drill:');
   });
@@ -117,7 +134,7 @@ describe('approveVideoDraft', () => {
       approveVideoDraft('session-1', makeDraft(), 'coach-1', 'Coach Kevin', blockedSwimmer),
     ).rejects.toThrow(/media consent|cannot tag/i);
     expect(firestore.updateDoc).not.toHaveBeenCalled();
-    expect(firestore.addDoc).not.toHaveBeenCalled();
+    expect(__notesQuery.insert).not.toHaveBeenCalled();
   });
 });
 

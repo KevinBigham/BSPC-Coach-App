@@ -5,6 +5,9 @@ jest.mock('../../src/config/firebase', () => ({
   functions: {},
 }));
 
+// Phase E split: approved drafts post canonical swimmer_notes rows; draft
+// documents stay on Firestore until Phase F. BUG #4 media-consent
+// assertions unchanged word-for-word.
 jest.mock('firebase/firestore', () => ({
   collection: jest.fn((...args: unknown[]) => ({
     path: (args as string[]).slice(1).join('/'),
@@ -13,15 +16,27 @@ jest.mock('firebase/firestore', () => ({
     path: (args as string[]).slice(1).join('/'),
     id: (args as string[])[args.length - 1],
   })),
-  addDoc: jest.fn().mockResolvedValue({ id: 'fixture-note-doc' }),
   updateDoc: jest.fn().mockResolvedValue(undefined),
   serverTimestamp: jest.fn(() => new Date('2026-04-28T12:00:00.000Z')),
 }));
+
+jest.mock('../../src/config/supabase', () => {
+  const query: Record<string, jest.Mock> & { then: unknown } = {
+    insert: jest.fn(() => query),
+    then: (resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) =>
+      Promise.resolve({ data: null, error: null }).then(resolve, reject),
+  };
+  const supabase = { from: jest.fn(() => query) };
+  return { supabase, __notesQuery: query };
+});
 
 import { approveVideoDraft, rejectVideoDraft } from '../../src/services/videoDrafts';
 import { buildVideoDraft, buildSwimmer, buildMediaConsent } from '../fixtures/coach';
 
 const firestore = require('firebase/firestore');
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const supabaseMock = require('../../src/config/supabase');
+const { __notesQuery } = supabaseMock;
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -42,14 +57,15 @@ describe('videoDrafts.approveVideoDraft (critical op)', () => {
       expect.objectContaining({ path: 'video_sessions/sess-VID-001/drafts/draft-VID-001' }),
       expect.objectContaining({ approved: true, reviewedBy: 'coach-001' }),
     );
-    expect(firestore.addDoc).toHaveBeenCalledWith(
-      expect.objectContaining({ path: 'swimmers/swim-GO-001/notes' }),
+    expect(__notesQuery.insert).toHaveBeenCalledWith(
       expect.objectContaining({
+        swimmer_id: 'swim-GO-001',
         source: 'video_ai',
-        coachId: 'coach-001',
-        coachName: 'Coach One',
+        coach_id: 'coach-001',
       }),
     );
+    const noteData = __notesQuery.insert.mock.calls[0][0];
+    expect(noteData).not.toHaveProperty('coachName'); // derived on read
   });
 
   it('edge: note content joins observation, diagnosis, and drill with line breaks', async () => {
@@ -68,7 +84,7 @@ describe('videoDrafts.approveVideoDraft (critical op)', () => {
 
     await approveVideoDraft('sess-VID-001', draft as never, 'coach-001', 'Coach One', swimmer);
 
-    const noteData = firestore.addDoc.mock.calls[0][1];
+    const noteData = __notesQuery.insert.mock.calls[0][0];
     expect(noteData.content).toContain('Late catch');
     expect(noteData.content).toContain('Diagnosis: Dropped elbow');
     expect(noteData.content).toContain('Drill: Sculling 4x25');
@@ -90,7 +106,7 @@ describe('videoDrafts.approveVideoDraft (critical op)', () => {
 
     await approveVideoDraft('sess-VID-001', draft as never, 'coach-001', 'Coach One', swimmer);
 
-    const noteData = firestore.addDoc.mock.calls[0][1];
+    const noteData = __notesQuery.insert.mock.calls[0][0];
     expect(noteData.content).toBe('Strong kick');
     expect(noteData.content).not.toContain('Diagnosis:');
     expect(noteData.content).not.toContain('Drill:');
@@ -111,7 +127,7 @@ describe('videoDrafts.approveVideoDraft (critical op)', () => {
     await expect(
       approveVideoDraft('sess-VID-001', draft as never, 'coach-001', 'Coach One', swimmer),
     ).rejects.toThrow(/media consent|cannot tag/i);
-    expect(firestore.addDoc).not.toHaveBeenCalled();
+    expect(__notesQuery.insert).not.toHaveBeenCalled();
     expect(firestore.updateDoc).not.toHaveBeenCalled();
   });
 
@@ -129,7 +145,7 @@ describe('videoDrafts.approveVideoDraft (critical op)', () => {
     await expect(
       approveVideoDraft('sess-VID-001', draft as never, 'coach-001', 'Coach One', swimmer),
     ).rejects.toThrow(/do_not_photograph|cannot tag/i);
-    expect(firestore.addDoc).not.toHaveBeenCalled();
+    expect(__notesQuery.insert).not.toHaveBeenCalled();
   });
 });
 
@@ -144,7 +160,7 @@ describe('videoDrafts.rejectVideoDraft (critical op)', () => {
 
   it('failure-shape: rejecting MUST NOT post a swimmer note', async () => {
     await rejectVideoDraft('sess-VID-001', 'draft-VID-001', 'coach-001');
-    expect(firestore.addDoc).not.toHaveBeenCalled();
+    expect(__notesQuery.insert).not.toHaveBeenCalled();
   });
 
   it('edge: rejection records reviewer uid', async () => {
