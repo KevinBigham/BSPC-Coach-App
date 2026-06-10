@@ -1,3 +1,6 @@
+// Swimmer creation migrated Firestore -> canonical Postgres (UNIFY Phase B).
+// The import-job bookkeeping (importJobs service) intentionally stays on
+// Firestore until its own phase, so the firestore mock below only serves it.
 jest.mock('../../config/firebase', () => ({
   db: {},
   auth: { currentUser: { uid: 'test-uid' } },
@@ -8,38 +11,53 @@ jest.mock('../../config/firebase', () => ({
 jest.mock('firebase/firestore', () => ({
   addDoc: jest.fn().mockResolvedValue({ id: 'job-1' }),
   collection: jest.fn((...args: unknown[]) => ({ path: (args as string[]).slice(1).join('/') })),
-  query: jest.fn((ref: unknown) => ref),
-  where: jest.fn(),
-  getDocs: jest.fn(),
   doc: jest.fn((...args: unknown[]) => ({
     path: (args as string[]).slice(1).join('/'),
     id: (args as string[])[args.length - 1],
   })),
   serverTimestamp: jest.fn(() => new Date()),
   updateDoc: jest.fn().mockResolvedValue(undefined),
-  writeBatch: jest.fn(() => ({
-    set: jest.fn(),
-    update: jest.fn(),
-    delete: jest.fn(),
-    commit: jest.fn().mockResolvedValue(undefined),
-  })),
 }));
+
+jest.mock('../../config/supabase', () => {
+  const state: { existingRows: unknown[]; insertedIds: string[] } = {
+    existingRows: [],
+    insertedIds: ['new-sw-1'],
+  };
+  const swimmersQuery: Record<string, jest.Mock> & { then: unknown } = {
+    // select() doubles as the dedup read (thenable -> existingRows) and the
+    // post-insert id read (returns a promise when chained after insert()).
+    select: jest.fn(() => swimmersQuery),
+    insert: jest.fn(() => ({
+      select: jest.fn(() =>
+        Promise.resolve({ data: state.insertedIds.map((id) => ({ id })), error: null }),
+      ),
+    })),
+    then: (resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) =>
+      Promise.resolve({ data: state.existingRows, error: null }).then(resolve, reject),
+  };
+  const scpQuery = {
+    insert: jest.fn(() => Promise.resolve({ error: null })),
+  };
+  const supabase = {
+    from: jest.fn((table: string) =>
+      table === 'swimmer_coach_profile' ? scpQuery : swimmersQuery,
+    ),
+  };
+  return { supabase, __state: state, __swimmersQuery: swimmersQuery, __scpQuery: scpQuery };
+});
 
 import { parseCSV, validateRows, importSwimmers } from '../csvImport';
 import type { ParsedRow } from '../csvImport';
 
-const firestore = require('firebase/firestore');
-
-interface ExistingSwimmerDoc {
-  data: () => {
-    firstName: string;
-    lastName: string;
-    group: string;
-  };
-}
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const supabaseMock = require('../../config/supabase');
+const { __state, __swimmersQuery, __scpQuery } = supabaseMock;
 
 beforeEach(() => {
   jest.clearAllMocks();
+  __state.existingRows = [];
+  __state.insertedIds = ['new-sw-1'];
 });
 
 describe('parseCSV', () => {
@@ -161,11 +179,7 @@ describe('validateRows', () => {
 
 describe('importSwimmers', () => {
   it('skips duplicates based on name+group', async () => {
-    firestore.getDocs.mockResolvedValue({
-      forEach: (cb: (d: ExistingSwimmerDoc) => void) => {
-        cb({ data: () => ({ firstName: 'Jane', lastName: 'Doe', group: 'Gold' }) });
-      },
-    });
+    __state.existingRows = [{ first_name: 'Jane', last_name: 'Doe', practice_group: 'Gold' }];
 
     const result = await importSwimmers(
       [{ firstName: 'Jane', lastName: 'Doe', group: 'Gold', gender: 'F' }] as ParsedRow[],
@@ -173,16 +187,64 @@ describe('importSwimmers', () => {
     );
     expect(result.skipped).toBe(1);
     expect(result.created).toBe(0);
+    expect(__swimmersQuery.insert).not.toHaveBeenCalled();
   });
 
-  it('creates new swimmers not in roster', async () => {
-    firestore.getDocs.mockResolvedValue({ forEach: () => {} });
-
+  it('creates new swimmers not in roster with mapped canonical columns', async () => {
     const result = await importSwimmers(
       [{ firstName: 'New', lastName: 'Swimmer', group: 'Gold', gender: 'M' }] as ParsedRow[],
       'coach-1',
     );
     expect(result.created).toBe(1);
     expect(result.skipped).toBe(0);
+
+    const [insertedRows] = __swimmersQuery.insert.mock.calls[0];
+    expect(insertedRows).toEqual([
+      expect.objectContaining({
+        first_name: 'New',
+        last_name: 'Swimmer',
+        display_name: 'New Swimmer',
+        practice_group: 'Gold',
+        gender: 'M',
+        is_active: true,
+        created_by: 'coach-1',
+      }),
+    ]);
+    expect(insertedRows[0]).not.toHaveProperty('created_at'); // DB-owned
+    expect(insertedRows[0]).not.toHaveProperty('updated_at');
+  });
+
+  it('routes CSV parent contacts to the staff-only swimmer_coach_profile table', async () => {
+    await importSwimmers(
+      [
+        {
+          firstName: 'New',
+          lastName: 'Swimmer',
+          group: 'Gold',
+          gender: 'F',
+          parentName: 'Mary Doe',
+          parentPhone: '555-1234',
+          parentEmail: 'mary@example.com',
+        },
+      ] as ParsedRow[],
+      'coach-1',
+    );
+
+    // contacts never land on the swimmers row...
+    expect(__swimmersQuery.insert.mock.calls[0][0][0]).not.toHaveProperty('parent_contacts');
+    // ...they land on the companion row keyed by the new swimmer id
+    expect(__scpQuery.insert).toHaveBeenCalledWith([
+      {
+        swimmer_id: 'new-sw-1',
+        parent_contacts: [
+          {
+            name: 'Mary Doe',
+            phone: '555-1234',
+            email: 'mary@example.com',
+            relationship: 'Parent',
+          },
+        ],
+      },
+    ]);
   });
 });

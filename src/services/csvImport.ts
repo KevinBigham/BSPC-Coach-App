@@ -1,5 +1,4 @@
-import { collection, query, getDocs, writeBatch, doc, serverTimestamp } from 'firebase/firestore';
-import { db } from '../config/firebase';
+import { supabase } from '../config/supabase';
 import { GROUPS } from '../config/constants';
 import { createImportJob, updateImportJob } from './importJobs';
 import { logger } from '../utils/logger';
@@ -129,7 +128,7 @@ export function validateRows(rows: ParsedRow[]): ValidationResult {
   return { valid, errors };
 }
 
-/** Imports validated swimmers into Firestore, skipping duplicates */
+/** Imports validated swimmers into canonical Postgres, skipping duplicates */
 export async function importSwimmers(rows: ParsedRow[], coachUid: string): Promise<ImportResult> {
   const importJobId = await createImportJob({
     type: 'csv_roster',
@@ -148,23 +147,33 @@ export async function importSwimmers(rows: ParsedRow[], coachUid: string): Promi
 
   try {
     // Fetch existing swimmers for duplicate detection
-    const existing = await getDocs(query(collection(db, 'swimmers')));
+    const { data: existing, error: existingError } = await supabase
+      .from('swimmers')
+      .select('first_name, last_name, practice_group');
+    if (existingError) throw existingError;
     const existingKeys = new Set<string>();
-    existing.forEach((d) => {
-      const data = d.data();
-      existingKeys.add(
-        `${data.firstName?.toLowerCase()}|${data.lastName?.toLowerCase()}|${data.group?.toLowerCase()}`,
-      );
-    });
+    (existing ?? []).forEach(
+      (data: {
+        first_name: string | null;
+        last_name: string | null;
+        practice_group: string | null;
+      }) => {
+        existingKeys.add(
+          `${data.first_name?.toLowerCase()}|${data.last_name?.toLowerCase()}|${data.practice_group?.toLowerCase()}`,
+        );
+      },
+    );
 
     let created = 0;
     let skipped = 0;
     const errors: string[] = [];
 
-    // Batch in chunks of 400 (Firestore limit is 500, leaving room)
+    // Insert in chunks of 400 (kept from the Firestore batch limit; keeps
+    // payload sizes bounded and one failed chunk from sinking the rest)
     for (let i = 0; i < rows.length; i += 400) {
       const chunk = rows.slice(i, i + 400);
-      const batch = writeBatch(db);
+      const swimmerRows: Record<string, unknown>[] = [];
+      const contactsByIndex: Array<ParsedRow | null> = [];
 
       for (const row of chunk) {
         const key = `${row.firstName.toLowerCase()}|${row.lastName.toLowerCase()}|${row.group.toLowerCase()}`;
@@ -173,41 +182,54 @@ export async function importSwimmers(rows: ParsedRow[], coachUid: string): Promi
           continue;
         }
 
-        const ref = doc(collection(db, 'swimmers'));
-        batch.set(ref, {
-          firstName: row.firstName,
-          lastName: row.lastName,
-          displayName: `${row.firstName} ${row.lastName}`,
-          group: row.group,
+        swimmerRows.push({
+          first_name: row.firstName,
+          last_name: row.lastName,
+          display_name: `${row.firstName} ${row.lastName}`,
+          practice_group: row.group,
           gender: row.gender || 'F',
-          dateOfBirth: row.dateOfBirth || null,
-          usaSwimmingId: row.usaSwimmingId || null,
-          active: true,
-          strengths: [],
-          weaknesses: [],
-          techniqueFocusAreas: [],
-          goals: [],
-          parentContacts: row.parentName
-            ? [
-                {
-                  name: row.parentName,
-                  phone: row.parentPhone || '',
-                  email: row.parentEmail || '',
-                  relationship: 'Parent',
-                },
-              ]
-            : [],
-          meetSchedule: [],
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-          createdBy: coachUid,
+          date_of_birth: row.dateOfBirth || null,
+          usa_swimming_id: row.usaSwimmingId || null,
+          is_active: true,
+          created_by: coachUid,
+          // created_at / updated_at owned by the DB
         });
+        contactsByIndex.push(row.parentName ? row : null);
         existingKeys.add(key);
         created++;
       }
 
+      if (swimmerRows.length === 0) continue;
+
       try {
-        await batch.commit();
+        const { data: inserted, error: insertError } = await supabase
+          .from('swimmers')
+          .insert(swimmerRows)
+          .select('id');
+        if (insertError) throw insertError;
+
+        // Coach-eyes companion rows: CSV parent contacts land on the
+        // staff-only swimmer_coach_profile table, never on swimmers.
+        const scpRows = (inserted ?? []).map((rec: { id: string }, idx: number) => {
+          const source = contactsByIndex[idx];
+          return {
+            swimmer_id: rec.id,
+            parent_contacts: source
+              ? [
+                  {
+                    name: source.parentName,
+                    phone: source.parentPhone || '',
+                    email: source.parentEmail || '',
+                    relationship: 'Parent',
+                  },
+                ]
+              : [],
+          };
+        });
+        if (scpRows.length > 0) {
+          const { error: scpError } = await supabase.from('swimmer_coach_profile').insert(scpRows);
+          if (scpError) throw scpError;
+        }
       } catch (err: unknown) {
         // Intentionally swallowed: record the batch error and finish the import job summary.
         logger.error('csvImport:importSwimmers:batchCommitFail', {
