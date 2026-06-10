@@ -1,26 +1,3 @@
-import { createMockDoc, createMockQuerySnapshot } from '../__mocks__/firebaseAdmin';
-
-// times intentionally stays on Firestore until its own phase (UNIFY/04 D);
-// only that read keeps a firestore mock.
-const mockTimesCollection = {
-  orderBy: jest.fn().mockReturnThis(),
-  limit: jest.fn().mockReturnThis(),
-  get: jest.fn(),
-};
-
-const mockDb = {
-  collection: jest.fn().mockImplementation((path: string) => {
-    if (path === 'swimmers') {
-      return { doc: jest.fn(() => ({ collection: jest.fn(() => mockTimesCollection) })) };
-    }
-    return { doc: jest.fn() };
-  }),
-};
-
-jest.mock('firebase-admin/firestore', () => ({
-  getFirestore: jest.fn(() => mockDb),
-}));
-
 jest.mock('firebase-admin', () => ({
   apps: [{}],
   initializeApp: jest.fn(),
@@ -56,10 +33,19 @@ const attendanceBuilder = {
   limit: jest.fn(),
 };
 
+// Times are canonical as of Phase D: same chain shape against swim_results.
+const timesBuilder = {
+  select: jest.fn().mockReturnThis(),
+  eq: jest.fn().mockReturnThis(),
+  order: jest.fn().mockReturnThis(),
+  limit: jest.fn(),
+};
+
 const mockSupabaseFrom = jest.fn((table: string) => {
   if (table === 'profiles') return profilesBuilder;
   if (table === 'swimmers') return swimmersBuilder;
   if (table === 'attendance') return attendanceBuilder;
+  if (table === 'swim_results') return timesBuilder;
   return guardianshipsBuilder;
 });
 
@@ -126,18 +112,24 @@ describe('parent portal callables', () => {
       data: makeSwimmerRow(),
       error: null,
     });
-    mockTimesCollection.get.mockResolvedValue(
-      createMockQuerySnapshot([
-        createMockDoc('time-1', {
-          event: '50 Free',
+    // Canonical swim_results row; the staff-ish extra columns prove the
+    // sanitizer drops anything beyond the frozen 8-field shape. There is no
+    // stored timeDisplay — the payload derives it from time_hundredths.
+    timesBuilder.limit.mockResolvedValue({
+      data: [
+        {
+          id: 'time-1',
+          event_name: '50 Free',
           course: 'SCY',
-          time: 2500,
-          timeDisplay: '25.00',
-          isPR: true,
-          meetName: 'Dual Meet',
-        }),
-      ]),
-    );
+          time_hundredths: 2500,
+          is_personal_best: true,
+          meet_name: 'Dual Meet',
+          date: null,
+          created_by: 'coach-uuid-private',
+        },
+      ],
+      error: null,
+    });
     // Canonical attendance row; the extra staff-only columns prove the
     // sanitizer drops anything beyond id/practiceDate/status.
     attendanceBuilder.limit.mockResolvedValue({
@@ -242,6 +234,64 @@ describe('parent portal callables', () => {
     expect(attendanceBuilder.eq).toHaveBeenCalledWith('swimmer_id', 'swimmer-1');
     expect(attendanceBuilder.order).toHaveBeenCalledWith('practice_date', { ascending: false });
     expect(attendanceBuilder.limit).toHaveBeenCalledWith(30);
+  });
+
+  it('reads times from canonical swim_results scoped to the swimmer, newest entry first, capped at 50', async () => {
+    const handler = handlerOf(getParentSwimmerPortalData) as (request: unknown) => Promise<unknown>;
+    await handler(makeRequest({ swimmerId: 'swimmer-1' }));
+
+    expect(mockSupabaseFrom).toHaveBeenCalledWith('swim_results');
+    expect(timesBuilder.select).toHaveBeenCalledWith(
+      'id, event_name, course, time_hundredths, is_personal_best, meet_name, date',
+    );
+    expect(timesBuilder.eq).toHaveBeenCalledWith('swimmer_id', 'swimmer-1');
+    expect(timesBuilder.order).toHaveBeenCalledWith('created_at', { ascending: false });
+    expect(timesBuilder.limit).toHaveBeenCalledWith(50);
+  });
+
+  it('derives timeDisplay from stored hundredths and keeps the frozen times payload shape', async () => {
+    timesBuilder.limit.mockResolvedValue({
+      data: [
+        {
+          id: 'time-2',
+          event_name: '100 Free',
+          course: 'LCM',
+          time_hundredths: 6523,
+          is_personal_best: false,
+          meet_name: null,
+          date: '2026-03-15',
+          created_by: 'coach-uuid-private',
+        },
+      ],
+      error: null,
+    });
+
+    const handler = handlerOf(getParentSwimmerPortalData) as (request: unknown) => Promise<unknown>;
+    const result = (await handler(makeRequest({ swimmerId: 'swimmer-1' }))) as {
+      times: Record<string, unknown>[];
+    };
+
+    expect(result.times[0]).toEqual({
+      id: 'time-2',
+      event: '100 Free',
+      course: 'LCM',
+      time: 6523,
+      timeDisplay: '1:05.23', // derived — canonical stores no display strings
+      isPR: false,
+      meetName: null,
+      meetDate: '2026-03-15',
+    });
+    expect(Object.keys(result.times[0]).sort()).toEqual([
+      'course',
+      'event',
+      'id',
+      'isPR',
+      'meetDate',
+      'meetName',
+      'time',
+      'timeDisplay',
+    ]);
+    expect(JSON.stringify(result.times)).not.toContain('coach-uuid-private');
   });
 
   it('collapses every raw status to present/absent for guardians (D-C4: one wall, one rule)', async () => {

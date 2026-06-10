@@ -1,5 +1,4 @@
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
-import { getFirestore } from 'firebase-admin/firestore';
 
 import { supabase } from '../config/supabase';
 import { resolveParentIdentity } from '../identity';
@@ -46,8 +45,6 @@ interface ParentScheduleEvent {
   location: string | null;
 }
 
-type DocData = Record<string, unknown>;
-
 function asString(value: unknown, fallback = ''): string {
   return typeof value === 'string' ? value : fallback;
 }
@@ -64,17 +61,6 @@ function asBoolean(value: unknown, fallback = false): boolean {
 
 function asNumber(value: unknown, fallback = 0): number {
   return typeof value === 'number' ? value : fallback;
-}
-
-function toIsoDate(value: unknown): string | null {
-  if (!value) return null;
-  if (typeof value === 'string') return value;
-  if (value instanceof Date) return value.toISOString();
-  if (typeof value === 'object' && typeof (value as { toDate?: unknown }).toDate === 'function') {
-    const date = (value as { toDate: () => Date }).toDate();
-    return date.toISOString();
-  }
-  return null;
 }
 
 // Swimmer reads come from canonical swimmers (UNIFY/04 Phase B); coach-eyes
@@ -123,16 +109,48 @@ function sanitizeSwimmerDetail(row: PortalSwimmerRow): ParentSwimmerDetail {
   };
 }
 
-function sanitizeTime(id: string, data: DocData): ParentSwimTime {
+// times read from canonical swim_results (UNIFY/08 Phase D). The outbound
+// shape is FROZEN; only the source columns changed. timeDisplay is derived
+// here — canonical stores no display strings — via a pure copy of the client
+// formatter (RD-12: same algorithm both sides).
+interface PortalTimeRow {
+  id: string;
+  event_name: string | null;
+  course: string | null;
+  time_hundredths: number | null;
+  is_personal_best: boolean | null;
+  meet_name: string | null;
+  date: string | null;
+}
+
+const PORTAL_TIME_SELECT =
+  'id, event_name, course, time_hundredths, is_personal_best, meet_name, date';
+
+function formatTimeDisplay(hundredths: number): string {
+  const min = Math.floor(hundredths / 6000);
+  const sec = Math.floor((hundredths % 6000) / 100);
+  const hund = hundredths % 100;
+
+  const hundStr = String(hund).padStart(2, '0');
+  if (min > 0) {
+    return `${min}:${String(sec).padStart(2, '0')}.${hundStr}`;
+  }
+  return `${sec}.${hundStr}`;
+}
+
+function sanitizeTime(row: PortalTimeRow): ParentSwimTime {
+  const time = asNumber(row.time_hundredths);
   return {
-    id,
-    event: asString(data.event),
-    course: asString(data.course),
-    time: asNumber(data.time),
-    timeDisplay: asString(data.timeDisplay),
-    isPR: asBoolean(data.isPR),
-    meetName: asString(data.meetName) || null,
-    meetDate: toIsoDate(data.meetDate),
+    id: row.id,
+    event: asString(row.event_name),
+    course: asString(row.course),
+    time,
+    timeDisplay: formatTimeDisplay(time),
+    isPR: asBoolean(row.is_personal_best),
+    meetName: asString(row.meet_name) || null,
+    // a calendar string in the database; the same string the old Firestore
+    // docs carried (imports stored 'YYYY-MM-DD'; manual times stored null)
+    meetDate: row.date ?? null,
   };
 }
 
@@ -221,15 +239,16 @@ export const getParentSwimmerPortalData = onCall(
       throw new HttpsError('not-found', 'Swimmer not found');
     }
 
-    // times intentionally stays on Firestore until its own phase (UNIFY/04 D)
-    const db = getFirestore();
-    const timesSnap = await db
-      .collection('swimmers')
-      .doc(swimmerId)
-      .collection('times')
-      .orderBy('createdAt', 'desc')
-      .limit(50)
-      .get();
+    // Service role bypasses RLS: authorization is the linkedSwimmerIds gate
+    // above. Newest entries first — the same 50-row window as the old
+    // subcollection read.
+    const { data: timeRows, error: timesError } = await supabase
+      .from('swim_results')
+      .select(PORTAL_TIME_SELECT)
+      .eq('swimmer_id', swimmerId)
+      .order('created_at', { ascending: false })
+      .limit(50);
+    if (timesError) throw timesError;
 
     // Service role bypasses RLS: authorization is the linkedSwimmerIds gate
     // above, and the sanitizer collapses to the parent-safe shape (Phase C).
@@ -243,7 +262,7 @@ export const getParentSwimmerPortalData = onCall(
 
     return {
       swimmer: sanitizeSwimmerDetail(swimmerRow as unknown as PortalSwimmerRow),
-      times: timesSnap.docs.map((doc) => sanitizeTime(doc.id, doc.data() ?? {})),
+      times: ((timeRows ?? []) as PortalTimeRow[]).map(sanitizeTime),
       attendance: ((attendanceRows ?? []) as PortalAttendanceRow[]).map(sanitizeAttendance),
       schedule: [] as ParentScheduleEvent[],
     };
