@@ -1,21 +1,20 @@
 /**
  * Shared meet results import logic used by both SDIF and HY3 parsers.
- * Handles swimmer matching, PR detection, and Firestore writes.
- * Optionally links results to an existing Meet (updating MeetEntry docs).
+ * Handles swimmer matching and result writes.
+ *
+ * Phase D split (UNIFY/08 §5d, the ratified csvImport pattern): the TIMES
+ * half writes to Supabase swim_results — plain chunked INSERTs; the
+ * maintain_personal_bests() trigger does ALL PR math (D-D5), so the
+ * per-batch un-PR loop is gone and `result.prs` is recounted from the
+ * post-insert is_personal_best truth (RD-9). The meets/{id}/entries
+ * finalTime sync stays on Firestore until Phase H; import_jobs bookkeeping
+ * stays on Firestore until its phase.
  */
 
-import {
-  collection,
-  query,
-  where,
-  getDocs,
-  writeBatch,
-  doc,
-  serverTimestamp,
-  updateDoc,
-} from 'firebase/firestore';
+import { collection, query, where, getDocs, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
-import type { Swimmer, SwimTime } from '../types/firestore.types';
+import { supabase } from '../config/supabase';
+import type { Swimmer } from '../types/firestore.types';
 import type { SDIFRecord, MatchResult, ImportResult } from './meetImportTypes';
 import { createImportJob, updateImportJob } from './importJobs';
 import { logger } from '../utils/logger';
@@ -59,8 +58,9 @@ export function matchSwimmersToRoster(
 }
 
 /**
- * Import matched results into swimmer time subcollections.
- * Optionally updates MeetEntry documents when meetId is provided.
+ * Import matched results into swim_results.
+ * Optionally updates MeetEntry documents when meetId is provided (Firestore
+ * until Phase H).
  */
 export async function importMatchedResults(
   matches: MatchResult[],
@@ -103,72 +103,64 @@ export async function importMatchedResults(
     }
 
     for (const [swimmerId, swimmerMatches] of bySwimmer) {
-      // Fetch existing times for PR comparison
-      const timesRef = collection(db, 'swimmers', swimmerId, 'times');
-      const existingSnap = await getDocs(timesRef);
-      const existingTimes = existingSnap.docs.map((d) => ({
-        id: d.id,
-        ...d.data(),
-      })) as (SwimTime & { id: string })[];
-
-      // Batch write in chunks of 400
+      // Insert in chunks of 400; per-swimmer error capture semantics preserved.
+      // No existing-times read and no un-PR writes: the trigger owns PR truth.
       const chunks: MatchResult[][] = [];
       for (let i = 0; i < swimmerMatches.length; i += 400) {
         chunks.push(swimmerMatches.slice(i, i + 400));
       }
 
+      const insertedIds: string[] = [];
       for (const chunk of chunks) {
-        const batch = writeBatch(db);
+        const rows = chunk.map(({ record: rec }) => ({
+          swimmer_id: swimmerId,
+          event_name: rec.event,
+          course: rec.course,
+          time_hundredths: rec.time,
+          meet_name: rec.meetName || null,
+          date: rec.meetDate || null,
+          source,
+          created_by: coachUid,
+          // timeDisplay is derived on read; is_personal_best is trigger-owned
+        }));
 
-        for (const match of chunk) {
-          const rec = match.record;
-          const sameTimes = existingTimes.filter(
-            (t) => t.event === rec.event && t.course === rec.course,
-          );
-          const isPR = sameTimes.length === 0 || sameTimes.every((t) => rec.time < t.time);
-
-          const newRef = doc(collection(db, 'swimmers', swimmerId, 'times'));
-          batch.set(newRef, {
-            event: rec.event,
-            course: rec.course,
-            time: rec.time,
-            timeDisplay: rec.timeDisplay,
-            isPR,
-            meetName: rec.meetName || null,
-            meetDate: rec.meetDate || null,
-            source,
-            createdAt: serverTimestamp(),
-            createdBy: coachUid,
-          });
-
-          result.imported++;
-          if (isPR) result.prs++;
-
-          // Un-PR old times if this is a new PR
-          if (isPR && sameTimes.length > 0) {
-            for (const old of sameTimes) {
-              if (old.isPR) {
-                batch.update(doc(db, 'swimmers', swimmerId, 'times', old.id), { isPR: false });
-              }
-            }
-          }
-        }
-
-        try {
-          await batch.commit();
-        } catch (err: unknown) {
-          // Intentionally swallowed: keep importing other swimmers and report this swimmer's batch error.
-          logger.error('meetResultsImport:importMatchedResults:batchCommitFail', {
-            error: String(err),
+        const { data, error } = await supabase.from('swim_results').insert(rows).select('id');
+        if (error) {
+          // Intentionally swallowed: keep importing other swimmers and report
+          // this swimmer's chunk error.
+          logger.error('meetResultsImport:importMatchedResults:chunkInsertFail', {
+            error: String(error.message ?? error),
             swimmerId,
           });
-          result.errors.push(
-            `Batch write failed for swimmer ${swimmerId}: ${err instanceof Error ? err.message : String(err)}`,
-          );
+          result.errors.push(`Batch write failed for swimmer ${swimmerId}: ${error.message}`);
+          continue;
+        }
+
+        result.imported += rows.length;
+        for (const row of (data ?? []) as { id: string }[]) {
+          insertedIds.push(row.id);
         }
       }
 
-      // If linked to a meet, update MeetEntry docs
+      // [RD-9] the PR count must reflect the trigger's truth, not a client
+      // guess from stale reads — one recount query over the inserted ids.
+      if (insertedIds.length > 0) {
+        const { data: prRows, error: prError } = await supabase
+          .from('swim_results')
+          .select('id')
+          .in('id', insertedIds)
+          .eq('is_personal_best', true);
+        if (prError) {
+          logger.error('meetResultsImport:importMatchedResults:prRecountFail', {
+            error: String(prError.message ?? prError),
+            swimmerId,
+          });
+        } else {
+          result.prs += (prRows ?? []).length;
+        }
+      }
+
+      // If linked to a meet, update MeetEntry docs (Firestore until Phase H)
       if (meetId) {
         try {
           for (const match of swimmerMatches) {
