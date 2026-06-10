@@ -1,6 +1,10 @@
-export { onAudioUploaded } from './triggers/onAudioUploaded';
-export { onVideoUploaded } from './triggers/onVideoUploaded';
-export { onDraftReviewed } from './triggers/onDraftReviewed';
+// Phase F: the media pipeline is client-invoked + swept (D-F2). The
+// Firestore triggers onAudioUploaded/onVideoUploaded/onDraftReviewed retired
+// with the Firestore session docs; onVideoSessionWritten remains exported but
+// its subject collection no longer receives writes — it goes to Phase J with
+// the rest of the aggregation machinery (the D-C1(b)/D-D1 family).
+export { processAudioSession, processVideoSession } from './https/processSession';
+export { sweepStuckSessions } from './scheduled/sweepStuckSessions';
 export { onNotificationCreated } from './triggers/onNotification';
 export { dailyDigest } from './scheduled/dailyDigest';
 export { redeemInvite } from './callable/redeemInvite';

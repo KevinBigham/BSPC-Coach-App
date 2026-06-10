@@ -1,11 +1,4 @@
-import {
-  createMockFirestore,
-  createMockFieldValue,
-  createMockVertexAI,
-} from '../__mocks__/firebaseAdmin';
-
-const { db, mockBatch } = createMockFirestore();
-const fieldValue = createMockFieldValue();
+import { createMockVertexAI } from '../__mocks__/firebaseAdmin';
 
 const aiResponse = JSON.stringify([
   {
@@ -28,29 +21,23 @@ jest.mock('@google-cloud/vertexai', () => ({
   VertexAI: MockVertexAI,
 }));
 
-// Drafts batch write stays on Firestore (UNIFY Phase F)
-jest.mock('firebase-admin', () => ({
-  apps: [{}],
-  initializeApp: jest.fn(),
-  firestore: Object.assign(
-    jest.fn(() => db),
-    { FieldValue: fieldValue },
-  ),
-}));
-
-// Roster reads come from canonical swimmers (UNIFY Phase B)
+// Roster reads canonical since Phase B; the drafts write is canonical too as
+// of Phase F — one insert into audio_session_drafts (no firebase-admin left
+// in the module at all).
 jest.mock('../config/supabase', () => {
   const state: { rows: unknown[] } = { rows: [] };
   interface QueryMock {
     select: jest.Mock;
     eq: jest.Mock;
     in: jest.Mock;
+    insert: jest.Mock;
     then: (resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) => Promise<unknown>;
   }
   const query: QueryMock = {
     select: jest.fn(() => query),
     eq: jest.fn(() => query),
     in: jest.fn(() => query),
+    insert: jest.fn(() => Promise.resolve({ data: null, error: null })),
     then: (resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) =>
       Promise.resolve({ data: state.rows, error: null }).then(resolve, reject),
   };
@@ -80,11 +67,6 @@ describe('extractObservations', () => {
     jest.clearAllMocks();
     __state.rows = rosterRows;
 
-    db.collection.mockImplementation(() => {
-      // drafts collection (Firestore until Phase F)
-      return { doc: jest.fn().mockReturnValue({ id: 'draft-id' }) };
-    });
-
     mockGenerateContent.mockResolvedValue({
       response: {
         candidates: [{ content: { parts: [{ text: aiResponse }] } }],
@@ -92,18 +74,24 @@ describe('extractObservations', () => {
     });
   });
 
-  it('should extract observations and create draft docs', async () => {
+  it('should extract observations and insert canonical draft rows', async () => {
     await extractObservations('session-1', 'Jane had a great catch today', 'Gold');
 
     expect(MockVertexAI).toHaveBeenCalled();
     expect(mockGenerateContent).toHaveBeenCalled();
+    expect(mockSupabase.from).toHaveBeenCalledWith('audio_session_drafts');
     // Only Jane Smith matches, Unknown Person is skipped
-    expect(mockBatch.set).toHaveBeenCalledTimes(1);
-    expect(mockBatch.commit).toHaveBeenCalled();
-
-    const setCall = mockBatch.set.mock.calls[0][1];
-    expect(setCall.swimmerId).toBe('s1');
-    expect(setCall.observation).toBe('Great catch position on freestyle');
+    expect(__query.insert).toHaveBeenCalledTimes(1);
+    const rows = __query.insert.mock.calls[0][0];
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      session_id: 'session-1',
+      swimmer_id: 's1',
+      observation: 'Great catch position on freestyle',
+    });
+    // denorm gone, timestamps DB-owned
+    expect(rows[0]).not.toHaveProperty('swimmerName');
+    expect(rows[0]).not.toHaveProperty('created_at');
   });
 
   it('should filter group-specific swimmers when group is provided', async () => {
@@ -127,8 +115,8 @@ describe('extractObservations', () => {
     await extractObservations('session-1', 'Jane Smith looked sharp', 'Gold');
 
     // fuzzy match still resolves via the derived display name
-    expect(mockBatch.set).toHaveBeenCalledTimes(1);
-    expect(mockBatch.set.mock.calls[0][1].swimmerName).toBe('Jane Smith');
+    expect(__query.insert).toHaveBeenCalledTimes(1);
+    expect(__query.insert.mock.calls[0][0][0].swimmer_id).toBe('s1');
   });
 
   it('should handle empty AI response gracefully', async () => {
@@ -138,8 +126,7 @@ describe('extractObservations', () => {
 
     await extractObservations('session-1', 'No swimmers mentioned', null);
 
-    expect(mockBatch.set).not.toHaveBeenCalled();
-    expect(mockBatch.commit).not.toHaveBeenCalled();
+    expect(__query.insert).not.toHaveBeenCalled();
   });
 
   it('should handle unparseable AI response gracefully', async () => {
@@ -152,7 +139,7 @@ describe('extractObservations', () => {
     await extractObservations('session-1', 'Some text', null);
 
     expect(consoleSpy).toHaveBeenCalled();
-    expect(mockBatch.set).not.toHaveBeenCalled();
+    expect(__query.insert).not.toHaveBeenCalled();
     consoleSpy.mockRestore();
   });
 
@@ -182,9 +169,9 @@ describe('extractObservations', () => {
 
     await extractObservations('session-1', 'Jane did well', 'Gold');
 
-    const setCall = mockBatch.set.mock.calls[0][1];
-    expect(setCall.tags).toEqual(['technique', 'freestyle']);
-    expect(setCall.tags).not.toContain('invalid_tag');
+    const row = __query.insert.mock.calls[0][0][0];
+    expect(row.tags).toEqual(['technique', 'freestyle']);
+    expect(row.tags).not.toContain('invalid_tag');
   });
 
   it('should clamp confidence to 0-1 range', async () => {
@@ -198,9 +185,9 @@ describe('extractObservations', () => {
                   text: JSON.stringify([
                     {
                       swimmerName: 'Jane Smith',
-                      observation: 'Good work',
+                      observation: 'Stellar set',
                       tags: ['technique'],
-                      confidence: 1.5,
+                      confidence: 1.7,
                     },
                   ]),
                 },
@@ -211,54 +198,20 @@ describe('extractObservations', () => {
       },
     });
 
-    await extractObservations('session-1', 'Jane was great', 'Gold');
+    await extractObservations('session-1', 'Jane crushed it', 'Gold');
 
-    const setCall = mockBatch.set.mock.calls[0][1];
-    expect(setCall.confidence).toBe(1);
+    expect(__query.insert.mock.calls[0][0][0].confidence).toBe(1);
   });
 
-  it('passes selected swimmers into the prompt and only writes selected swimmer drafts', async () => {
-    // only s1 exists; missing selected ids are simply absent from the result
-    __state.rows = [
-      { id: 's1', first_name: 'Jane', last_name: 'Smith', display_name: 'Jane Smith' },
-    ];
-
-    mockGenerateContent.mockResolvedValueOnce({
-      response: {
-        candidates: [
-          {
-            content: {
-              parts: [
-                {
-                  text: JSON.stringify([
-                    {
-                      swimmerName: 'Bob Jones',
-                      observation: 'Good kick tempo',
-                      tags: ['kick'],
-                      confidence: 0.8,
-                    },
-                    {
-                      swimmerName: 'Jane Smith',
-                      observation: 'Great catch position',
-                      tags: ['technique'],
-                      confidence: 0.9,
-                    },
-                  ]),
-                },
-              ],
-            },
-          },
-        ],
-      },
-    });
-
-    await extractObservations('session-1', 'Jane and Bob did well', 'Gold', ['s1']);
+  it('scopes the roster read to selectedSwimmerIds when provided (two-pass P1-4 read)', async () => {
+    await extractObservations('session-1', 'Jane had a great catch', 'Gold', ['s1']);
 
     expect(__query.in).toHaveBeenCalledWith('id', ['s1']);
-    expect(getPrompt).toHaveBeenCalledWith('Jane and Bob did well', 'Jane Smith', 'Gold', [
-      { id: 's1', displayName: 'Jane Smith' },
-    ]);
-    expect(mockBatch.set).toHaveBeenCalledTimes(1);
-    expect(mockBatch.set.mock.calls[0][1].swimmerId).toBe('s1');
+    expect(getPrompt).toHaveBeenCalledWith(
+      'Jane had a great catch',
+      expect.any(String),
+      'Gold',
+      expect.arrayContaining([{ id: 's1', displayName: 'Jane Smith' }]),
+    );
   });
 });

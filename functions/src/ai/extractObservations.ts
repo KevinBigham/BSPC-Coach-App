@@ -1,12 +1,5 @@
-import * as admin from 'firebase-admin';
 import { supabase } from '../config/supabase';
 import { getPrompt, type PromptSwimmer } from './prompts';
-
-if (!admin.apps.length) {
-  admin.initializeApp();
-}
-
-const db = admin.firestore();
 
 interface ExtractedObservation {
   swimmerName: string;
@@ -15,8 +8,9 @@ interface ExtractedObservation {
   confidence: number;
 }
 
-// Roster reads come from canonical swimmers (UNIFY/04 Phase B); the drafts
-// write below stays on Firestore until the media phase (F).
+// Roster reads come from canonical swimmers (Phase B); the drafts write is
+// canonical too as of Phase F — one insert into audio_session_drafts (the
+// swimmerName denorm drops; it derives through the swimmers embed on read).
 interface RosterRow {
   id: string;
   first_name: string | null;
@@ -103,9 +97,8 @@ export async function extractObservations(
 
   if (!Array.isArray(observations) || observations.length === 0) return;
 
-  // Match swimmer names to IDs and create draft docs
-  const batch = db.batch();
-  const draftsCollection = db.collection(`audio_sessions/${sessionId}/drafts`);
+  // Match swimmer names to IDs and build canonical draft rows
+  const draftRows: Record<string, unknown>[] = [];
 
   for (const obs of observations) {
     // Fuzzy match swimmer name
@@ -143,16 +136,18 @@ export async function extractObservations(
     ];
     const tags = (obs.tags || []).filter((t: string) => validTags.includes(t));
 
-    const ref = draftsCollection.doc();
-    batch.set(ref, {
-      swimmerId: matched.id,
-      swimmerName: matched.displayName,
+    draftRows.push({
+      session_id: sessionId,
+      swimmer_id: matched.id,
       observation: obs.observation,
       tags,
       confidence: Math.min(Math.max(obs.confidence || 0.5, 0), 1),
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      // created_at DB-owned; swimmerName derived on read
     });
   }
 
-  await batch.commit();
+  if (draftRows.length === 0) return;
+
+  const { error: insertError } = await supabase.from('audio_session_drafts').insert(draftRows);
+  if (insertError) throw insertError;
 }
