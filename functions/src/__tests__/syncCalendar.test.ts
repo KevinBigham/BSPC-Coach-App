@@ -1,35 +1,27 @@
-import { createMockFirestore, createMockFieldValue } from '../__mocks__/firebaseAdmin';
+// Phase H (D-H3): syncCalendar writes canonical calendar_events via ONE
+// upsert keyed on the raw iCal UID (the plain ical_uid UNIQUE column). The
+// djb2 doc-id machinery retired with Firestore — its idempotency-key
+// subjects re-point here to the conflict key (same subjects: determinism,
+// distinctness, weird-character safety). created_at left the payload (the
+// healed nightly churn, named); coach_id is NULL with provenance in source
+// (the 'ical_sync' sentinel is unrepresentable against the FK).
+jest.mock('../config/supabase', () => {
+  const state: { upsertResult: { error: unknown } } = { upsertResult: { error: null } };
+  const upsert = jest.fn(() => Promise.resolve(state.upsertResult));
+  const from = jest.fn(() => ({ upsert }));
+  return { supabase: { from }, __state: state, __from: from, __upsert: upsert };
+});
 
-const { db, mockCollectionRef } = createMockFirestore();
-const fieldValue = createMockFieldValue();
-
-jest.mock('firebase-admin', () => ({
-  apps: [{}],
-  initializeApp: jest.fn(),
-  firestore: Object.assign(
-    jest.fn(() => db),
-    { FieldValue: fieldValue },
-  ),
-}));
-
-import { upsertCalendarEvent, stableId } from '../scheduled/syncCalendar';
+import { upsertCalendarEvent } from '../scheduled/syncCalendar';
 import type { ParsedICalEvent } from '../utils/icalParser';
 
-// The shared mock factory's mockCollectionRef.doc(...) returns a fresh inline
-// object every call, but `.mockReturnValue` reuses the same instance — so we
-// reach the `.set` mock through `.mock.results[0].value`.
-function lastDocSetCall(): unknown {
-  const setMock = (mockCollectionRef.doc as jest.Mock).mock.results[0].value.set as jest.Mock;
-  return setMock.mock.calls[0][0];
-}
-
-function lastDocSetOptions(): unknown {
-  const setMock = (mockCollectionRef.doc as jest.Mock).mock.results[0].value.set as jest.Mock;
-  return setMock.mock.calls[0][1];
-}
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const mock = require('../config/supabase');
+const { __state, __from, __upsert } = mock;
 
 beforeEach(() => {
   jest.clearAllMocks();
+  __state.upsertResult = { error: null };
 });
 
 function event(over: Partial<ParsedICalEvent> = {}): ParsedICalEvent {
@@ -48,56 +40,92 @@ function event(over: Partial<ParsedICalEvent> = {}): ParsedICalEvent {
   };
 }
 
-describe('stableId', () => {
-  it('produces deterministic ids — same UID -> same docId', () => {
-    expect(stableId('practice-001@bspc')).toBe(stableId('practice-001@bspc'));
+function lastPayload(): Record<string, unknown> {
+  return __upsert.mock.calls[0][0] as Record<string, unknown>;
+}
+
+describe('the idempotency key (ex-stableId subjects)', () => {
+  it('is deterministic — the same UID is the same conflict key (it IS the raw UID)', async () => {
+    await upsertCalendarEvent(event());
+    await upsertCalendarEvent(event());
+
+    expect(__upsert.mock.calls[0][0].ical_uid).toBe(__upsert.mock.calls[1][0].ical_uid);
+    expect(__upsert.mock.calls[0][1]).toEqual({ onConflict: 'ical_uid' });
   });
 
-  it('different UIDs produce different ids (no collisions for sample set)', () => {
-    const ids = new Set([
-      stableId('practice-001@bspc'),
-      stableId('practice-002@bspc'),
-      stableId('meet-spring@bspc'),
-      stableId('fundraiser-2026@bspc'),
-      stableId('a@b'),
-    ]);
-    expect(ids.size).toBe(5);
+  it('different UIDs produce different keys (no collisions — no hashing at all)', async () => {
+    const uids = [
+      'practice-001@bspc',
+      'practice-002@bspc',
+      'meet-spring@bspc',
+      'fundraiser-2026@bspc',
+      'a@b',
+    ];
+    for (const uid of uids) {
+      await upsertCalendarEvent(event({ uid }));
+    }
+    const keys = new Set(
+      __upsert.mock.calls.map((c: unknown[]) => (c[0] as { ical_uid: string }).ical_uid),
+    );
+    expect(keys.size).toBe(5);
   });
 
-  it('id has the ical_ prefix and only firestore-safe chars', () => {
-    const id = stableId('weird/uid//with::illegal??chars');
-    expect(id.startsWith('ical_')).toBe(true);
-    expect(id).toMatch(/^[a-z0-9_]+$/);
+  it('weird characters pass through VERBATIM — PG column values need no path-safe encoding', async () => {
+    await upsertCalendarEvent(event({ uid: 'weird/uid//with::illegal??chars' }));
+
+    expect(lastPayload().ical_uid).toBe('weird/uid//with::illegal??chars');
   });
 });
 
 describe('upsertCalendarEvent', () => {
-  it('writes a doc keyed by stableId(uid) into calendar_events with merge', async () => {
+  it('upserts into calendar_events keyed onConflict ical_uid (D-H3 — one write, idempotent)', async () => {
     await upsertCalendarEvent(event());
 
-    expect(db.collection).toHaveBeenCalledWith('calendar_events');
-    expect(mockCollectionRef.doc).toHaveBeenCalledWith(stableId('practice-001@bspc'));
-    expect(lastDocSetOptions()).toEqual({ merge: true });
+    expect(__from).toHaveBeenCalledWith('calendar_events');
+    expect(__upsert).toHaveBeenCalledWith(
+      expect.objectContaining({ ical_uid: 'practice-001@bspc' }),
+      { onConflict: 'ical_uid' },
+    );
   });
 
-  it('passes through inferred type, source flag, and the original iCal UID', async () => {
+  it('writes OWNERLESS rows: coach_id NULL, provenance in source — the sentinel is gone', async () => {
+    await upsertCalendarEvent(event());
+
+    const payload = lastPayload();
+    expect(payload.coach_id).toBeNull();
+    expect(payload.source).toBe('ical_sync');
+    expect(payload).not.toHaveProperty('coachId');
+    expect(payload).not.toHaveProperty('coachName');
+    expect(payload).not.toHaveProperty('coach_name');
+  });
+
+  it('never writes created_at — DB-owned on insert, untouched on update (the healed churn)', async () => {
+    await upsertCalendarEvent(event());
+
+    const payload = lastPayload();
+    expect(payload).not.toHaveProperty('created_at');
+    expect(payload).not.toHaveProperty('createdAt');
+    expect(typeof payload.synced_at).toBe('string');
+    expect(typeof payload.updated_at).toBe('string');
+  });
+
+  it('passes through inferred type, title, and the calendar-string dates', async () => {
     await upsertCalendarEvent(event({ title: 'Spring Invitational Meet' }));
 
-    const payload = lastDocSetCall() as Record<string, unknown>;
+    const payload = lastPayload();
     expect(payload.type).toBe('meet');
-    expect(payload.source).toBe('ical_sync');
-    expect(payload.icalUid).toBe('practice-001@bspc');
     expect(payload.title).toBe('Spring Invitational Meet');
+    expect(payload.start_date).toBe('2026-05-01');
   });
 
-  it('omits startTime / endDate / endTime when the event is all-day', async () => {
+  it('omits start_time / end_date / end_time when the event is all-day (merge-faithful: absent columns survive on conflict)', async () => {
     await upsertCalendarEvent(event({ startTime: null, endDate: null, endTime: null }));
 
-    const payload = lastDocSetCall() as Record<string, unknown>;
-    expect(payload).not.toHaveProperty('startTime');
-    expect(payload).not.toHaveProperty('endDate');
-    expect(payload).not.toHaveProperty('endTime');
-    expect(payload.startDate).toBe('2026-05-01');
+    const payload = lastPayload();
+    expect(payload).not.toHaveProperty('start_time');
+    expect(payload).not.toHaveProperty('end_date');
+    expect(payload).not.toHaveProperty('end_time');
+    expect(payload.start_date).toBe('2026-05-01');
   });
 
   it('emits recurring metadata when the parser collapsed RRULE to weekly', async () => {
@@ -105,20 +133,26 @@ describe('upsertCalendarEvent', () => {
       event({ recurrence: { frequency: 'weekly', dayOfWeek: 1, until: '2026-08-01' } }),
     );
 
-    const payload = lastDocSetCall() as Record<string, unknown>;
+    const payload = lastPayload();
     expect(payload.recurring).toEqual({
       frequency: 'weekly',
       dayOfWeek: 1,
       until: '2026-08-01',
     });
-    expect(payload.rawRrule).toBeNull();
+    expect(payload.raw_rrule).toBeNull();
   });
 
-  it('preserves rawRrule for fallthrough RRULE shapes the parser did not collapse', async () => {
+  it('preserves raw_rrule for fallthrough RRULE shapes the parser did not collapse', async () => {
     await upsertCalendarEvent(event({ recurrence: null, rawRrule: 'FREQ=DAILY' }));
 
-    const payload = lastDocSetCall() as Record<string, unknown>;
-    expect(payload.rawRrule).toBe('FREQ=DAILY');
+    const payload = lastPayload();
+    expect(payload.raw_rrule).toBe('FREQ=DAILY');
     expect(payload).not.toHaveProperty('recurring');
+  });
+
+  it('throws on an upsert error so the handler can count the skip (swallow lives in the loop)', async () => {
+    __state.upsertResult = { error: { message: 'boom' } };
+
+    await expect(upsertCalendarEvent(event())).rejects.toThrow('boom');
   });
 });

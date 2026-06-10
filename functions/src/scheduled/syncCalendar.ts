@@ -1,27 +1,33 @@
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import * as logger from 'firebase-functions/logger';
-import * as admin from 'firebase-admin';
+import { supabase } from '../config/supabase';
 import { parseICal, inferEventType, type ParsedICalEvent } from '../utils/icalParser';
 
-if (!admin.apps.length) admin.initializeApp();
-
 /**
- * Daily public-calendar sync.
+ * Daily public-calendar sync (Phase H, D-H3: writes canonical
+ * calendar_events).
  *
  * The BSPC public website embeds a Google Calendar; the ICS feed URL is
- * supplied via environment config (CALENDAR_ICS_URL). When set, this job
- * fetches the feed every day and upserts each VEVENT into the
- * `calendar_events` Firestore collection, keyed by iCal UID so a re-run
- * of the same feed produces zero net changes.
+ * supplied via environment config (CALENDAR_ICS_URL — contract unchanged).
+ * When set, this job fetches the feed every day and upserts each VEVENT into
+ * the `calendar_events` table, keyed by the RAW iCal UID (the plain
+ * `ical_uid` UNIQUE column — the djb2 doc-id hashing retired with Firestore;
+ * PG column values need no path-safe encoding).
  *
  * Design choices:
- *   - **Idempotent**: doc id == iCal UID hashed to a Firestore-safe form.
+ *   - **Idempotent**: one upsert per VEVENT, onConflict ical_uid — a re-run
+ *     of the same feed produces zero net new rows.
  *   - **Non-destructive**: events that drop from the feed are NOT deleted —
- *     we only ingest. A coach who hand-edits an auto-pulled event keeps
- *     their changes on subsequent runs (we use set with merge).
- *   - **Provenance flag**: every auto-pulled doc carries `source: 'ical_sync'`
- *     so the UI can show a small "synced" badge and so future cleanup tooling
- *     can identify auto-pulled rows.
+ *     we only ingest. The conflict-update sets exactly the payload columns
+ *     (today's set-with-merge clobber semantics, faithfully preserved:
+ *     hand-edits to payload fields ARE overwritten nightly; columns outside
+ *     the payload survive). created_at is DB-owned and never touched by the
+ *     conflict-update — the old nightly created_at churn is healed (named,
+ *     invisible to all readers).
+ *   - **Ownerless rows**: coach_id is NULL with provenance in
+ *     `source: 'ical_sync'` (D-H3 — the old string sentinel is
+ *     unrepresentable against the profiles FK; the UI's "synced" badge reads
+ *     source).
  *   - **Skip when unconfigured**: if CALENDAR_ICS_URL is missing, log once
  *     and exit cleanly — never throw, never break the schedule.
  */
@@ -67,36 +73,29 @@ export const syncCalendar = onSchedule(
 );
 
 /**
- * Upsert one parsed VEVENT into `calendar_events`.
- *
- * Doc id strategy: hash the UID to a stable 32-char base32 string so
- * Firestore-illegal characters (`/`, leading `__`, etc.) cannot escape into
- * the doc path. Implementation uses a tiny djb2 hash + base36 — collisions
- * are not a meaningful concern for the BSPC calendar's tens-of-events scale.
+ * Upsert one parsed VEVENT into `calendar_events`, keyed on the raw iCal UID.
  */
 async function upsertCalendarEvent(event: ParsedICalEvent): Promise<void> {
-  const db = admin.firestore();
-  const docId = stableId(event.uid);
-  const ref = db.collection('calendar_events').doc(docId);
-
+  const now = new Date().toISOString();
   const payload: Record<string, unknown> = {
     title: event.title,
     description: event.description,
     type: inferEventType(event.title),
-    startDate: event.startDate,
+    start_date: event.startDate,
     location: event.location,
     groups: [],
-    coachId: 'ical_sync',
-    coachName: 'iCal Sync',
+    coach_id: null, // D-H3: ownerless; the FK forbids any fake-owner sentinel
     source: 'ical_sync',
-    icalUid: event.uid,
-    rawRrule: event.rawRrule,
-    syncedAt: admin.firestore.FieldValue.serverTimestamp(),
-    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    ical_uid: event.uid, // the upsert key — the RAW UID, verbatim
+    raw_rrule: event.rawRrule,
+    synced_at: now,
+    updated_at: now,
+    // created_at deliberately absent: DB-owned on insert, untouched on
+    // conflict-update — the nightly churn is healed.
   };
-  if (event.startTime) payload.startTime = event.startTime;
-  if (event.endDate) payload.endDate = event.endDate;
-  if (event.endTime) payload.endTime = event.endTime;
+  if (event.startTime) payload.start_time = event.startTime;
+  if (event.endDate) payload.end_date = event.endDate;
+  if (event.endTime) payload.end_time = event.endTime;
   if (event.recurrence) {
     payload.recurring = {
       frequency: event.recurrence.frequency,
@@ -105,30 +104,12 @@ async function upsertCalendarEvent(event: ParsedICalEvent): Promise<void> {
     };
   }
 
-  // Merge so coach hand-edits to title/description/location are not clobbered.
-  // Newly-discovered fields (e.g., a freshly-added end time) still land.
-  await ref.set(
-    {
-      ...payload,
-      // createdAt only on first write — set with merge will not overwrite if
-      // the field already exists, but FieldValue.serverTimestamp() always
-      // writes a new value, so we fence it via the existence check below.
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    },
-    { merge: true },
-  );
-}
-
-function stableId(uid: string): string {
-  let h = 5381;
-  for (let i = 0; i < uid.length; i++) {
-    h = ((h << 5) + h) ^ uid.charCodeAt(i);
-  }
-  // Force unsigned 32-bit and base36 — yields up to 7 chars, prefix tagged.
-  const unsigned = h >>> 0;
-  return `ical_${unsigned.toString(36)}`;
+  const { error } = await supabase
+    .from('calendar_events')
+    .upsert(payload, { onConflict: 'ical_uid' });
+  if (error) throw new Error(error.message);
 }
 
 // Re-export the upsert helper for direct use in tests; the scheduled handler
 // is wrapped by Firebase and not directly invocable in unit tests.
-export { upsertCalendarEvent, stableId };
+export { upsertCalendarEvent };
