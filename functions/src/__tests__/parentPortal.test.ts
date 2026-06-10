@@ -1,6 +1,7 @@
 import { createMockDoc, createMockQuerySnapshot } from '../__mocks__/firebaseAdmin';
 
-const mockSwimmerDocRefs = new Map<string, { get: jest.Mock; collection: jest.Mock }>();
+// times + attendance payloads intentionally stay on Firestore until their own
+// phases (UNIFY/04 C/D); only those reads keep firestore mocks.
 const mockTimesCollection = {
   orderBy: jest.fn().mockReturnThis(),
   limit: jest.fn().mockReturnThis(),
@@ -14,20 +15,10 @@ const mockAttendanceQuery = {
   get: jest.fn(),
 };
 
-function getSwimmerDocRef(id: string) {
-  if (!mockSwimmerDocRefs.has(id)) {
-    mockSwimmerDocRefs.set(id, {
-      get: jest.fn(),
-      collection: jest.fn(() => mockTimesCollection),
-    });
-  }
-  return mockSwimmerDocRefs.get(id)!;
-}
-
 const mockDb = {
   collection: jest.fn().mockImplementation((path: string) => {
     if (path === 'swimmers') {
-      return { doc: jest.fn((id: string) => getSwimmerDocRef(id)) };
+      return { doc: jest.fn(() => ({ collection: jest.fn(() => mockTimesCollection) })) };
     }
     if (path === 'attendance') {
       return mockAttendanceQuery;
@@ -45,8 +36,10 @@ jest.mock('firebase-admin', () => ({
   initializeApp: jest.fn(),
 }));
 
-// Identity gate now resolves via canonical profiles + guardianships
-// (UNIFY/05 §3.3, Phase A Option (b)) through the service-role client.
+// Identity resolves via canonical profiles + guardianships (Phase A Option
+// (b)); swimmer reads now come from canonical swimmers + the staff-only
+// swimmer_coach_profile / goals embeds (Phase B) — all through the
+// service-role client.
 const profilesBuilder = {
   select: jest.fn().mockReturnThis(),
   eq: jest.fn().mockReturnThis(),
@@ -58,9 +51,18 @@ const guardianshipsBuilder = {
   eq: jest.fn(),
 };
 
-const mockSupabaseFrom = jest.fn((table: string) =>
-  table === 'profiles' ? profilesBuilder : guardianshipsBuilder,
-);
+const swimmersBuilder = {
+  select: jest.fn().mockReturnThis(),
+  in: jest.fn(),
+  eq: jest.fn().mockReturnThis(),
+  maybeSingle: jest.fn(),
+};
+
+const mockSupabaseFrom = jest.fn((table: string) => {
+  if (table === 'profiles') return profilesBuilder;
+  if (table === 'swimmers') return swimmersBuilder;
+  return guardianshipsBuilder;
+});
 
 jest.mock('../config/supabase', () => ({
   // Lazy lookup: jest hoists this factory above the const declarations, so
@@ -84,13 +86,31 @@ function makeRequest(
   return { data, auth };
 }
 
+// Canonical swimmers row fixture. The private-ish columns prove the
+// sanitizers drop anything beyond the allowed fields.
+const makeSwimmerRow = (over: Record<string, unknown> = {}) => ({
+  id: 'swimmer-1',
+  first_name: 'Jane',
+  last_name: 'Smith',
+  display_name: 'Jane Smith',
+  practice_group: 'Gold',
+  gender: 'F',
+  is_active: true,
+  profile_photo_url: null,
+  media_consent_notes: 'private consent detail',
+  coach_profile: { strengths: [] },
+  goals: [],
+  ...over,
+});
+
 describe('parent portal callables', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockSwimmerDocRefs.clear();
     profilesBuilder.select.mockReturnThis();
     profilesBuilder.eq.mockReturnThis();
     guardianshipsBuilder.select.mockReturnThis();
+    swimmersBuilder.select.mockReturnThis();
+    swimmersBuilder.eq.mockReturnThis();
     profilesBuilder.maybeSingle.mockResolvedValue({
       data: { id: 'profile-1', email: 'parent@example.com', full_name: 'Parent' },
       error: null,
@@ -99,17 +119,14 @@ describe('parent portal callables', () => {
       data: [{ swimmer_id: 'swimmer-1' }],
       error: null,
     });
-    getSwimmerDocRef('swimmer-1').get.mockResolvedValue(
-      createMockDoc('swimmer-1', {
-        firstName: 'Jane',
-        lastName: 'Smith',
-        displayName: 'Jane Smith',
-        group: 'Gold',
-        gender: 'F',
-        active: true,
-        parentContacts: [{ email: 'private@example.com' }],
-      }),
-    );
+    swimmersBuilder.in.mockResolvedValue({
+      data: [makeSwimmerRow()],
+      error: null,
+    });
+    swimmersBuilder.maybeSingle.mockResolvedValue({
+      data: makeSwimmerRow(),
+      error: null,
+    });
     mockTimesCollection.get.mockResolvedValue(
       createMockQuerySnapshot([
         createMockDoc('time-1', {
@@ -246,5 +263,55 @@ describe('parent portal callables', () => {
 
     const handler = handlerOf(getParentPortalDashboard) as (request: unknown) => Promise<unknown>;
     await expect(handler(makeRequest())).rejects.toThrow('identity store down');
+  });
+
+  it('reads roster summaries from canonical swimmers scoped to the linked ids', async () => {
+    const handler = handlerOf(getParentPortalDashboard) as (request: unknown) => Promise<unknown>;
+    await handler(makeRequest());
+
+    expect(mockSupabaseFrom).toHaveBeenCalledWith('swimmers');
+    expect(swimmersBuilder.in).toHaveBeenCalledWith('id', ['swimmer-1']);
+  });
+
+  it('skips dangling linked ids with no swimmers row (old not-found path)', async () => {
+    guardianshipsBuilder.eq.mockResolvedValue({
+      data: [{ swimmer_id: 'swimmer-1' }, { swimmer_id: 'swimmer-gone' }],
+      error: null,
+    });
+    // only swimmer-1 has a row
+    swimmersBuilder.in.mockResolvedValue({ data: [makeSwimmerRow()], error: null });
+
+    const handler = handlerOf(getParentPortalDashboard) as (request: unknown) => Promise<unknown>;
+    const result = (await handler(makeRequest())) as { swimmers: { id: string }[] };
+
+    expect(result.swimmers).toHaveLength(1);
+    expect(result.swimmers[0].id).toBe('swimmer-1');
+  });
+
+  it('returns not-found when the linked swimmer row is missing on the detail read', async () => {
+    swimmersBuilder.maybeSingle.mockResolvedValue({ data: null, error: null });
+
+    const handler = handlerOf(getParentSwimmerPortalData) as (request: unknown) => Promise<unknown>;
+    await expect(handler(makeRequest({ swimmerId: 'swimmer-1' }))).rejects.toThrow(
+      /not.found|Swimmer not found/i,
+    );
+  });
+
+  it('derives portal strengths and goals from the companion table and goals rows', async () => {
+    swimmersBuilder.maybeSingle.mockResolvedValue({
+      data: makeSwimmerRow({
+        coach_profile: { strengths: ['underwaters'] },
+        goals: [{ event_name: '100 Free' }, { event_name: '200 IM' }],
+      }),
+      error: null,
+    });
+
+    const handler = handlerOf(getParentSwimmerPortalData) as (request: unknown) => Promise<unknown>;
+    const result = (await handler(makeRequest({ swimmerId: 'swimmer-1' }))) as {
+      swimmer: { strengths: string[]; goals: string[] };
+    };
+
+    expect(result.swimmer.strengths).toEqual(['underwaters']);
+    expect(result.swimmer.goals).toEqual(['100 Free', '200 IM']);
   });
 });

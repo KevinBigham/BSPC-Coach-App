@@ -1,6 +1,7 @@
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { getFirestore } from 'firebase-admin/firestore';
 
+import { supabase } from '../config/supabase';
 import { resolveParentIdentity } from '../identity';
 
 interface ParentSwimmerSummary {
@@ -76,26 +77,49 @@ function toIsoDate(value: unknown): string | null {
   return null;
 }
 
-function sanitizeSwimmerSummary(id: string, data: DocData): ParentSwimmerSummary {
-  const firstName = asString(data.firstName);
-  const lastName = asString(data.lastName);
+// Swimmer reads come from canonical swimmers (UNIFY/04 Phase B); coach-eyes
+// strengths come from the staff-only swimmer_coach_profile companion and
+// portal goals strings are derived from the goals table. The sanitizers keep
+// the exact same outbound shapes — nothing beyond these fields ever leaves.
+interface PortalSwimmerRow {
+  id: string;
+  first_name: string | null;
+  last_name: string | null;
+  display_name: string | null;
+  practice_group: string | null;
+  gender: string | null;
+  is_active: boolean | null;
+  profile_photo_url: string | null;
+  coach_profile?: { strengths: string[] | null } | null;
+  goals?: { event_name: string | null }[] | null;
+}
+
+const PORTAL_SWIMMER_SUMMARY_SELECT =
+  'id, first_name, last_name, display_name, practice_group, gender, is_active, profile_photo_url';
+const PORTAL_SWIMMER_DETAIL_SELECT =
+  PORTAL_SWIMMER_SUMMARY_SELECT +
+  ', coach_profile:swimmer_coach_profile(strengths), goals(event_name)';
+
+function sanitizeSwimmerSummary(row: PortalSwimmerRow): ParentSwimmerSummary {
+  const firstName = asString(row.first_name);
+  const lastName = asString(row.last_name);
   return {
-    id,
+    id: row.id,
     firstName,
     lastName,
-    displayName: asString(data.displayName, `${firstName} ${lastName}`.trim()),
-    group: asString(data.group),
-    gender: asString(data.gender),
-    active: asBoolean(data.active),
-    profilePhotoUrl: asString(data.profilePhotoUrl) || null,
+    displayName: asString(row.display_name, `${firstName} ${lastName}`.trim()),
+    group: asString(row.practice_group),
+    gender: asString(row.gender),
+    active: asBoolean(row.is_active),
+    profilePhotoUrl: asString(row.profile_photo_url) || null,
   };
 }
 
-function sanitizeSwimmerDetail(id: string, data: DocData): ParentSwimmerDetail {
+function sanitizeSwimmerDetail(row: PortalSwimmerRow): ParentSwimmerDetail {
   return {
-    ...sanitizeSwimmerSummary(id, data),
-    strengths: asStringArray(data.strengths),
-    goals: asStringArray(data.goals),
+    ...sanitizeSwimmerSummary(row),
+    strengths: asStringArray(row.coach_profile?.strengths),
+    goals: (row.goals ?? []).map((goal) => asString(goal.event_name)).filter(Boolean),
   };
 }
 
@@ -123,17 +147,23 @@ function sanitizeAttendance(id: string, data: DocData): ParentAttendanceSummary 
 async function loadLinkedSwimmerSummaries(
   linkedSwimmerIds: string[],
 ): Promise<ParentSwimmerSummary[]> {
-  const db = getFirestore();
-  const summaries: ParentSwimmerSummary[] = [];
+  if (linkedSwimmerIds.length === 0) return [];
 
-  for (const swimmerId of linkedSwimmerIds) {
-    const snap = await db.collection('swimmers').doc(swimmerId).get();
-    if (snap.exists) {
-      summaries.push(sanitizeSwimmerSummary(snap.id, snap.data() ?? {}));
-    }
-  }
+  const { data, error } = await supabase
+    .from('swimmers')
+    .select(PORTAL_SWIMMER_SUMMARY_SELECT)
+    .in('id', linkedSwimmerIds);
+  if (error) throw error;
 
-  return summaries;
+  const rowsById = new Map(
+    ((data ?? []) as unknown as PortalSwimmerRow[]).map((row) => [row.id, row]),
+  );
+  // Preserve the linked order and skip dangling links, matching the old
+  // per-id Firestore reads.
+  return linkedSwimmerIds
+    .map((id) => rowsById.get(id))
+    .filter((row): row is PortalSwimmerRow => Boolean(row))
+    .map(sanitizeSwimmerSummary);
 }
 
 export const getParentPortalDashboard = onCall(
@@ -167,12 +197,19 @@ export const getParentSwimmerPortalData = onCall(
       throw new HttpsError('permission-denied', 'This swimmer is not linked to your account');
     }
 
-    const db = getFirestore();
-    const swimmerSnap = await db.collection('swimmers').doc(swimmerId).get();
-    if (!swimmerSnap.exists) {
+    const { data: swimmerRow, error: swimmerError } = await supabase
+      .from('swimmers')
+      .select(PORTAL_SWIMMER_DETAIL_SELECT)
+      .eq('id', swimmerId)
+      .maybeSingle();
+    if (swimmerError) throw swimmerError;
+    if (!swimmerRow) {
       throw new HttpsError('not-found', 'Swimmer not found');
     }
 
+    // times + attendance intentionally stay on Firestore until their own
+    // phases (UNIFY/04 C/D)
+    const db = getFirestore();
     const timesSnap = await db
       .collection('swimmers')
       .doc(swimmerId)
@@ -189,7 +226,7 @@ export const getParentSwimmerPortalData = onCall(
       .get();
 
     return {
-      swimmer: sanitizeSwimmerDetail(swimmerSnap.id, swimmerSnap.data() ?? {}),
+      swimmer: sanitizeSwimmerDetail(swimmerRow as unknown as PortalSwimmerRow),
       times: timesSnap.docs.map((doc) => sanitizeTime(doc.id, doc.data() ?? {})),
       attendance: attendanceSnap.docs.map((doc) => sanitizeAttendance(doc.id, doc.data() ?? {})),
       schedule: [] as ParentScheduleEvent[],
