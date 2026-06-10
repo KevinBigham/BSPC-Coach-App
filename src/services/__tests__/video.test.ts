@@ -1,35 +1,46 @@
-jest.mock('../../config/firebase', () => ({
-  db: {},
-  auth: { currentUser: { uid: 'test-uid' } },
-  storage: {},
-  functions: {},
+// Data layer migrated Firestore -> Supabase (UNIFY/01:video_sessions, Phase F).
+// Same behavioral contract; the mock is re-pointed at the Supabase client.
+// The BUG #4 media-consent rejection pins are UNCHANGED in substance — only
+// the "no write happened" assertion target moved (addDoc -> insert). New
+// pins: the kind-discriminated P1-4 junction and the D-F2 pipeline kick.
+jest.mock('../../config/supabase', () => {
+  const state: { selectRows: unknown[]; onHandler: ((p: unknown) => void) | null } = {
+    selectRows: [],
+    onHandler: null,
+  };
+  const query: Record<string, jest.Mock> & { then: unknown } = {
+    select: jest.fn(() => query),
+    eq: jest.fn(() => query),
+    order: jest.fn(() => query),
+    limit: jest.fn(() => query),
+    insert: jest.fn(() => query),
+    update: jest.fn(() => query),
+    single: jest.fn(() => Promise.resolve({ data: { id: 'new-session-id' }, error: null })),
+    then: (resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) =>
+      Promise.resolve({ data: state.selectRows, error: null }).then(resolve, reject),
+  };
+  const channel = {
+    on: jest.fn((_evt: unknown, _filter: unknown, handler: (p: unknown) => void) => {
+      state.onHandler = handler;
+      return channel;
+    }),
+    subscribe: jest.fn(() => channel),
+  };
+  const supabase = {
+    from: jest.fn(() => query),
+    channel: jest.fn(() => channel),
+    removeChannel: jest.fn(),
+  };
+  return { supabase, __state: state, __query: query, __channel: channel };
+});
+
+jest.mock('../mediaUpload', () => ({
+  uploadFileToBucket: jest.fn().mockResolvedValue('mocked-path'),
+  getSignedFileUrl: jest.fn().mockResolvedValue('https://signed.url/video.mp4'),
 }));
 
-jest.mock('firebase/firestore', () => ({
-  collection: jest.fn((...args: unknown[]) => ({ path: (args as string[]).slice(1).join('/') })),
-  query: jest.fn((ref: unknown) => ref),
-  where: jest.fn(),
-  orderBy: jest.fn(),
-  limit: jest.fn(),
-  doc: jest.fn((...args: unknown[]) => ({
-    path: (args as string[]).slice(1).join('/'),
-    id: (args as string[])[args.length - 1],
-  })),
-  addDoc: jest.fn().mockResolvedValue({ id: 'new-session-id' }),
-  updateDoc: jest.fn().mockResolvedValue(undefined),
-  onSnapshot: jest.fn(),
-  serverTimestamp: jest.fn(() => new Date()),
-}));
-
-jest.mock('firebase/storage', () => ({
-  ref: jest.fn((_s: unknown, path: string) => ({ path })),
-  uploadBytesResumable: jest.fn(() => ({
-    on: jest.fn((_event: string, _progress: unknown, _error: unknown, complete: () => void) =>
-      complete(),
-    ),
-    snapshot: { ref: { path: 'mock/path' } },
-  })),
-  getDownloadURL: jest.fn().mockResolvedValue('https://mock.url/video.mp4'),
+jest.mock('../mediaPipeline', () => ({
+  requestSessionProcessing: jest.fn().mockResolvedValue(undefined),
 }));
 
 import {
@@ -41,13 +52,20 @@ import {
   getVideoStatusLabel,
   getVideoStatusColor,
 } from '../video';
+import { uploadFileToBucket } from '../mediaUpload';
+import { requestSessionProcessing } from '../mediaPipeline';
 import type { Swimmer } from '../../types/firestore.types';
 
-const firestore = require('firebase/firestore');
-const storageModule = require('firebase/storage');
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const mock = require('../../config/supabase');
+const { supabase, __state, __query, __channel } = mock;
+
+const flush = () => new Promise((resolve) => setImmediate(resolve));
 
 beforeEach(() => {
   jest.clearAllMocks();
+  __state.selectRows = [];
+  __state.onHandler = null;
 });
 
 const consentedSwimmers: Array<Swimmer & { id: string }> = [
@@ -99,43 +117,106 @@ const assertCreateVideoSessionRequiresRosterContext = () => {
 };
 void assertCreateVideoSessionRequiresRosterContext;
 
-describe('subscribeVideoSessions', () => {
-  it('calls onSnapshot with correct query for a coach', () => {
-    const cb = jest.fn();
-    subscribeVideoSessions('coach-1', cb, 10);
+const makeSessionRow = (over: Record<string, unknown> = {}) => ({
+  id: 'v-1',
+  coach_id: 'coach-profile-1',
+  storage_path: 'video/c1/2026-06-09/video_1.mp4',
+  thumbnail_path: null,
+  duration_sec: 240,
+  practice_date: '2026-06-09',
+  practice_group: 'Gold',
+  status: 'review',
+  frame_count: null,
+  error_message: null,
+  created_at: '2026-06-09T18:00:00.000Z',
+  updated_at: '2026-06-09T18:05:00.000Z',
+  coach: { full_name: 'Coach K' },
+  swimmers: [
+    { swimmer_id: 'sw-1', kind: 'tagged' },
+    { swimmer_id: 'sw-1', kind: 'selected' },
+    { swimmer_id: 'sw-2', kind: 'selected' },
+  ],
+  ...over,
+});
 
-    expect(firestore.collection).toHaveBeenCalledWith({}, 'video_sessions');
-    expect(firestore.where).toHaveBeenCalledWith('coachId', '==', 'coach-1');
-    expect(firestore.orderBy).toHaveBeenCalledWith('createdAt', 'desc');
-    expect(firestore.limit).toHaveBeenCalledWith(10);
-    expect(firestore.onSnapshot).toHaveBeenCalled();
+describe('subscribeVideoSessions', () => {
+  it('queries video_sessions scoped to the coach, newest first, and opens a realtime channel', () => {
+    subscribeVideoSessions('coach-1', jest.fn(), 10);
+    expect(supabase.from).toHaveBeenCalledWith('video_sessions');
+    expect(__query.eq).toHaveBeenCalledWith('coach_id', 'coach-1');
+    expect(__query.order).toHaveBeenCalledWith('created_at', { ascending: false });
+    expect(__query.limit).toHaveBeenCalledWith(10);
+    expect(supabase.channel).toHaveBeenCalled();
+    expect(__channel.subscribe).toHaveBeenCalled();
   });
 
-  it('maps snapshot docs with id', () => {
+  it('maps rows: junction kinds split back into tagged/selected arrays, embed serves coachName', async () => {
+    __state.selectRows = [makeSessionRow()];
     const cb = jest.fn();
-    firestore.onSnapshot.mockImplementation((_q: unknown, handler: (snap: unknown) => void) => {
-      handler({
-        docs: [{ id: 'v1', data: () => ({ coachId: 'c1', status: 'uploaded' }) }],
-      });
-      return jest.fn();
+    subscribeVideoSessions('coach-profile-1', cb);
+    await flush();
+    const session = cb.mock.calls[0][0][0];
+    expect(session).toMatchObject({
+      id: 'v-1',
+      coachId: 'coach-profile-1',
+      coachName: 'Coach K',
+      taggedSwimmerIds: ['sw-1'],
+      selectedSwimmerIds: ['sw-1', 'sw-2'],
+      status: 'review',
+      practiceDate: '2026-06-09',
     });
-    subscribeVideoSessions('c1', cb);
-    expect(cb).toHaveBeenCalledWith([{ id: 'v1', coachId: 'c1', status: 'uploaded' }]);
   });
 });
 
 describe('subscribeVideoDrafts', () => {
-  it('queries drafts subcollection for session', () => {
+  it('queries video_session_drafts for the session (the subcollection is gone)', () => {
+    subscribeVideoDrafts('session-1', jest.fn());
+    expect(supabase.from).toHaveBeenCalledWith('video_session_drafts');
+    expect(__query.eq).toHaveBeenCalledWith('session_id', 'session-1');
+    expect(__query.order).toHaveBeenCalledWith('created_at', { ascending: false });
+    expect(__channel.subscribe).toHaveBeenCalled();
+  });
+
+  it('maps draft rows — swimmerName derived from the swimmers embed, nullables defaulted', async () => {
+    __state.selectRows = [
+      {
+        id: 'd-1',
+        session_id: 'session-1',
+        swimmer_id: 'sw-1',
+        observation: 'Head lifts on breath',
+        diagnosis: null,
+        drill_recommendation: 'Side-kick with snorkel',
+        phase: 'stroke',
+        tags: ['technique'],
+        confidence: 0.85,
+        approved: null,
+        reviewed_by: null,
+        reviewed_at: null,
+        created_at: '2026-06-09T18:00:00.000Z',
+        swimmer: { display_name: 'Alice A' },
+      },
+    ];
     const cb = jest.fn();
     subscribeVideoDrafts('session-1', cb);
-
-    expect(firestore.collection).toHaveBeenCalledWith({}, 'video_sessions', 'session-1', 'drafts');
-    expect(firestore.onSnapshot).toHaveBeenCalled();
+    await flush();
+    const draft = cb.mock.calls[0][0][0];
+    expect(draft).toMatchObject({
+      id: 'd-1',
+      swimmerId: 'sw-1',
+      swimmerName: 'Alice A',
+      observation: 'Head lifts on breath',
+      diagnosis: '',
+      drillRecommendation: 'Side-kick with snorkel',
+      phase: 'stroke',
+      tags: ['technique'],
+      confidence: 0.85,
+      approved: undefined,
+    });
   });
 });
 
 describe('createVideoSession', () => {
-  it('creates a session doc and returns its id', async () => {
+  it('inserts the session row + BOTH junction kinds and returns the id', async () => {
     const id = await createVideoSession(
       'c1',
       'Coach K',
@@ -146,42 +227,46 @@ describe('createVideoSession', () => {
       consentedSwimmers,
     );
     expect(id).toBe('new-session-id');
-    expect(firestore.addDoc).toHaveBeenCalledWith(
-      expect.anything(),
+    expect(supabase.from).toHaveBeenCalledWith('video_sessions');
+    expect(supabase.from).toHaveBeenCalledWith('video_session_swimmers');
+    expect(__query.insert).toHaveBeenNthCalledWith(
+      1,
       expect.objectContaining({
-        coachId: 'c1',
-        coachName: 'Coach K',
-        duration: 120,
-        practiceDate: '2026-04-01',
-        group: 'Gold',
-        taggedSwimmerIds: ['s1', 's2'],
-        selectedSwimmerIds: ['s1', 's2'],
+        coach_id: 'c1',
+        duration_sec: 120,
+        practice_date: '2026-04-01',
+        practice_group: 'Gold',
         status: 'uploading',
-        storagePath: '',
+        storage_path: '',
       }),
     );
+    expect(__query.insert).toHaveBeenNthCalledWith(2, [
+      { session_id: 'new-session-id', swimmer_id: 's1', kind: 'tagged' },
+      { session_id: 'new-session-id', swimmer_id: 's2', kind: 'tagged' },
+      { session_id: 'new-session-id', swimmer_id: 's1', kind: 'selected' },
+      { session_id: 'new-session-id', swimmer_id: 's2', kind: 'selected' },
+    ]);
   });
 
-  it('defaults group to null when not provided', async () => {
+  it('defaults practice_group to null when not provided', async () => {
     await createVideoSession('c1', 'Coach K', 60, '2026-04-02', ['s1'], undefined, [
       consentedSwimmers[0],
     ]);
-    const call = firestore.addDoc.mock.calls[0][1];
-    expect(call.group).toBeNull();
+    expect(__query.insert.mock.calls[0][0].practice_group).toBeNull();
   });
 
   it('rejects empty selected swimmer ids', async () => {
     await expect(
       createVideoSession('c1', 'Coach K', 60, '2026-04-02', [], undefined, []),
     ).rejects.toThrow(/selected swimmer/i);
-    expect(firestore.addDoc).not.toHaveBeenCalled();
+    expect(__query.insert).not.toHaveBeenCalled();
   });
 
   it('rejects creation without selected swimmer ids', async () => {
     await expect(
       (createVideoSession as any)('c1', 'Coach K', 60, '2026-04-02', undefined, undefined, []),
     ).rejects.toThrow(/selected swimmer/i);
-    expect(firestore.addDoc).not.toHaveBeenCalled();
+    expect(__query.insert).not.toHaveBeenCalled();
   });
 
   it('rejects when a tagged swimmer is missing from the roster context', async () => {
@@ -190,7 +275,7 @@ describe('createVideoSession', () => {
         consentedSwimmers[0],
       ]),
     ).rejects.toThrow(/roster context/i);
-    expect(firestore.addDoc).not.toHaveBeenCalled();
+    expect(__query.insert).not.toHaveBeenCalled();
   });
 
   it('rejects when a selected swimmer does not have media consent', async () => {
@@ -204,27 +289,39 @@ describe('createVideoSession', () => {
         },
       ]),
     ).rejects.toThrow(/media consent/i);
-    expect(firestore.addDoc).not.toHaveBeenCalled();
+    expect(__query.insert).not.toHaveBeenCalled();
   });
 });
 
 describe('updateVideoSession', () => {
-  it('updates the session doc with updatedAt', async () => {
+  it('maps camelCase fields to columns and updates by id', async () => {
     await updateVideoSession('s1', { status: 'posted' });
-    expect(firestore.updateDoc).toHaveBeenCalledWith(
-      expect.objectContaining({ path: 'video_sessions/s1' }),
-      expect.objectContaining({ status: 'posted' }),
-    );
+    expect(__query.update).toHaveBeenCalledWith({ status: 'posted' });
+    expect(__query.eq).toHaveBeenCalledWith('id', 's1');
+  });
+
+  it("kicks the pipeline when the patch flips status to 'uploaded' (D-F2)", async () => {
+    await updateVideoSession('s1', { storagePath: 'video/x.mp4', status: 'uploaded' });
+    expect(requestSessionProcessing).toHaveBeenCalledWith('video', 's1');
+  });
+
+  it('does NOT kick the pipeline on other status writes', async () => {
+    await updateVideoSession('s1', { status: 'analyzing' });
+    expect(requestSessionProcessing).not.toHaveBeenCalled();
   });
 });
 
 describe('uploadVideo', () => {
-  it('calls fetch, creates storage ref, and resolves with path and url', async () => {
-    global.fetch = jest
-      .fn()
-      .mockResolvedValue({ blob: jest.fn().mockResolvedValue(new Blob()) }) as jest.Mock;
+  it('uploads into media-video under the frozen path layout and resolves with path and url', async () => {
     const result = await uploadVideo('file://video.mp4', 'c1', '2026-04-01');
-    expect(result.downloadUrl).toBe('https://mock.url/video.mp4');
+    expect(uploadFileToBucket).toHaveBeenCalledWith(
+      'media-video',
+      expect.stringContaining('video/c1/2026-04-01/'),
+      'file://video.mp4',
+      'video/mp4',
+      undefined,
+    );
+    expect(result.downloadUrl).toBe('https://signed.url/video.mp4');
     expect(result.storagePath).toContain('video/c1/2026-04-01/');
   });
 });
