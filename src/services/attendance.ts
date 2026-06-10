@@ -12,6 +12,7 @@ import { supabase } from '../config/supabase';
 import type { Swimmer, AttendanceRecord, AttendanceStatus, Coach } from '../types/firestore.types';
 import { BatchPartialFailureError } from '../utils/batchError';
 import { logger } from '../utils/logger';
+import { requestAttendanceEvaluation } from './attendancePipeline';
 
 type AttendanceWithId = AttendanceRecord & { id: string };
 type SwimmerWithId = Swimmer & { id: string };
@@ -196,6 +197,9 @@ export async function checkIn(
   if (rows.length === 0) {
     throw new Error('attendance_check_in returned no rows');
   }
+  // D-G1 kick: fire-and-forget — the check-in is already committed and must
+  // never fail or wait on rule evaluation; the sweeper covers a lost kick.
+  void requestAttendanceEvaluation([rows[0].attendance_id]);
   return rows[0].attendance_id;
 }
 
@@ -213,6 +217,9 @@ export async function checkOut(
     })
     .eq('id', recordId);
   if (error) throw error;
+  // D-G1 kick: the Firestore trigger fired on every attendance write,
+  // including checkouts — preserved (idempotent server-side).
+  void requestAttendanceEvaluation([recordId]);
 }
 
 export async function batchCheckIn(
@@ -230,7 +237,7 @@ export async function batchCheckIn(
     // The roster screens batch one practice group at a time; if a mixed batch
     // ever arrives, the group label is omitted rather than mislabeled.
     const groups = new Set(chunk.map((s) => s.group));
-    const { error } = await supabase.rpc('attendance_check_in', {
+    const { data, error } = await supabase.rpc('attendance_check_in', {
       p_swimmer_ids: chunk.map((s) => s.id),
       p_practice_date: date,
       p_practice_group: groups.size === 1 ? chunk[0].group : null,
@@ -250,6 +257,10 @@ export async function batchCheckIn(
         cause: error,
       });
     }
+    // D-G1 kick: one batched call per COMMITTED chunk (kicks for committed
+    // rows survive a later chunk's failure; the sweeper covers any loss).
+    const committedRows = (data ?? []) as CheckInResultRow[];
+    void requestAttendanceEvaluation(committedRows.map((row) => row.attendance_id));
     committedItemCount += chunk.length;
   }
 }

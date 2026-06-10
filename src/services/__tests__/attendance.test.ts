@@ -54,6 +54,13 @@ jest.mock('../../config/supabase', () => {
   };
 });
 
+// Phase G (D-G1): the data layer kicks rule evaluation after a write commits.
+// Fire-and-forget — the real function never rejects (pinned in its own suite).
+const mockRequestAttendanceEvaluation = jest.fn().mockResolvedValue(undefined);
+jest.mock('../attendancePipeline', () => ({
+  requestAttendanceEvaluation: (ids: string[]) => mockRequestAttendanceEvaluation(ids),
+}));
+
 import {
   subscribeTodayAttendance,
   subscribeSwimmerAttendance,
@@ -211,6 +218,25 @@ describe('checkIn', () => {
     expect(id).toBe('new-att-id');
   });
 
+  it('fires exactly one evaluation kick with the committed row id (D-G1)', async () => {
+    const swimmer = { id: 'sw-1', firstName: 'Jane', lastName: 'Doe', group: 'varsity' } as any;
+
+    await checkIn(swimmer, { uid: 'coach-1', displayName: 'Coach K' }, '2026-04-04');
+
+    expect(mockRequestAttendanceEvaluation).toHaveBeenCalledTimes(1);
+    expect(mockRequestAttendanceEvaluation).toHaveBeenCalledWith(['new-att-id']);
+  });
+
+  it('fires no kick when the check-in itself fails', async () => {
+    __state.rpcResult = { data: null, error: { message: 'staff only' } };
+    const swimmer = { id: 'sw-1', firstName: 'A', lastName: 'B', group: 'jv' } as any;
+
+    await expect(
+      checkIn(swimmer, { uid: 'c', displayName: '' }, '2026-04-04'),
+    ).rejects.toBeTruthy();
+    expect(mockRequestAttendanceEvaluation).not.toHaveBeenCalled();
+  });
+
   it('persists no denormalized names — identity is server-side, names derive on read', async () => {
     const swimmer = { id: 'sw-1', firstName: 'A', lastName: 'B', group: 'jv' } as any;
 
@@ -274,6 +300,13 @@ describe('checkOut', () => {
     expect(payload).not.toHaveProperty('status');
     expect(payload).not.toHaveProperty('note');
   });
+
+  it('fires exactly one evaluation kick (the Firestore trigger fired on every write)', async () => {
+    await checkOut('att-1');
+
+    expect(mockRequestAttendanceEvaluation).toHaveBeenCalledTimes(1);
+    expect(mockRequestAttendanceEvaluation).toHaveBeenCalledWith(['att-1']);
+  });
 });
 
 describe('batchCheckIn', () => {
@@ -313,6 +346,48 @@ describe('batchCheckIn', () => {
     expect(supabase.rpc).toHaveBeenCalledTimes(2);
     expect((supabase.rpc as jest.Mock).mock.calls[0][1].p_swimmer_ids).toHaveLength(400);
     expect((supabase.rpc as jest.Mock).mock.calls[1][1].p_swimmer_ids).toHaveLength(1);
+  });
+
+  it('fires one batched kick per committed chunk with the returned row ids (D-G1)', async () => {
+    const swimmers = [
+      { id: 'sw-1', firstName: 'Jane', lastName: 'Doe', group: 'varsity' },
+      { id: 'sw-2', firstName: 'John', lastName: 'Smith', group: 'varsity' },
+    ] as any;
+    __state.rpcResult = {
+      data: [
+        { swimmer_id: 'sw-1', attendance_id: 'att-a', created: true },
+        { swimmer_id: 'sw-2', attendance_id: 'att-b', created: false },
+      ],
+      error: null,
+    };
+
+    await batchCheckIn(swimmers, { uid: 'coach-1', displayName: 'Coach K' }, '2026-04-04');
+
+    expect(mockRequestAttendanceEvaluation).toHaveBeenCalledTimes(1);
+    expect(mockRequestAttendanceEvaluation).toHaveBeenCalledWith(['att-a', 'att-b']);
+  });
+
+  it('kicks for committed chunks survive a later chunk failure (the sweeper covers the rest)', async () => {
+    (supabase.rpc as jest.Mock)
+      .mockResolvedValueOnce({
+        data: [{ swimmer_id: 'sw-0', attendance_id: 'att-0', created: true }],
+        error: null,
+      })
+      .mockResolvedValueOnce({ data: null, error: { message: 'quota exceeded' } });
+
+    const swimmers = Array.from({ length: 401 }, (_, i) => ({
+      id: `sw-${i}`,
+      firstName: 'A',
+      lastName: 'B',
+      group: 'Diamond',
+    })) as any;
+
+    await expect(
+      batchCheckIn(swimmers, { uid: 'coach-1', displayName: 'Coach K' }, '2026-04-04'),
+    ).rejects.toBeInstanceOf(BatchPartialFailureError);
+
+    expect(mockRequestAttendanceEvaluation).toHaveBeenCalledTimes(1);
+    expect(mockRequestAttendanceEvaluation).toHaveBeenCalledWith(['att-0']);
   });
 
   it('mid-batch failure throws BatchPartialFailureError with the committed count', async () => {
