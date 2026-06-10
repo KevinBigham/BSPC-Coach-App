@@ -1,24 +1,43 @@
-jest.mock('../../config/firebase', () => ({
-  db: {},
-  auth: { currentUser: { uid: 'test-uid' } },
-  storage: {},
-  functions: {},
-}));
-
-jest.mock('firebase/firestore', () => ({
-  collection: jest.fn((...args: unknown[]) => ({ path: (args as string[]).slice(1).join('/') })),
-  query: jest.fn((ref: unknown) => ref),
-  where: jest.fn(),
-  orderBy: jest.fn(),
-  doc: jest.fn((...args: unknown[]) => ({
-    path: (args as string[]).slice(1).join('/'),
-    id: (args as string[])[args.length - 1],
-  })),
-  serverTimestamp: jest.fn(() => new Date('2026-04-29T12:00:00.000Z')),
-  updateDoc: jest.fn().mockResolvedValue(undefined),
-  getDocs: jest.fn(),
-  onSnapshot: jest.fn(),
-}));
+// Data layer migrated Firestore -> Supabase (UNIFY/01:practice_plans, Phase H).
+// Same behavioral contract; the mock is re-pointed at the Supabase client.
+// New pins: RH-2 filter discipline (coachId stays a real query param),
+// is_public mapping, the rateWorkout read-merge-write (one JSONB vote per
+// coach, keys stay coach.uid until cutover), the tagWorkout trigger-bump
+// (named FYI: no client stamp), D-H6 parity-deny documented at the wall.
+jest.mock('../../config/supabase', () => {
+  const state: {
+    selectRows: unknown[];
+    singleResult: { data: unknown; error: unknown };
+    onHandler: ((p: unknown) => void) | null;
+  } = {
+    selectRows: [],
+    singleResult: { data: { ratings: {} }, error: null },
+    onHandler: null,
+  };
+  const query: Record<string, jest.Mock> & { then: unknown } = {
+    select: jest.fn(() => query),
+    eq: jest.fn(() => query),
+    overlaps: jest.fn(() => query),
+    order: jest.fn(() => query),
+    update: jest.fn(() => query),
+    single: jest.fn(() => Promise.resolve(state.singleResult)),
+    then: (resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) =>
+      Promise.resolve({ data: state.selectRows, error: null }).then(resolve, reject),
+  };
+  const channel = {
+    on: jest.fn((_evt: unknown, _filter: unknown, handler: (p: unknown) => void) => {
+      state.onHandler = handler;
+      return channel;
+    }),
+    subscribe: jest.fn(() => channel),
+  };
+  const supabase = {
+    from: jest.fn(() => query),
+    channel: jest.fn(() => channel),
+    removeChannel: jest.fn(),
+  };
+  return { supabase, __state: state, __query: query, __channel: channel };
+});
 
 import {
   WORKOUT_FOCUSES,
@@ -31,10 +50,37 @@ import {
 } from '../workoutLibrary';
 import type { Group } from '../../config/constants';
 
-const firestore = require('firebase/firestore');
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const mock = require('../../config/supabase');
+const { supabase, __state, __query } = mock;
+
+const flush = () => new Promise((resolve) => setImmediate(resolve));
+
+const makeWorkoutRow = (over: Record<string, unknown> = {}) => ({
+  id: 'w-1',
+  title: 'Endurance Builder',
+  description: 'Long sets',
+  practice_group: 'Gold',
+  is_template: true,
+  is_public: false,
+  template_source_id: null,
+  plan_date: null,
+  total_duration_min: 90,
+  tags: [],
+  ratings: {},
+  sets: [],
+  coach_id: 'coach-profile-1',
+  created_at: '2026-04-01T12:00:00.000Z',
+  updated_at: '2026-04-01T12:00:00.000Z',
+  coach: { full_name: 'Coach K' },
+  ...over,
+});
 
 beforeEach(() => {
   jest.clearAllMocks();
+  __state.selectRows = [];
+  __state.singleResult = { data: { ratings: {} }, error: null };
+  __state.onHandler = null;
 });
 
 describe('WORKOUT_FOCUSES', () => {
@@ -56,95 +102,118 @@ describe('WORKOUT_FOCUSES', () => {
 describe('tagWorkout', () => {
   it('updates tags on the practice plan', async () => {
     await tagWorkout('workout-1', ['speed', 'relay']);
-    expect(firestore.updateDoc).toHaveBeenCalledWith(
-      expect.objectContaining({ path: 'practice_plans/workout-1' }),
-      { tags: ['speed', 'relay'] },
-    );
+
+    expect(supabase.from).toHaveBeenCalledWith('practice_plans');
+    expect(__query.update).toHaveBeenCalledWith({ tags: ['speed', 'relay'] });
+    expect(__query.eq).toHaveBeenCalledWith('id', 'workout-1');
+  });
+
+  it('writes NO client stamp — the DB trigger bumps updated_at (named FYI delta)', async () => {
+    await tagWorkout('workout-1', ['pace']);
+
+    const payload = __query.update.mock.calls[0][0];
+    expect(payload).not.toHaveProperty('updatedAt');
+    expect(payload).not.toHaveProperty('updated_at');
   });
 });
 
 describe('rateWorkout', () => {
-  it('stores rating keyed by coachId', async () => {
+  it('merges the vote into the coachId-keyed ratings map (keys stay coach.uid until cutover)', async () => {
+    __state.singleResult = { data: { ratings: { 'coach-9': 3 } }, error: null };
+
     await rateWorkout('workout-1', 4, 'coach-1');
-    expect(firestore.updateDoc).toHaveBeenCalledWith(
-      expect.objectContaining({ path: 'practice_plans/workout-1' }),
-      { 'ratings.coach-1': 4 },
-    );
+
+    expect(__query.select).toHaveBeenCalledWith('ratings');
+    expect(__query.update).toHaveBeenCalledWith({
+      ratings: { 'coach-9': 3, 'coach-1': 4 }, // other coaches' votes survive
+    });
+    expect(__query.eq).toHaveBeenCalledWith('id', 'workout-1');
+  });
+
+  it('starts a fresh map when no ratings exist', async () => {
+    __state.singleResult = { data: { ratings: null }, error: null };
+
+    await rateWorkout('workout-1', 5, 'coach-1');
+
+    expect(__query.update).toHaveBeenCalledWith({ ratings: { 'coach-1': 5 } });
   });
 });
 
 describe('searchWorkouts', () => {
-  it('returns workouts matching title', async () => {
-    firestore.getDocs.mockResolvedValue({
-      docs: [
-        {
-          id: 'w1',
-          data: () => ({ title: 'Endurance Builder', description: 'Long sets', isTemplate: true }),
-        },
-        {
-          id: 'w2',
-          data: () => ({ title: 'Sprint Day', description: 'Fast sets', isTemplate: true }),
-        },
-      ],
-    });
+  it('returns workouts matching title (frozen fetch-then-filter)', async () => {
+    __state.selectRows = [
+      makeWorkoutRow({ id: 'w1', title: 'Endurance Builder', description: 'Long sets' }),
+      makeWorkoutRow({ id: 'w2', title: 'Sprint Day', description: 'Fast sets' }),
+    ];
 
     const results = await searchWorkouts('endurance');
+    expect(__query.eq).toHaveBeenCalledWith('is_template', true);
     expect(results).toHaveLength(1);
     expect(results[0].id).toBe('w1');
   });
 
   it('matches on description too', async () => {
-    firestore.getDocs.mockResolvedValue({
-      docs: [
-        {
-          id: 'w1',
-          data: () => ({
-            title: 'Morning Set',
-            description: 'Focus on technique drills',
-            isTemplate: true,
-          }),
-        },
-      ],
-    });
+    __state.selectRows = [
+      makeWorkoutRow({ id: 'w1', title: 'Morning Set', description: 'Focus on technique drills' }),
+    ];
 
     const results = await searchWorkouts('technique');
     expect(results).toHaveLength(1);
   });
 
   it('returns empty when no matches', async () => {
-    firestore.getDocs.mockResolvedValue({
-      docs: [{ id: 'w1', data: () => ({ title: 'Basic Set', description: '', isTemplate: true }) }],
-    });
+    __state.selectRows = [makeWorkoutRow({ id: 'w1', title: 'Basic Set', description: '' })];
 
     const results = await searchWorkouts('zzzzz');
     expect(results).toHaveLength(0);
   });
 
-  it('adds coachId filter when supplied — required in production for the practice_plans rule', async () => {
-    firestore.getDocs.mockResolvedValue({ docs: [] });
+  it('adds the coachId filter when supplied — REQUIRED in production (RH-2 discipline)', async () => {
+    __state.selectRows = [];
     await searchWorkouts('foo', 'coach-456');
-    expect(firestore.where).toHaveBeenCalledWith('coachId', '==', 'coach-456');
+    expect(__query.eq).toHaveBeenCalledWith('coach_id', 'coach-456');
   });
 });
 
 describe('subscribeWorkouts', () => {
-  it('queries template practice plans', () => {
+  it('queries template practice plans and opens a realtime channel', () => {
     const cb = jest.fn();
     subscribeWorkouts({}, cb);
-    expect(firestore.where).toHaveBeenCalledWith('isTemplate', '==', true);
-    expect(firestore.onSnapshot).toHaveBeenCalled();
+
+    expect(supabase.from).toHaveBeenCalledWith('practice_plans');
+    expect(__query.eq).toHaveBeenCalledWith('is_template', true);
+    expect(__query.order).toHaveBeenCalledWith('created_at', { ascending: false });
+    expect(supabase.channel).toHaveBeenCalled();
   });
 
-  it('adds group filter when specified', () => {
-    const cb = jest.fn();
-    subscribeWorkouts({ group: 'Gold' as Group }, cb);
-    expect(firestore.where).toHaveBeenCalledWith('group', '==', 'Gold');
+  it("adds the group filter SERVER-side when specified (today's where, preserved)", () => {
+    subscribeWorkouts({ group: 'Gold' as Group }, jest.fn());
+    expect(__query.eq).toHaveBeenCalledWith('practice_group', 'Gold');
   });
 
-  it('adds coachId filter when specified — required in production for the practice_plans rule', () => {
+  it('keeps the coachId filter as a REAL query param — required in production (RH-2)', () => {
+    subscribeWorkouts({ coachId: 'coach-123' }, jest.fn());
+    expect(__query.eq).toHaveBeenCalledWith('coach_id', 'coach-123');
+  });
+
+  it('filters yardage client-side (computed field, frozen semantics)', async () => {
+    __state.selectRows = [
+      makeWorkoutRow({
+        id: 'w-small',
+        sets: [{ items: [{ reps: 2, distance: 100 }] }],
+      }),
+      makeWorkoutRow({
+        id: 'w-big',
+        sets: [{ items: [{ reps: 10, distance: 400 }] }],
+      }),
+    ];
     const cb = jest.fn();
-    subscribeWorkouts({ coachId: 'coach-123' }, cb);
-    expect(firestore.where).toHaveBeenCalledWith('coachId', '==', 'coach-123');
+    subscribeWorkouts({ minYardage: 1000 }, cb);
+    await flush();
+
+    const workouts = cb.mock.calls[0][0];
+    expect(workouts).toHaveLength(1);
+    expect(workouts[0].id).toBe('w-big');
   });
 });
 
@@ -153,56 +222,50 @@ describe('subscribePublicWorkouts', () => {
     const cb = jest.fn();
     subscribePublicWorkouts(cb);
 
-    expect(firestore.where).toHaveBeenCalledWith('isTemplate', '==', true);
-    expect(firestore.where).toHaveBeenCalledWith('public', '==', true);
-    expect(firestore.orderBy).toHaveBeenCalledWith('updatedAt', 'desc');
-    expect(firestore.onSnapshot).toHaveBeenCalled();
+    expect(__query.eq).toHaveBeenCalledWith('is_template', true);
+    expect(__query.eq).toHaveBeenCalledWith('is_public', true);
+    expect(__query.order).toHaveBeenCalledWith('updated_at', { ascending: false });
   });
 
-  it('adds group and tags filters when specified', () => {
+  it('adds group and tags filters when specified (array-contains-any ≡ overlaps)', () => {
     subscribePublicWorkouts(jest.fn(), { group: 'Gold' as Group, tags: ['starts', 'turns'] });
 
-    expect(firestore.where).toHaveBeenCalledWith('group', '==', 'Gold');
-    expect(firestore.where).toHaveBeenCalledWith('tags', 'array-contains-any', ['starts', 'turns']);
+    expect(__query.eq).toHaveBeenCalledWith('practice_group', 'Gold');
+    expect(__query.overlaps).toHaveBeenCalledWith('tags', ['starts', 'turns']);
   });
 
-  it('maps public workout snapshots without dropping the public flag', () => {
-    firestore.onSnapshot.mockImplementation((_q: unknown, cb: (snap: unknown) => void) => {
-      cb({
-        docs: [
-          {
-            id: 'plan-public',
-            data: () => ({ title: 'Shared Set', isTemplate: true, public: true, sets: [] }),
-          },
-        ],
-      });
-      return jest.fn();
-    });
-
+  it('maps public workout rows without dropping the public flag', async () => {
+    __state.selectRows = [
+      makeWorkoutRow({ id: 'plan-public', title: 'Shared Set', is_public: true }),
+    ];
     const cb = jest.fn();
     subscribePublicWorkouts(cb);
+    await flush();
 
     expect(cb).toHaveBeenCalledWith([
-      { id: 'plan-public', title: 'Shared Set', isTemplate: true, public: true, sets: [] },
+      expect.objectContaining({
+        id: 'plan-public',
+        title: 'Shared Set',
+        isTemplate: true,
+        public: true,
+      }),
     ]);
   });
 });
 
 describe('setPlanPublicStatus', () => {
-  it('updates only public status and updatedAt', async () => {
+  it('updates only the public status — updated_at is trigger-owned now (inverted pin)', async () => {
     await setPlanPublicStatus('plan-1', true);
 
-    expect(firestore.updateDoc).toHaveBeenCalledWith(
-      expect.objectContaining({ path: 'practice_plans/plan-1' }),
-      { public: true, updatedAt: new Date('2026-04-29T12:00:00.000Z') },
-    );
+    expect(__query.update).toHaveBeenCalledWith({ is_public: true });
+    expect(__query.eq).toHaveBeenCalledWith('id', 'plan-1');
   });
 
   it('does not overwrite the public field when tagging or rating workouts', async () => {
     await tagWorkout('plan-1', ['pace']);
     await rateWorkout('plan-1', 5, 'coach-1');
 
-    expect(firestore.updateDoc.mock.calls[0][1]).toEqual({ tags: ['pace'] });
-    expect(firestore.updateDoc.mock.calls[1][1]).toEqual({ 'ratings.coach-1': 5 });
+    expect(__query.update.mock.calls[0][0]).toEqual({ tags: ['pace'] });
+    expect(__query.update.mock.calls[1][0]).toEqual({ ratings: { 'coach-1': 5 } });
   });
 });
