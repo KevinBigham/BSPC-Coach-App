@@ -97,7 +97,12 @@ describe('parent portal callables', () => {
     swimmersBuilder.select.mockReturnThis();
     swimmersBuilder.eq.mockReturnThis();
     profilesBuilder.maybeSingle.mockResolvedValue({
-      data: { id: 'profile-1', email: 'parent@example.com', full_name: 'Parent' },
+      data: {
+        id: 'profile-1',
+        email: 'parent@example.com',
+        full_name: 'Parent',
+        account_status: 'approved',
+      },
       error: null,
     });
     guardianshipsBuilder.eq.mockResolvedValue({
@@ -361,6 +366,49 @@ describe('parent portal callables', () => {
 
     const handler = handlerOf(getParentPortalDashboard) as (request: unknown) => Promise<unknown>;
     await expect(handler(makeRequest())).rejects.toThrow('identity store down');
+  });
+
+  it('D-I3: a PENDING parent resolves their profile but ZERO linked swimmers — the gate states the is_my_swimmer wall', async () => {
+    profilesBuilder.maybeSingle.mockResolvedValue({
+      data: {
+        id: 'profile-1',
+        email: 'pending@example.com',
+        full_name: 'Pending Parent',
+        account_status: 'pending',
+      },
+      error: null,
+    });
+
+    const handler = handlerOf(getParentPortalDashboard) as (request: unknown) => Promise<unknown>;
+    const result = await handler(makeRequest());
+
+    expect(result).toEqual({
+      profile: {
+        uid: 'parent-1',
+        email: 'pending@example.com',
+        displayName: 'Pending Parent',
+        linkedSwimmerIds: [],
+      },
+      swimmers: [],
+    });
+    expect(mockSupabaseFrom).not.toHaveBeenCalledWith('guardianships');
+  });
+
+  it('D-I3: a PENDING-but-linked parent is permission-denied on swimmer detail — dark until approval (D-I1)', async () => {
+    profilesBuilder.maybeSingle.mockResolvedValue({
+      data: {
+        id: 'profile-1',
+        email: 'pending@example.com',
+        full_name: 'Pending Parent',
+        account_status: 'pending',
+      },
+      error: null,
+    });
+
+    const handler = handlerOf(getParentSwimmerPortalData) as (request: unknown) => Promise<unknown>;
+    await expect(handler(makeRequest({ swimmerId: 'swimmer-1' }))).rejects.toThrow(
+      /permission-denied|not linked/i,
+    );
   });
 
   it('reads roster summaries from canonical swimmers scoped to the linked ids', async () => {

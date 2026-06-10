@@ -36,7 +36,12 @@ describe('getParentProfile (Supabase identity read)', () => {
     profilesBuilder.eq.mockReturnThis();
     guardianshipsBuilder.select.mockReturnThis();
     profilesBuilder.maybeSingle.mockResolvedValue({
-      data: { id: 'profile-1', email: 'parent@example.com', full_name: 'Pat Parent' },
+      data: {
+        id: 'profile-1',
+        email: 'parent@example.com',
+        full_name: 'Pat Parent',
+        account_status: 'approved',
+      },
       error: null,
     });
     guardianshipsBuilder.eq.mockResolvedValue({
@@ -75,6 +80,28 @@ describe('getParentProfile (Supabase identity read)', () => {
     const result = await getParentProfile('auth-user-1');
 
     expect(result?.linkedSwimmerIds).toEqual([]);
+  });
+
+  it('D-I3: a PENDING parent resolves their profile with ZERO links (and guardianships is never queried) — the is_my_swimmer mirror', async () => {
+    profilesBuilder.maybeSingle.mockResolvedValue({
+      data: {
+        id: 'profile-1',
+        email: 'pending@example.com',
+        full_name: 'Pending Parent',
+        account_status: 'pending',
+      },
+      error: null,
+    });
+
+    const result = await getParentProfile('auth-user-1');
+
+    expect(result).toEqual({
+      uid: 'auth-user-1',
+      email: 'pending@example.com',
+      displayName: 'Pending Parent',
+      linkedSwimmerIds: [],
+    });
+    expect(mockFrom).not.toHaveBeenCalledWith('guardianships');
   });
 
   it('throws when the profiles query errors', async () => {

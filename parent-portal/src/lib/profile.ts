@@ -14,11 +14,18 @@ export interface ParentProfile {
 export async function getParentProfile(uid: string): Promise<ParentProfile | null> {
   const { data: profile, error } = await supabase
     .from('profiles')
-    .select('id, email, full_name')
+    .select('id, email, full_name, account_status')
     .eq('user_id', uid)
     .maybeSingle();
   if (error) throw error;
   if (!profile) return null;
+
+  // D-I3: the gate states the database wall's rule — swimmer links activate
+  // only for an APPROVED account (is_my_swimmer mirror). Pending parents see
+  // the team-wide-only world here exactly as they do under RLS.
+  if ((profile as { account_status?: string }).account_status !== 'approved') {
+    return { uid, email: profile.email, displayName: profile.full_name, linkedSwimmerIds: [] };
+  }
 
   const { data: links, error: linksError } = await supabase
     .from('guardianships')
