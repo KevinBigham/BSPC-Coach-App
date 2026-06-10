@@ -1,41 +1,85 @@
+// Phase G: the daily digest, moved whole onto canonical Postgres (OD-4
+// resolved by D-G3). Recipients are enumerated from the STAFF ROLE SET by
+// construction — never from preference rows — which is what keeps the DIGEST
+// DOCTRINE provable: the body carries only team-wide counts of staff-readable
+// tables, and it is addressed only to staff (RG-8). The preference gate is
+// notification_preferences.digest_enabled; a MISSING row means included (the
+// ratified D-G3 edge flip: signup always wrote default-true, and the column
+// default replaces that write at cutover).
 import { onSchedule } from 'firebase-functions/v2/scheduler';
-import * as admin from 'firebase-admin';
+import { supabase } from '../config/supabase';
 
-if (!admin.apps.length) admin.initializeApp();
-const db = admin.firestore();
+// [D-C5] presence-meaning read: BSPC-marked absences never count as attended.
+const NOT_ABSENT = 'status.is.null,status.neq.absent';
 
-export const dailyDigest = onSchedule('every day 20:00', async () => {
+export async function runDailyDigestOnce(): Promise<number> {
   const today = new Date().toISOString().split('T')[0];
 
-  // Get today's attendance
-  const attendanceSnap = await db.collection('attendance').where('practiceDate', '==', today).get();
-
+  // "still at practice" semantics preserved (RC-13): departed_at IS NULL
+  // means the same thing the Firestore !departedAt filter meant.
+  const { data: attendanceRows } = await supabase
+    .from('attendance')
+    .select('swimmer_id')
+    .eq('practice_date', today)
+    .or(NOT_ABSENT)
+    .is('departed_at', null);
   const presentCount = new Set(
-    attendanceSnap.docs.filter((d) => !d.data().departedAt).map((d) => d.data().swimmerId),
+    ((attendanceRows ?? []) as { swimmer_id: string }[]).map((row) => row.swimmer_id),
   ).size;
 
-  // Get today's notes count
-  const notesSnap = await db.collectionGroup('notes').where('practiceDate', '==', today).get();
+  const { count: notesCount } = await supabase
+    .from('swimmer_notes')
+    .select('*', { count: 'exact', head: true })
+    .eq('practice_date', today);
 
-  // Get video sessions ready for review
-  const videoSnap = await db.collection('video_sessions').where('status', '==', 'review').get();
-  const videoReviewCount = videoSnap.size;
+  const { count: videoReviewCount } = await supabase
+    .from('video_sessions')
+    .select('*', { count: 'exact', head: true })
+    .eq('status', 'review');
 
-  // Get active coaches
-  const coachesSnap = await db.collection('coaches').get();
+  const { data: staffRows } = await supabase
+    .from('profiles')
+    .select('user_id')
+    .in('role', ['coach_admin', 'super_admin']);
+  const staff = (staffRows ?? []) as { user_id: string }[];
+  if (staff.length === 0) return 0;
 
-  for (const coachDoc of coachesSnap.docs) {
-    const coach = coachDoc.data();
-    if (!coach.notificationPrefs?.dailyDigest) continue;
+  const { data: prefRows } = await supabase
+    .from('notification_preferences')
+    .select('user_id, digest_enabled')
+    .in(
+      'user_id',
+      staff.map((s) => s.user_id),
+    );
+  const optedOut = new Set(
+    ((prefRows ?? []) as { user_id: string; digest_enabled: boolean }[])
+      .filter((pref) => pref.digest_enabled === false)
+      .map((pref) => pref.user_id),
+  );
+  const recipients = staff.filter((s) => !optedOut.has(s.user_id));
+  if (recipients.length === 0) return 0;
 
-    await db.collection('notifications').add({
-      coachId: coachDoc.id,
-      title: 'Daily Practice Summary',
-      body: `${presentCount} swimmers attended today. ${notesSnap.size} notes recorded.${videoReviewCount > 0 ? ` ${videoReviewCount} video ${videoReviewCount > 1 ? 'analyses' : 'analysis'} ready for review.` : ''}`,
-      type: 'daily_digest',
-      data: { date: today },
-      read: false,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
-  }
+  const videos = videoReviewCount ?? 0;
+  const body = `${presentCount} swimmers attended today. ${notesCount ?? 0} notes recorded.${
+    videos > 0 ? ` ${videos} video ${videos > 1 ? 'analyses' : 'analysis'} ready for review.` : ''
+  }`;
+
+  // ONE batched insert. Digest rows carry NULL rule_id — deliberately outside
+  // the idempotency index (RG-11: faithful to the Firestore add(); the
+  // scheduler fires once daily).
+  const rows = recipients.map((s) => ({
+    user_id: s.user_id,
+    title: 'Daily Practice Summary',
+    body,
+    category: 'daily_digest',
+    data: { date: today },
+    is_read: false,
+  }));
+  const { error } = await supabase.from('in_app_notifications').insert(rows);
+  if (error) throw new Error(`dailyDigest insert failed: ${error.message}`);
+  return rows.length;
+}
+
+export const dailyDigest = onSchedule('every day 20:00', async () => {
+  await runDailyDigestOnce();
 });
