@@ -95,7 +95,9 @@ export interface SwimmerNote {
   id?: string;
   content: string;
   tags: NoteTag[];
-  source: 'manual' | 'audio_ai' | 'video_ai';
+  // voice_inline always existed in stored data (addNote wrote it); the type
+  // now matches reality and the canonical note_source domain.
+  source: 'manual' | 'audio_ai' | 'video_ai' | 'voice_inline';
   sourceRefId?: string;
   coachId: string;
   coachName: string;
