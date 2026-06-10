@@ -1,4 +1,5 @@
 import * as admin from 'firebase-admin';
+import { supabase } from '../config/supabase';
 import { getPrompt, type PromptSwimmer } from './prompts';
 
 if (!admin.apps.length) {
@@ -12,6 +13,28 @@ interface ExtractedObservation {
   observation: string;
   tags: string[];
   confidence: number;
+}
+
+// Roster reads come from canonical swimmers (UNIFY/04 Phase B); the drafts
+// write below stays on Firestore until the media phase (F).
+interface RosterRow {
+  id: string;
+  first_name: string | null;
+  last_name: string | null;
+  display_name: string | null;
+}
+
+const ROSTER_SELECT = 'id, first_name, last_name, display_name';
+
+function rowToRosterSwimmer(row: RosterRow) {
+  const firstName = row.first_name ?? '';
+  const lastName = row.last_name ?? '';
+  return {
+    id: row.id,
+    firstName,
+    lastName,
+    displayName: row.display_name ?? `${firstName} ${lastName}`.trim(),
+  };
 }
 
 export async function extractObservations(
@@ -30,33 +53,23 @@ export async function extractObservations(
   }>;
 
   if (scopedToSelected) {
-    const selectedDocs = await Promise.all(
-      selectedSwimmerIds.map((swimmerId) => db.doc(`swimmers/${swimmerId}`).get()),
-    );
-    swimmers = selectedDocs
-      .filter((doc) => doc.exists)
-      .map((doc) => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          firstName: data?.firstName as string,
-          lastName: data?.lastName as string,
-          displayName: data?.displayName as string,
-        };
-      });
+    // Missing ids are simply absent from the result, matching the old
+    // per-doc exists filter.
+    const { data, error } = await supabase
+      .from('swimmers')
+      .select(ROSTER_SELECT)
+      .in('id', selectedSwimmerIds);
+    if (error) throw error;
+    swimmers = ((data ?? []) as unknown as RosterRow[]).map(rowToRosterSwimmer);
   } else {
     // Fetch swimmer names for legacy sessions that predate selectedSwimmerIds.
-    let swimmerQuery: admin.firestore.Query = db.collection('swimmers').where('active', '==', true);
+    let swimmerQuery = supabase.from('swimmers').select(ROSTER_SELECT).eq('is_active', true);
     if (group) {
-      swimmerQuery = swimmerQuery.where('group', '==', group);
+      swimmerQuery = swimmerQuery.eq('practice_group', group);
     }
-    const swimmerSnap = await swimmerQuery.get();
-    swimmers = swimmerSnap.docs.map((d) => ({
-      id: d.id,
-      firstName: d.data().firstName as string,
-      lastName: d.data().lastName as string,
-      displayName: d.data().displayName as string,
-    }));
+    const { data, error } = await swimmerQuery;
+    if (error) throw error;
+    swimmers = ((data ?? []) as unknown as RosterRow[]).map(rowToRosterSwimmer);
   }
 
   const swimmerNames = swimmers.map((s) => `${s.firstName} ${s.lastName}`).join(', ');

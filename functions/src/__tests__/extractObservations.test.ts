@@ -1,8 +1,6 @@
 import {
   createMockFirestore,
   createMockFieldValue,
-  createMockDoc,
-  createMockQuerySnapshot,
   createMockVertexAI,
 } from '../__mocks__/firebaseAdmin';
 
@@ -30,6 +28,7 @@ jest.mock('@google-cloud/vertexai', () => ({
   VertexAI: MockVertexAI,
 }));
 
+// Drafts batch write stays on Firestore (UNIFY Phase F)
 jest.mock('firebase-admin', () => ({
   apps: [{}],
   initializeApp: jest.fn(),
@@ -39,6 +38,26 @@ jest.mock('firebase-admin', () => ({
   ),
 }));
 
+// Roster reads come from canonical swimmers (UNIFY Phase B)
+jest.mock('../config/supabase', () => {
+  const state: { rows: unknown[] } = { rows: [] };
+  interface QueryMock {
+    select: jest.Mock;
+    eq: jest.Mock;
+    in: jest.Mock;
+    then: (resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) => Promise<unknown>;
+  }
+  const query: QueryMock = {
+    select: jest.fn(() => query),
+    eq: jest.fn(() => query),
+    in: jest.fn(() => query),
+    then: (resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) =>
+      Promise.resolve({ data: state.rows, error: null }).then(resolve, reject),
+  };
+  const supabase = { from: jest.fn(() => query) };
+  return { supabase, __state: state, __query: query };
+});
+
 jest.mock('../ai/prompts', () => ({
   getPrompt: jest.fn().mockReturnValue('Extract observations from transcription'),
 }));
@@ -46,39 +65,25 @@ jest.mock('../ai/prompts', () => ({
 import { extractObservations } from '../ai/extractObservations';
 import { getPrompt } from '../ai/prompts';
 
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const supabaseMock = require('../config/supabase');
+const { __state, __query } = supabaseMock;
+const mockSupabase = supabaseMock.supabase;
+
 describe('extractObservations', () => {
-  const swimmers = [
-    createMockDoc('s1', {
-      firstName: 'Jane',
-      lastName: 'Smith',
-      displayName: 'Jane Smith',
-      active: true,
-      group: 'Gold',
-    }),
-    createMockDoc('s2', {
-      firstName: 'Bob',
-      lastName: 'Jones',
-      displayName: 'Bob Jones',
-      active: true,
-      group: 'Gold',
-    }),
+  const rosterRows = [
+    { id: 's1', first_name: 'Jane', last_name: 'Smith', display_name: 'Jane Smith' },
+    { id: 's2', first_name: 'Bob', last_name: 'Jones', display_name: 'Bob Jones' },
   ];
 
   beforeEach(() => {
     jest.clearAllMocks();
+    __state.rows = rosterRows;
 
-    // Mock the swimmer query chain
-    const mockSwimmerQuery = {
-      where: jest.fn().mockReturnThis(),
-      get: jest.fn().mockResolvedValue(createMockQuerySnapshot(swimmers)),
-    };
-
-    db.collection.mockImplementation((path: string) => {
-      if (path === 'swimmers') return mockSwimmerQuery;
-      // drafts collection
+    db.collection.mockImplementation(() => {
+      // drafts collection (Firestore until Phase F)
       return { doc: jest.fn().mockReturnValue({ id: 'draft-id' }) };
     });
-    db.doc.mockReset();
 
     mockGenerateContent.mockResolvedValue({
       response: {
@@ -102,38 +107,28 @@ describe('extractObservations', () => {
   });
 
   it('should filter group-specific swimmers when group is provided', async () => {
-    const mockSwimmerQuery = {
-      where: jest.fn().mockReturnThis(),
-      get: jest.fn().mockResolvedValue(createMockQuerySnapshot(swimmers)),
-    };
-    db.collection.mockImplementation((path: string) => {
-      if (path === 'swimmers') return mockSwimmerQuery;
-      return { doc: jest.fn().mockReturnValue({ id: 'draft-id' }) };
-    });
-
     await extractObservations('session-1', 'Some transcription', 'Gold');
 
-    // Should call where('active', '==', true) and where('group', '==', 'Gold')
-    expect(mockSwimmerQuery.where).toHaveBeenCalledWith('active', '==', true);
-    expect(mockSwimmerQuery.where).toHaveBeenCalledWith('group', '==', 'Gold');
+    expect(mockSupabase.from).toHaveBeenCalledWith('swimmers');
+    expect(__query.eq).toHaveBeenCalledWith('is_active', true);
+    expect(__query.eq).toHaveBeenCalledWith('practice_group', 'Gold');
   });
 
   it('should not filter by group when group is null', async () => {
-    const mockWhere = jest.fn().mockReturnThis();
-    const mockSwimmerQuery = {
-      where: mockWhere,
-      get: jest.fn().mockResolvedValue(createMockQuerySnapshot(swimmers)),
-    };
-    db.collection.mockImplementation((path: string) => {
-      if (path === 'swimmers') return mockSwimmerQuery;
-      return { doc: jest.fn().mockReturnValue({ id: 'draft-id' }) };
-    });
-
     await extractObservations('session-1', 'Some transcription', null);
 
-    // Should only call where('active', '==', true), NOT where('group', ...)
-    expect(mockWhere).toHaveBeenCalledTimes(1);
-    expect(mockWhere).toHaveBeenCalledWith('active', '==', true);
+    expect(__query.eq).toHaveBeenCalledTimes(1);
+    expect(__query.eq).toHaveBeenCalledWith('is_active', true);
+  });
+
+  it('falls back to first+last name when display_name is null (BSPC-origin rows)', async () => {
+    __state.rows = [{ id: 's1', first_name: 'Jane', last_name: 'Smith', display_name: null }];
+
+    await extractObservations('session-1', 'Jane Smith looked sharp', 'Gold');
+
+    // fuzzy match still resolves via the derived display name
+    expect(mockBatch.set).toHaveBeenCalledTimes(1);
+    expect(mockBatch.set.mock.calls[0][1].swimmerName).toBe('Jane Smith');
   });
 
   it('should handle empty AI response gracefully', async () => {
@@ -223,22 +218,10 @@ describe('extractObservations', () => {
   });
 
   it('passes selected swimmers into the prompt and only writes selected swimmer drafts', async () => {
-    db.doc.mockImplementation((path: string) => {
-      if (path === 'swimmers/s1') {
-        return {
-          get: jest.fn().mockResolvedValue(
-            createMockDoc('s1', {
-              firstName: 'Jane',
-              lastName: 'Smith',
-              displayName: 'Jane Smith',
-              active: true,
-              group: 'Gold',
-            }),
-          ),
-        };
-      }
-      return { get: jest.fn().mockResolvedValue(createMockDoc('missing', {}, false)) };
-    });
+    // only s1 exists; missing selected ids are simply absent from the result
+    __state.rows = [
+      { id: 's1', first_name: 'Jane', last_name: 'Smith', display_name: 'Jane Smith' },
+    ];
 
     mockGenerateContent.mockResolvedValueOnce({
       response: {
@@ -271,6 +254,7 @@ describe('extractObservations', () => {
 
     await extractObservations('session-1', 'Jane and Bob did well', 'Gold', ['s1']);
 
+    expect(__query.in).toHaveBeenCalledWith('id', ['s1']);
     expect(getPrompt).toHaveBeenCalledWith('Jane and Bob did well', 'Jane Smith', 'Gold', [
       { id: 's1', displayName: 'Jane Smith' },
     ]);
