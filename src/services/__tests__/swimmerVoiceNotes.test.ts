@@ -1,3 +1,7 @@
+// Data layer migrated Firestore -> Supabase (UNIFY/01:swimmer_voice_notes,
+// Phase E) — rows only. The audio files, upload path and AsyncStorage queue
+// stay on Firebase Storage until Phase F, so those tests keep their
+// firebase/storage mocks unchanged.
 jest.mock('../../config/firebase', () => ({
   db: {},
   storage: {},
@@ -12,20 +16,36 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
   setItem: jest.fn().mockResolvedValue(undefined),
 }));
 
-jest.mock('firebase/firestore', () => ({
-  collection: jest.fn((...args: unknown[]) => ({ path: (args as string[]).slice(1).join('/') })),
-  query: jest.fn((ref: unknown) => ref),
-  orderBy: jest.fn(),
-  limit: jest.fn(),
-  doc: jest.fn((...args: unknown[]) => ({
-    path: (args as string[]).slice(1).join('/'),
-    id: (args as string[])[args.length - 1],
-  })),
-  setDoc: jest.fn().mockResolvedValue(undefined),
-  updateDoc: jest.fn().mockResolvedValue(undefined),
-  onSnapshot: jest.fn(),
-  serverTimestamp: jest.fn(() => new Date()),
-}));
+jest.mock('../../config/supabase', () => {
+  const state: { selectRows: unknown[]; onHandler: ((p: unknown) => void) | null } = {
+    selectRows: [],
+    onHandler: null,
+  };
+  const query: Record<string, jest.Mock> & { then: unknown } = {
+    select: jest.fn(() => query),
+    eq: jest.fn(() => query),
+    order: jest.fn(() => query),
+    limit: jest.fn(() => query),
+    insert: jest.fn(() => query),
+    update: jest.fn(() => query),
+    single: jest.fn(() => Promise.resolve({ data: { id: 'voice-1' }, error: null })),
+    then: (resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) =>
+      Promise.resolve({ data: state.selectRows, error: null }).then(resolve, reject),
+  };
+  const channel = {
+    on: jest.fn((_evt: unknown, _filter: unknown, handler: (p: unknown) => void) => {
+      state.onHandler = handler;
+      return channel;
+    }),
+    subscribe: jest.fn(() => channel),
+  };
+  const supabase = {
+    from: jest.fn(() => query),
+    channel: jest.fn(() => channel),
+    removeChannel: jest.fn(),
+  };
+  return { supabase, __state: state, __query: query, __channel: channel };
+});
 
 jest.mock('firebase/storage', () => ({
   ref: jest.fn((_storage: unknown, path: string) => ({ path })),
@@ -48,63 +68,85 @@ import {
   flushQueuedSwimmerVoiceNotes,
 } from '../swimmerVoiceNotes';
 
-const firestore = require('firebase/firestore');
 const { addNote } = require('../notes');
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const mock = require('../../config/supabase');
+const { supabase, __state, __query, __channel } = mock;
+
+const flush = () => new Promise((resolve) => setImmediate(resolve));
 
 beforeEach(() => {
   jest.clearAllMocks();
+  __state.selectRows = [];
+  __state.onHandler = null;
   (AsyncStorage.getItem as jest.Mock).mockResolvedValue(null);
 });
 
 describe('subscribeSwimmerVoiceNotes', () => {
-  it('subscribes to the swimmer voice_notes subcollection newest first', () => {
-    const mockUnsub = jest.fn();
-    firestore.onSnapshot.mockReturnValue(mockUnsub);
+  it('queries swimmer_voice_notes scoped to the swimmer, newest first, and opens a channel', () => {
+    subscribeSwimmerVoiceNotes('sw-1', jest.fn(), 10);
 
-    const unsub = subscribeSwimmerVoiceNotes('sw-1', jest.fn(), 10);
-
-    expect(firestore.collection).toHaveBeenCalledWith(
-      expect.anything(),
-      'swimmers',
-      'sw-1',
-      'voice_notes',
-    );
-    expect(firestore.orderBy).toHaveBeenCalledWith('createdAt', 'desc');
-    expect(firestore.limit).toHaveBeenCalledWith(10);
-    expect(unsub).toBe(mockUnsub);
+    expect(supabase.from).toHaveBeenCalledWith('swimmer_voice_notes');
+    expect(__query.eq).toHaveBeenCalledWith('swimmer_id', 'sw-1');
+    expect(__query.order).toHaveBeenCalledWith('created_at', { ascending: false });
+    expect(__query.limit).toHaveBeenCalledWith(10);
+    expect(__channel.subscribe).toHaveBeenCalled();
   });
 
-  it('maps snapshot docs with ids', () => {
-    firestore.onSnapshot.mockImplementation((_q: unknown, cb: (snap: unknown) => void) => {
-      cb({
-        docs: [
-          {
-            id: 'voice-2',
-            data: () => ({
-              swimmerId: 'sw-1',
-              storagePath: 'audio/swimmers/sw-1/2026-04-18/voice-2.m4a',
-            }),
-          },
-        ],
-      });
-      return jest.fn();
-    });
+  it('applies the default limit of 20', () => {
+    subscribeSwimmerVoiceNotes('sw-1', jest.fn());
+    expect(__query.limit).toHaveBeenCalledWith(20);
+  });
 
+  it('maps rows to SwimmerVoiceNotes with ids', async () => {
+    __state.selectRows = [
+      {
+        id: 'voice-2',
+        swimmer_id: 'sw-1',
+        coach_id: 'coach-1',
+        storage_path: 'audio/swimmers/sw-1/2026-04-18/voice-2.m4a',
+        duration_sec: 42,
+        practice_date: '2026-04-18',
+        transcription: null,
+        created_at: '2026-04-18T12:00:00.000Z',
+      },
+    ];
     const callback = jest.fn();
     subscribeSwimmerVoiceNotes('sw-1', callback);
+    await flush();
 
     expect(callback).toHaveBeenCalledWith([
       {
         id: 'voice-2',
         swimmerId: 'sw-1',
+        coachId: 'coach-1',
         storagePath: 'audio/swimmers/sw-1/2026-04-18/voice-2.m4a',
+        durationSec: 42,
+        transcription: null,
+        createdAt: new Date('2026-04-18T12:00:00.000Z'),
       },
     ]);
+  });
+
+  it('re-emits on realtime changes and stops after unsubscribe', async () => {
+    __state.selectRows = [];
+    const cb = jest.fn();
+    const unsub = subscribeSwimmerVoiceNotes('sw-1', cb);
+    await flush();
+    expect(cb).toHaveBeenCalledTimes(1);
+    __state.onHandler?.({ eventType: 'INSERT' });
+    await flush();
+    expect(cb).toHaveBeenCalledTimes(2);
+    unsub();
+    __state.onHandler?.({ eventType: 'UPDATE' });
+    await flush();
+    expect(cb).toHaveBeenCalledTimes(2);
+    expect(supabase.removeChannel).toHaveBeenCalledWith(__channel);
   });
 });
 
 describe('createSwimmerVoiceNote', () => {
-  it('creates the voice note doc and companion swimmer note', async () => {
+  it('inserts the voice-note row and companion swimmer note', async () => {
     const noteId = await createSwimmerVoiceNote({
       swimmerId: 'sw-1',
       coachId: 'coach-1',
@@ -114,17 +156,16 @@ describe('createSwimmerVoiceNote', () => {
       noteId: 'voice-1',
     });
 
-    expect(firestore.setDoc).toHaveBeenCalledWith(
-      expect.objectContaining({ path: 'swimmers/sw-1/voice_notes/voice-1', id: 'voice-1' }),
-      expect.objectContaining({
-        id: 'voice-1',
-        swimmerId: 'sw-1',
-        coachId: 'coach-1',
-        storagePath: '',
-        durationSec: 83,
-        transcription: null,
-      }),
-    );
+    expect(supabase.from).toHaveBeenCalledWith('swimmer_voice_notes');
+    expect(__query.insert).toHaveBeenCalledWith({
+      id: 'voice-1',
+      swimmer_id: 'sw-1',
+      coach_id: 'coach-1',
+      storage_path: '',
+      duration_sec: 83,
+      practice_date: '2026-04-18',
+      transcription: null,
+    });
     expect(addNote).toHaveBeenCalledWith(
       'sw-1',
       'VOICE NOTE RECORDED - 1:23 - transcription pending',
@@ -138,25 +179,47 @@ describe('createSwimmerVoiceNote', () => {
     );
     expect(noteId).toBe('voice-1');
   });
-});
 
-describe('updateSwimmerVoiceNote', () => {
-  it('updates the existing voice note doc', async () => {
-    await updateSwimmerVoiceNote('sw-1', 'voice-1', {
-      storagePath: 'audio/swimmers/sw-1/2026-04-18/voice-1.m4a',
+  it('lets the database generate the id when none is supplied', async () => {
+    __query.single.mockResolvedValueOnce({ data: { id: 'db-generated-id' }, error: null });
+
+    const noteId = await createSwimmerVoiceNote({
+      swimmerId: 'sw-1',
+      coachId: 'coach-1',
+      coachName: 'Coach K',
+      durationSec: 30,
+      practiceDate: '2026-04-18',
     });
 
-    expect(firestore.updateDoc).toHaveBeenCalledWith(
-      expect.objectContaining({ path: 'swimmers/sw-1/voice_notes/voice-1' }),
-      expect.objectContaining({
-        storagePath: 'audio/swimmers/sw-1/2026-04-18/voice-1.m4a',
-      }),
+    const payload = __query.insert.mock.calls[0][0];
+    expect(payload).not.toHaveProperty('id');
+    expect(noteId).toBe('db-generated-id');
+    expect(addNote).toHaveBeenCalledWith(
+      'sw-1',
+      expect.any(String),
+      [],
+      expect.anything(),
+      expect.objectContaining({ sourceRefId: 'db-generated-id' }),
     );
   });
 });
 
+describe('updateSwimmerVoiceNote', () => {
+  it('updates the row by id, mapping fields to columns', async () => {
+    await updateSwimmerVoiceNote('sw-1', 'voice-1', {
+      storagePath: 'audio/swimmers/sw-1/2026-04-18/voice-1.m4a',
+    });
+
+    expect(supabase.from).toHaveBeenCalledWith('swimmer_voice_notes');
+    expect(__query.update).toHaveBeenCalledWith({
+      storage_path: 'audio/swimmers/sw-1/2026-04-18/voice-1.m4a',
+    });
+    expect(__query.eq).toHaveBeenCalledWith('id', 'voice-1');
+  });
+});
+
 describe('uploadSwimmerVoiceNote', () => {
-  it('uploads to the swimmer-scoped storage path', async () => {
+  it('uploads to the swimmer-scoped FIREBASE storage path (files stay until Phase F)', async () => {
     global.fetch = jest
       .fn()
       .mockResolvedValue({ blob: jest.fn().mockResolvedValue(new Blob()) }) as jest.Mock;

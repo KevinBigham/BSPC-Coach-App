@@ -1,18 +1,13 @@
+// Data layer migrated Firestore -> Supabase (UNIFY/01:swimmer_voice_notes,
+// Phase E) — ROWS ONLY. The audio FILES, the upload path and the offline
+// AsyncStorage queue stay on Firebase Storage until Phase F (the Phase B
+// profilePhoto precedent): storage_path keeps holding a Firebase Storage
+// path string. The companion swimmer note still goes through notes.ts
+// (which now writes swimmer_notes with the typed source_voice_note_id).
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import {
-  collection,
-  query,
-  orderBy,
-  onSnapshot,
-  doc,
-  setDoc,
-  updateDoc,
-  serverTimestamp,
-  limit as firestoreLimit,
-  type Unsubscribe,
-} from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
-import { db, storage } from '../config/firebase';
+import { storage } from '../config/firebase';
+import { supabase } from '../config/supabase';
 import { addNote } from './notes';
 import type { QueuedSwimmerVoiceNoteUpload, SwimmerVoiceNote } from '../types/voiceNote';
 import { logger } from '../utils/logger';
@@ -21,6 +16,10 @@ const QUEUE_KEY = '@bspc/swimmer-voice-note-queue';
 const MAX_RETRIES = 3;
 
 type VoiceNoteWithId = SwimmerVoiceNote & { id: string };
+
+// Structurally identical to firebase's Unsubscribe (() => void); the data layer
+// no longer imports firestore, but the public return type is unchanged.
+type Unsubscribe = () => void;
 
 interface CreateSwimmerVoiceNoteInput {
   swimmerId: string;
@@ -31,10 +30,36 @@ interface CreateSwimmerVoiceNoteInput {
   noteId?: string;
 }
 
+interface VoiceNoteRow {
+  id: string;
+  swimmer_id: string;
+  coach_id: string;
+  storage_path: string | null;
+  duration_sec: number | null;
+  practice_date: string | null;
+  transcription: string | null;
+  created_at: string;
+}
+
+const VOICE_NOTE_SELECT =
+  'id, swimmer_id, coach_id, storage_path, duration_sec, practice_date, transcription, created_at';
+
 function formatDuration(seconds: number): string {
   const minutes = Math.floor(seconds / 60);
   const remainder = seconds % 60;
   return `${minutes}:${remainder.toString().padStart(2, '0')}`;
+}
+
+function rowToVoiceNote(row: VoiceNoteRow): VoiceNoteWithId {
+  return {
+    id: row.id,
+    swimmerId: row.swimmer_id,
+    coachId: row.coach_id,
+    storagePath: row.storage_path ?? '',
+    durationSec: row.duration_sec ?? 0,
+    transcription: row.transcription,
+    createdAt: new Date(row.created_at),
+  };
 }
 
 async function readQueue(): Promise<QueuedSwimmerVoiceNoteUpload[]> {
@@ -64,19 +89,50 @@ async function processQueuedSwimmerVoiceNoteUpload(
   await updateSwimmerVoiceNote(item.swimmerId, item.noteId, { storagePath });
 }
 
+let channelSeq = 0;
+
 export function subscribeSwimmerVoiceNotes(
   swimmerId: string,
   callback: (notes: VoiceNoteWithId[]) => void,
   max: number = 20,
 ): Unsubscribe {
-  const q = query(
-    collection(db, 'swimmers', swimmerId, 'voice_notes'),
-    orderBy('createdAt', 'desc'),
-    firestoreLimit(max),
-  );
-  return onSnapshot(q, (snapshot) => {
-    callback(snapshot.docs.map((note) => ({ id: note.id, ...note.data() }) as VoiceNoteWithId));
-  });
+  let live = true;
+
+  // Fetch the full current list and emit it — mirrors onSnapshot, which always
+  // hands the callback the whole ordered/limited snapshot rather than deltas.
+  const emit = async (): Promise<void> => {
+    const { data, error } = await supabase
+      .from('swimmer_voice_notes')
+      .select(VOICE_NOTE_SELECT)
+      .eq('swimmer_id', swimmerId)
+      .order('created_at', { ascending: false })
+      .limit(max);
+    if (!live || error || !data) return;
+    callback((data as unknown as VoiceNoteRow[]).map(rowToVoiceNote));
+  };
+
+  void emit(); // immediate first fire, like onSnapshot
+
+  const channel = supabase
+    .channel(`swimmer_voice_notes:${swimmerId}:${channelSeq++}`)
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'swimmer_voice_notes',
+        filter: `swimmer_id=eq.${swimmerId}`,
+      },
+      () => {
+        void emit();
+      },
+    )
+    .subscribe();
+
+  return () => {
+    live = false;
+    void supabase.removeChannel(channel);
+  };
 }
 
 export async function createSwimmerVoiceNote({
@@ -87,24 +143,23 @@ export async function createSwimmerVoiceNote({
   practiceDate,
   noteId,
 }: CreateSwimmerVoiceNoteInput): Promise<string> {
-  const voiceNoteRef = doc(
-    db,
-    'swimmers',
-    swimmerId,
-    'voice_notes',
-    noteId || doc(collection(db, 'swimmers', swimmerId, 'voice_notes')).id,
-  );
-  const resolvedNoteId = voiceNoteRef.id;
-
-  await setDoc(voiceNoteRef, {
-    id: resolvedNoteId,
-    swimmerId,
-    coachId,
-    storagePath: '',
-    durationSec,
-    transcription: null,
-    createdAt: serverTimestamp(),
-  });
+  // Firestore pre-generated the doc id client-side; Postgres owns id
+  // generation unless the caller supplies one (the queued-retry path).
+  const { data, error } = await supabase
+    .from('swimmer_voice_notes')
+    .insert({
+      ...(noteId ? { id: noteId } : {}),
+      swimmer_id: swimmerId,
+      coach_id: coachId,
+      storage_path: '',
+      duration_sec: durationSec,
+      practice_date: practiceDate,
+      transcription: null,
+    })
+    .select('id')
+    .single();
+  if (error) throw error;
+  const resolvedNoteId = (data as { id: string }).id;
 
   await addNote(
     swimmerId,
@@ -126,7 +181,15 @@ export async function updateSwimmerVoiceNote(
   noteId: string,
   data: Partial<SwimmerVoiceNote>,
 ): Promise<void> {
-  await updateDoc(doc(db, 'swimmers', swimmerId, 'voice_notes', noteId), data);
+  void swimmerId; // row addressed by PK; param kept for signature compat
+  // Map only provided fields to columns; created_at is DB-owned.
+  const patch: Record<string, unknown> = {};
+  if ('storagePath' in data) patch.storage_path = data.storagePath;
+  if ('durationSec' in data) patch.duration_sec = data.durationSec;
+  if ('transcription' in data) patch.transcription = data.transcription;
+
+  const { error } = await supabase.from('swimmer_voice_notes').update(patch).eq('id', noteId);
+  if (error) throw error;
 }
 
 export async function uploadSwimmerVoiceNote(
