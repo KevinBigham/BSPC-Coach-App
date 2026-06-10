@@ -1,22 +1,11 @@
 // Swimmer creation migrated Firestore -> canonical Postgres (UNIFY Phase B).
-// The import-job bookkeeping (importJobs service) intentionally stays on
-// Firestore until its own phase, so the firestore mock below only serves it.
+// Phase H (D-H8): the import-job bookkeeping rides Supabase import_jobs now —
+// the jobs route below serves it; no firestore mock remains.
 jest.mock('../../config/firebase', () => ({
   db: {},
   auth: { currentUser: { uid: 'test-uid' } },
   storage: {},
   functions: {},
-}));
-
-jest.mock('firebase/firestore', () => ({
-  addDoc: jest.fn().mockResolvedValue({ id: 'job-1' }),
-  collection: jest.fn((...args: unknown[]) => ({ path: (args as string[]).slice(1).join('/') })),
-  doc: jest.fn((...args: unknown[]) => ({
-    path: (args as string[]).slice(1).join('/'),
-    id: (args as string[])[args.length - 1],
-  })),
-  serverTimestamp: jest.fn(() => new Date()),
-  updateDoc: jest.fn().mockResolvedValue(undefined),
 }));
 
 jest.mock('../../config/supabase', () => {
@@ -39,12 +28,32 @@ jest.mock('../../config/supabase', () => {
   const scpQuery = {
     insert: jest.fn(() => Promise.resolve({ error: null })),
   };
+  // Phase H: the importJobs service (D-H8) writes canonical import_jobs.
+  const jobsQuery: Record<string, jest.Mock> & { then: unknown } = {
+    select: jest.fn(() => jobsQuery),
+    eq: jest.fn(() => jobsQuery),
+    insert: jest.fn(() => jobsQuery),
+    update: jest.fn(() => jobsQuery),
+    single: jest.fn(() => Promise.resolve({ data: { id: 'job-1' }, error: null })),
+    then: (resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) =>
+      Promise.resolve({ data: [], error: null }).then(resolve, reject),
+  };
   const supabase = {
     from: jest.fn((table: string) =>
-      table === 'swimmer_coach_profile' ? scpQuery : swimmersQuery,
+      table === 'swimmer_coach_profile'
+        ? scpQuery
+        : table === 'import_jobs'
+          ? jobsQuery
+          : swimmersQuery,
     ),
   };
-  return { supabase, __state: state, __swimmersQuery: swimmersQuery, __scpQuery: scpQuery };
+  return {
+    supabase,
+    __state: state,
+    __swimmersQuery: swimmersQuery,
+    __scpQuery: scpQuery,
+    __jobsQuery: jobsQuery,
+  };
 });
 
 import { parseCSV, validateRows, importSwimmers } from '../csvImport';
