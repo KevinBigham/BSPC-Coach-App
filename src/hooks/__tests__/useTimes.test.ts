@@ -1,23 +1,6 @@
-jest.mock('../../config/firebase', () => ({
-  db: {},
-  auth: { currentUser: { uid: 'test-uid' } },
-}));
-
-jest.mock('firebase/firestore', () => ({
-  collection: jest.fn((...args: unknown[]) => ({ path: (args as string[]).slice(1).join('/') })),
-  query: jest.fn((ref: unknown) => ref),
-  where: jest.fn(),
-  orderBy: jest.fn(),
-  limit: jest.fn(),
-  onSnapshot: jest.fn(),
-  addDoc: jest.fn(),
-  updateDoc: jest.fn(),
-  deleteDoc: jest.fn(),
-  doc: jest.fn(),
-  getDocs: jest.fn(),
-  serverTimestamp: jest.fn(() => new Date()),
-}));
-
+// Phase K hygiene (FYI-1): the dead firebase mocks removed — the subject's
+// import graph (useTimes -> services/times -> config/supabase) no longer
+// reaches src/config/firebase, verified at deletion.
 jest.mock('../../utils/time', () => ({
   formatTimeDisplay: jest.fn((t: number) => `${t}s`),
 }));

@@ -1,20 +1,6 @@
-jest.mock('../../config/firebase', () => ({
-  db: {},
-  auth: { currentUser: { uid: 'test-uid' } },
-}));
-
-jest.mock('firebase/firestore', () => ({
-  collection: jest.fn((...args: unknown[]) => ({ path: (args as string[]).slice(1).join('/') })),
-  query: jest.fn((ref: unknown) => ref),
-  orderBy: jest.fn(),
-  onSnapshot: jest.fn(),
-  addDoc: jest.fn(),
-  updateDoc: jest.fn(),
-  deleteDoc: jest.fn(),
-  doc: jest.fn(),
-  serverTimestamp: jest.fn(() => new Date()),
-}));
-
+// Phase K hygiene (FYI-1): the dead firebase mocks removed — the subject's
+// import graph (useGoals -> services/goals -> config/supabase) no longer
+// reaches src/config/firebase, verified at deletion.
 import { renderHook } from '@testing-library/react-native';
 import { subscribeGoals } from '../../services/goals';
 import { useGoals } from '../useGoals';

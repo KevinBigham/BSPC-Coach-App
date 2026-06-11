@@ -1,25 +1,7 @@
-jest.mock('../../config/firebase', () => ({
-  db: {},
-  auth: { currentUser: { uid: 'test-uid' } },
-}));
-
-jest.mock('firebase/firestore', () => ({
-  collection: jest.fn((...args: unknown[]) => ({ path: (args as string[]).slice(1).join('/') })),
-  query: jest.fn((ref: unknown) => ref),
-  where: jest.fn(),
-  orderBy: jest.fn(),
-  limit: jest.fn(),
-  onSnapshot: jest.fn(),
-  addDoc: jest.fn(),
-  updateDoc: jest.fn(),
-  doc: jest.fn(),
-  serverTimestamp: jest.fn(() => new Date()),
-  writeBatch: jest.fn(() => ({
-    set: jest.fn(),
-    commit: jest.fn().mockResolvedValue(undefined),
-  })),
-}));
-
+// Phase K hygiene (FYI-1): the dead firebase mocks removed — the subject's
+// import graph (useSwimmerAttendance -> services/attendance ->
+// config/supabase) no longer reaches src/config/firebase, verified at
+// deletion.
 import { renderHook } from '@testing-library/react-native';
 import { subscribeSwimmerAttendance } from '../../services/attendance';
 import { useSwimmerAttendance } from '../useSwimmerAttendance';

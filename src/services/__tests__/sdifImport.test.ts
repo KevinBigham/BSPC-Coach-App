@@ -1,28 +1,7 @@
-jest.mock('../../config/firebase', () => ({
-  db: {},
-  auth: { currentUser: { uid: 'test-uid' } },
-  storage: {},
-  functions: {},
-}));
-
-jest.mock('firebase/firestore', () => ({
-  collection: jest.fn((...args: unknown[]) => ({ path: (args as string[]).slice(1).join('/') })),
-  query: jest.fn((ref: unknown) => ref),
-  where: jest.fn(),
-  getDocs: jest.fn(),
-  doc: jest.fn((...args: unknown[]) => ({
-    path: (args as string[]).slice(1).join('/'),
-    id: (args as string[])[args.length - 1],
-  })),
-  serverTimestamp: jest.fn(() => new Date()),
-  writeBatch: jest.fn(() => ({
-    set: jest.fn(),
-    update: jest.fn(),
-    delete: jest.fn(),
-    commit: jest.fn().mockResolvedValue(undefined),
-  })),
-}));
-
+// Phase K hygiene (FYI-1): the dead firebase mocks removed — the subject's
+// import graph (sdifImport -> utils/time + utils/logger + meetResultsImport,
+// all PG/parser code) no longer reaches src/config/firebase, verified at
+// deletion.
 import { parseSDIF, matchSwimmers } from '../sdifImport';
 
 beforeEach(() => {
