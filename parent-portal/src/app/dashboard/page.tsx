@@ -11,7 +11,7 @@ import {
   type ParentProfile,
   type ParentSwimmerSummary,
 } from '@/lib/parentPortal';
-import type { User } from 'firebase/auth';
+import type { User } from '@supabase/supabase-js';
 
 export default function DashboardPage() {
   const router = useRouter();
