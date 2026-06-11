@@ -294,15 +294,8 @@ export interface PracticePlan {
   updatedAt: FirebaseTimestamp;
 }
 
-export interface Message {
-  id?: string;
-  content: string;
-  senderId: string;
-  senderName: string;
-  recipientIds: string[];
-  readBy: Record<string, FirebaseTimestamp>;
-  createdAt: FirebaseTimestamp;
-}
+// The Message interface retired with app/messages.tsx (Phase K, D-J7 — its
+// sole importer; coach_chat gets no canonical home).
 
 export interface Notification {
   id?: string;

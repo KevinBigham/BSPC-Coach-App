@@ -206,16 +206,6 @@ function RootNavigator() {
           }}
         />
         <Stack.Screen
-          name="messages"
-          options={{
-            headerShown: true,
-            title: 'COACH CHAT',
-            headerStyle: { backgroundColor: colors.bgElevated },
-            headerTintColor: colors.accent,
-            headerTitleStyle: { fontFamily: fontFamily.heading, fontSize: 22, color: colors.text },
-          }}
-        />
-        <Stack.Screen
           name="notifications"
           options={{
             headerShown: true,

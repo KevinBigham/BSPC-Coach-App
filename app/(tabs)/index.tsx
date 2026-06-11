@@ -160,12 +160,6 @@ function DashboardScreen() {
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.actionBtn, styles.actionBtnAlt]}
-          onPress={() => router.push('/messages')}
-        >
-          <Text style={styles.actionBtnTextAlt}>CHAT</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.actionBtn, styles.actionBtnAlt]}
           onPress={() => router.push('/calendar')}
         >
           <Text style={styles.actionBtnTextAlt}>CALENDAR</Text>
