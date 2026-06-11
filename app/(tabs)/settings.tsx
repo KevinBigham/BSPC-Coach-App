@@ -2,25 +2,39 @@ import { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Alert, ScrollView, Switch } from 'react-native';
 import { router } from 'expo-router';
 import Constants from 'expo-constants';
-import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '../../src/config/firebase';
 import { useAuth } from '../../src/contexts/AuthContext';
-import { getNotificationPermissionStatus } from '../../src/services/notifications';
+import {
+  getNotificationPermissionStatus,
+  getNotificationPreferences,
+  upsertNotificationPreferences,
+} from '../../src/services/notifications';
 import { colors, spacing, fontSize, borderRadius, fontFamily } from '../../src/config/theme';
 import { tapHeavy, selectionChanged } from '../../src/utils/haptics';
 import { withScreenErrorBoundary } from '../../src/components/ScreenErrorBoundary';
-
-type NotifPref = 'dailyDigest' | 'newNotes' | 'attendanceAlerts' | 'aiDraftsReady';
 
 function SettingsScreen() {
   const { coach, user, signOut, isAdmin } = useAuth();
   const [saving, setSaving] = useState(false);
   const [pushStatus, setPushStatus] = useState<string>('unknown');
+  // The ONE live toggle (CALL-2 / 05 §6.2a): Daily Digest round-trips to
+  // notification_preferences.digest_enabled through the D-CUT7 pair. Seeded
+  // from the coach resolution, refreshed from the own row on mount.
+  const [digestEnabled, setDigestEnabled] = useState<boolean>(
+    coach?.notificationPrefs.dailyDigest ?? true,
+  );
 
   useEffect(() => {
     getNotificationPermissionStatus()
       .then(setPushStatus)
       .catch(() => setPushStatus('error'));
+  }, []);
+
+  useEffect(() => {
+    getNotificationPreferences()
+      .then((prefs) => setDigestEnabled(prefs.digestEnabled))
+      .catch(() => {
+        // Keep the seeded value; the toggle still writes through.
+      });
   }, []);
 
   const handleSignOut = () => {
@@ -37,19 +51,16 @@ function SettingsScreen() {
     ]);
   };
 
-  const toggleNotification = async (key: NotifPref) => {
-    if (!user || !coach) return;
+  const toggleDailyDigest = async () => {
+    if (!user) return;
     selectionChanged();
-    const currentValue = coach.notificationPrefs[key];
+    const next = !digestEnabled;
     setSaving(true);
+    setDigestEnabled(next);
     try {
-      await updateDoc(doc(db, 'coaches', user.uid), {
-        [`notificationPrefs.${key}`]: !currentValue,
-        updatedAt: serverTimestamp(),
-      });
-      // AuthContext will refresh from Firestore on next auth state change
-      // For immediate feedback, we trust the toggle state
+      await upsertNotificationPreferences({ digestEnabled: next });
     } catch (err: unknown) {
+      setDigestEnabled(!next);
       Alert.alert('Error', err instanceof Error ? err.message : String(err));
     }
     setSaving(false);
@@ -69,7 +80,12 @@ function SettingsScreen() {
         </View>
       </View>
 
-      {/* Notifications */}
+      {/* Notifications. Daily Digest is the ONE live toggle — the named
+          CALL-2 retirement (D-K3 class) removed newNotes / attendanceAlerts /
+          aiDraftsReady at the swap: no reader exists for them post-G
+          (aiDraftsReady returns WITH the D-G4 producer; attendanceAlerts is
+          superseded by the notification_rules surface; newNotes returns only
+          with a revived producer). The Push row stays read-only OS status. */}
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>NOTIFICATIONS</Text>
         <View style={styles.pushStatusRow}>
@@ -85,26 +101,8 @@ function SettingsScreen() {
         </View>
         <NotificationToggle
           label="Daily Digest"
-          value={coach?.notificationPrefs.dailyDigest ?? true}
-          onToggle={() => toggleNotification('dailyDigest')}
-          disabled={saving}
-        />
-        <NotificationToggle
-          label="New Notes"
-          value={coach?.notificationPrefs.newNotes ?? true}
-          onToggle={() => toggleNotification('newNotes')}
-          disabled={saving}
-        />
-        <NotificationToggle
-          label="Attendance Alerts"
-          value={coach?.notificationPrefs.attendanceAlerts ?? true}
-          onToggle={() => toggleNotification('attendanceAlerts')}
-          disabled={saving}
-        />
-        <NotificationToggle
-          label="AI Drafts Ready"
-          value={coach?.notificationPrefs.aiDraftsReady ?? true}
-          onToggle={() => toggleNotification('aiDraftsReady')}
+          value={digestEnabled}
+          onToggle={() => void toggleDailyDigest()}
           disabled={saving}
         />
       </View>
