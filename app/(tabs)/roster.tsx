@@ -11,8 +11,6 @@ import {
   Image,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { doc, onSnapshot } from 'firebase/firestore';
-import { db } from '../../src/config/firebase';
 import { useAuth } from '../../src/contexts/AuthContext';
 import {
   colors,
@@ -26,7 +24,11 @@ import { GROUPS, type Group } from '../../src/config/constants';
 import { subscribeSwimmers, updateSwimmer } from '../../src/services/swimmers';
 import { exportRosterCSV, shareCSV } from '../../src/services/export';
 import { useSwimmersStore } from '../../src/stores/swimmersStore';
-import { getPRCount } from '../../src/services/aggregations';
+import {
+  getPRCount,
+  subscribeAttendanceAggregation,
+  subscribeSwimmerAggregation,
+} from '../../src/services/aggregations';
 import type {
   Swimmer,
   AttendanceAggregation,
@@ -62,40 +64,27 @@ function RosterScreen() {
   const [attendanceAggs, setAttendanceAggs] = useState<Record<string, AttendanceAggregation>>({});
   const [swimmerAggs, setSwimmerAggs] = useState<Record<string, SwimmerAggregation>>({});
 
-  // Subscribe to aggregation docs for all active swimmers
+  // Subscribe to the per-swimmer aggregation views for all active swimmers
+  // (Phase J: through the service — the inline Firestore doc subscriptions
+  // are gone; 04's "aggregations.ts (read-only)" is finally literally true)
   useEffect(() => {
     const unsubs: (() => void)[] = [];
     const ids = activeSwimmers.map((s) => s.id).filter(Boolean);
 
     ids.forEach((id) => {
       unsubs.push(
-        onSnapshot(
-          doc(db, 'aggregations', `attendance_${id}`),
-          (snap) => {
-            if (snap.exists()) {
-              setAttendanceAggs((prev) => ({
-                ...prev,
-                [id]: snap.data() as AttendanceAggregation,
-              }));
-            }
-          },
-          () => {
-            /* ignore errors */
-          },
-        ),
+        subscribeAttendanceAggregation(id, (agg) => {
+          if (agg) {
+            setAttendanceAggs((prev) => ({ ...prev, [id]: agg }));
+          }
+        }),
       );
       unsubs.push(
-        onSnapshot(
-          doc(db, 'aggregations', `swimmer_${id}`),
-          (snap) => {
-            if (snap.exists()) {
-              setSwimmerAggs((prev) => ({ ...prev, [id]: snap.data() as SwimmerAggregation }));
-            }
-          },
-          () => {
-            /* ignore errors */
-          },
-        ),
+        subscribeSwimmerAggregation(id, (agg) => {
+          if (agg) {
+            setSwimmerAggs((prev) => ({ ...prev, [id]: agg }));
+          }
+        }),
       );
     });
 

@@ -121,6 +121,37 @@ export function subscribeVideoSessions(
   };
 }
 
+// Phase J (the ratified D-J1 pendingDrafts rider): the dashboard's pending-
+// review count — the exact status='review' count the screen used to take
+// from Firestore directly; landed in this service so the hook stays out of
+// the data layer. Same query shape, no new capability (staff-wide wall).
+export function subscribePendingVideoReviewCount(callback: (count: number) => void): Unsubscribe {
+  let live = true;
+
+  const emit = async (): Promise<void> => {
+    const { count, error } = await supabase
+      .from('video_sessions')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'review');
+    if (!live || error || count === null) return;
+    callback(count);
+  };
+
+  void emit(); // immediate first fire, like onSnapshot
+
+  const channel = supabase
+    .channel(`video_sessions:review:${channelSeq++}`)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'video_sessions' }, () => {
+      void emit();
+    })
+    .subscribe();
+
+  return () => {
+    live = false;
+    void supabase.removeChannel(channel);
+  };
+}
+
 interface VideoDraftRow {
   id: string;
   session_id: string;

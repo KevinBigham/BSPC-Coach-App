@@ -67,10 +67,6 @@ jest.mock('../../../src/contexts/AuthContext', () => ({
   useAuth: () => ({ isAdmin: false }),
 }));
 
-jest.mock('../../../src/config/firebase', () => ({
-  db: {},
-}));
-
 jest.mock('../../../src/stores/swimmersStore', () => ({
   useSwimmersStore: (selector: (state: { swimmers: typeof mockActiveSwimmers }) => unknown) =>
     selector({ swimmers: mockActiveSwimmers }),
@@ -86,24 +82,19 @@ jest.mock('../../../src/services/export', () => ({
   shareCSV: jest.fn(),
 }));
 
+// Phase J: the screen subscribes through the service (the inline Firestore
+// doc subscriptions are gone); the bronze swimmer is the only one with rows.
 jest.mock('../../../src/services/aggregations', () => ({
   getPRCount: jest.fn(() => 2),
-}));
-
-jest.mock('firebase/firestore', () => ({
-  doc: jest.fn((_db: unknown, collectionName: string, id: string) => ({ collectionName, id })),
-  onSnapshot: jest.fn((ref: { id: string }, callback: (snap: unknown) => void) => {
-    if (ref.id === 'attendance_swim-bronze-1') {
-      callback({
-        exists: () => true,
-        data: () => ({ attendancePercent30: 90 }),
-      });
+  subscribeAttendanceAggregation: jest.fn((swimmerId: string, callback: (agg: unknown) => void) => {
+    if (swimmerId === 'swim-bronze-1') {
+      callback({ attendancePercent30: 90 });
     }
-    if (ref.id === 'swimmer_swim-bronze-1') {
-      callback({
-        exists: () => true,
-        data: () => ({ prsByEvent: { '50 Free': {}, '100 Free': {} } }),
-      });
+    return jest.fn();
+  }),
+  subscribeSwimmerAggregation: jest.fn((swimmerId: string, callback: (agg: unknown) => void) => {
+    if (swimmerId === 'swim-bronze-1') {
+      callback({ prsByEvent: { '50 Free': {}, '100 Free': {} } });
     }
     return jest.fn();
   }),

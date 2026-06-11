@@ -3,8 +3,13 @@
 // New pins: the P1-4 junction write/read, the coachName embed derivation, and
 // the D-F2 pipeline kick on the status flip to 'uploaded'.
 jest.mock('../../config/supabase', () => {
-  const state: { selectRows: unknown[]; onHandler: ((p: unknown) => void) | null } = {
+  const state: {
+    selectRows: unknown[];
+    count: number;
+    onHandler: ((p: unknown) => void) | null;
+  } = {
     selectRows: [],
+    count: 0,
     onHandler: null,
   };
   const query: Record<string, jest.Mock> & { then: unknown } = {
@@ -16,7 +21,10 @@ jest.mock('../../config/supabase', () => {
     update: jest.fn(() => query),
     single: jest.fn(() => Promise.resolve({ data: { id: 'new-audio-session-id' }, error: null })),
     then: (resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) =>
-      Promise.resolve({ data: state.selectRows, error: null }).then(resolve, reject),
+      Promise.resolve({ data: state.selectRows, count: state.count, error: null }).then(
+        resolve,
+        reject,
+      ),
   };
   const channel = {
     on: jest.fn((_evt: unknown, _filter: unknown, handler: (p: unknown) => void) => {
@@ -44,6 +52,7 @@ jest.mock('../mediaPipeline', () => ({
 
 import {
   subscribeAudioSessions,
+  subscribePendingAudioReviewCount,
   createAudioSession,
   updateAudioSession,
   uploadAudio,
@@ -77,6 +86,7 @@ const makeRow = (over: Record<string, unknown> = {}) => ({
 beforeEach(() => {
   jest.clearAllMocks();
   __state.selectRows = [];
+  __state.count = 0;
   __state.onHandler = null;
 });
 
@@ -232,5 +242,33 @@ describe('uploadAudio', () => {
     );
     expect(result.storagePath).toContain('audio/c1/2026-04-01/');
     expect(result.downloadUrl).toBe('https://signed.url/audio.m4a');
+  });
+});
+
+// Phase J (the ratified D-J1 pendingDrafts rider): the dashboard's pending-
+// review count rides this service now — same status='review' count the
+// screen used to take from Firestore directly.
+describe('subscribePendingAudioReviewCount', () => {
+  it('counts review sessions team-wide and opens a realtime channel (the D-J1 rider)', () => {
+    const unsub = subscribePendingAudioReviewCount(jest.fn());
+
+    expect(supabase.from).toHaveBeenCalledWith('audio_sessions');
+    expect(__query.select).toHaveBeenCalledWith('id', { count: 'exact', head: true });
+    expect(__query.eq).toHaveBeenCalledWith('status', 'review');
+    expect(supabase.channel).toHaveBeenCalled();
+    expect(typeof unsub).toBe('function');
+  });
+
+  it('emits the count immediately and again on each table change', async () => {
+    const cb = jest.fn();
+    __state.count = 2;
+    subscribePendingAudioReviewCount(cb);
+    await flush();
+    expect(cb).toHaveBeenCalledWith(2);
+
+    __state.count = 5;
+    __state.onHandler?.({});
+    await flush();
+    expect(cb).toHaveBeenCalledWith(5);
   });
 });

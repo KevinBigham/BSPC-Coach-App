@@ -10,29 +10,6 @@ import { useAttendanceStore } from '../../stores/attendanceStore';
 import { useSwimmersStore } from '../../stores/swimmersStore';
 import { useDashboardData } from '../useDashboardData';
 
-jest.mock('../../config/firebase', () => ({
-  db: {},
-}));
-
-const mockCollection = jest.fn((_db: unknown, path: string) => ({ path }));
-const mockQuery = jest.fn((ref: { path: string }, ...clauses: unknown[]) => ({
-  ...ref,
-  clauses,
-}));
-const mockWhere = jest.fn((field: string, operator: string, value: unknown) => ({
-  field,
-  operator,
-  value,
-}));
-const mockOnSnapshot = jest.fn();
-
-jest.mock('firebase/firestore', () => ({
-  collection: (...args: Parameters<typeof mockCollection>) => mockCollection(...args),
-  query: (...args: Parameters<typeof mockQuery>) => mockQuery(...args),
-  where: (...args: Parameters<typeof mockWhere>) => mockWhere(...args),
-  onSnapshot: (...args: Parameters<typeof mockOnSnapshot>) => mockOnSnapshot(...args),
-}));
-
 const mockSubscribeDashboardActivityAggregation = jest.fn();
 const mockSubscribeDashboardAttendanceAggregation = jest.fn();
 
@@ -43,6 +20,23 @@ jest.mock('../../services/aggregations', () => ({
   subscribeDashboardAttendanceAggregation: (
     ...args: Parameters<typeof mockSubscribeDashboardAttendanceAggregation>
   ) => mockSubscribeDashboardAttendanceAggregation(...args),
+}));
+
+// Phase J (D-J1 rider): pendingDrafts rides the audio/video services now —
+// the hook holds no direct Firestore queries.
+const mockSubscribePendingAudioReviewCount = jest.fn();
+const mockSubscribePendingVideoReviewCount = jest.fn();
+
+jest.mock('../../services/audio', () => ({
+  subscribePendingAudioReviewCount: (
+    ...args: Parameters<typeof mockSubscribePendingAudioReviewCount>
+  ) => mockSubscribePendingAudioReviewCount(...args),
+}));
+
+jest.mock('../../services/video', () => ({
+  subscribePendingVideoReviewCount: (
+    ...args: Parameters<typeof mockSubscribePendingVideoReviewCount>
+  ) => mockSubscribePendingVideoReviewCount(...args),
 }));
 
 const mockSubscribeUpcomingMeets = jest.fn();
@@ -67,7 +61,7 @@ jest.mock('../../utils/time', () => ({
 type ActivityCallback = (aggregation: DashboardActivityAggregation | null) => void;
 type AttendanceCallback = (aggregation: DashboardAttendanceAggregation | null) => void;
 type MeetsCallback = (meets: Array<Meet & { id: string }>) => void;
-type SnapshotCallback = (snap: { size: number }) => void;
+type CountCallback = (count: number) => void;
 type UnreadCallback = (count: number) => void;
 
 const unsubActivity = jest.fn();
@@ -80,8 +74,8 @@ const unreadUnsubs: jest.Mock[] = [];
 let activityCallback: ActivityCallback;
 let attendanceCallback: AttendanceCallback;
 let meetsCallback: MeetsCallback;
-let audioSnapshotCallback: SnapshotCallback;
-let videoSnapshotCallback: SnapshotCallback;
+let audioCountCallback: CountCallback;
+let videoCountCallback: CountCallback;
 let unreadCallback: UnreadCallback;
 
 function makeSwimmer(id: string, group: Swimmer['group']): Swimmer & { id: string } {
@@ -163,16 +157,13 @@ beforeEach(() => {
     meetsCallback = callback;
     return unsubMeets;
   });
-  mockOnSnapshot.mockImplementation((ref: { path: string }, callback: SnapshotCallback) => {
-    if (ref.path === 'audio_sessions') {
-      audioSnapshotCallback = callback;
-      return unsubAudio;
-    }
-    if (ref.path === 'video_sessions') {
-      videoSnapshotCallback = callback;
-      return unsubVideo;
-    }
-    throw new Error(`Unexpected snapshot path: ${ref.path}`);
+  mockSubscribePendingAudioReviewCount.mockImplementation((callback: CountCallback) => {
+    audioCountCallback = callback;
+    return unsubAudio;
+  });
+  mockSubscribePendingVideoReviewCount.mockImplementation((callback: CountCallback) => {
+    videoCountCallback = callback;
+    return unsubVideo;
   });
   mockGetUnreadCount.mockImplementation((_coachUid: string, callback: UnreadCallback) => {
     const unsub = jest.fn();
@@ -228,15 +219,17 @@ describe('useDashboardData', () => {
     expect(result.current.sparkData[29]).toEqual({ date: '2026-04-08', count: 9 });
   });
 
-  it('keeps pending draft count as audio and video review snapshots update independently', () => {
+  it('keeps pending draft count as audio and video review counts update independently', () => {
     const { result } = renderHook(() => useDashboardData(undefined));
 
+    expect(mockSubscribePendingAudioReviewCount).toHaveBeenCalledTimes(1);
+    expect(mockSubscribePendingVideoReviewCount).toHaveBeenCalledTimes(1);
     expect(result.current.pendingDrafts).toBe(0);
-    act(() => audioSnapshotCallback({ size: 2 }));
+    act(() => audioCountCallback(2));
     expect(result.current.pendingDrafts).toBe(2);
-    act(() => videoSnapshotCallback({ size: 3 }));
+    act(() => videoCountCallback(3));
     expect(result.current.pendingDrafts).toBe(5);
-    act(() => audioSnapshotCallback({ size: 1 }));
+    act(() => audioCountCallback(1));
     expect(result.current.pendingDrafts).toBe(4);
   });
 

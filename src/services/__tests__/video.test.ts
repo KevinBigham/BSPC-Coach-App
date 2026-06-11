@@ -4,8 +4,13 @@
 // the "no write happened" assertion target moved (addDoc -> insert). New
 // pins: the kind-discriminated P1-4 junction and the D-F2 pipeline kick.
 jest.mock('../../config/supabase', () => {
-  const state: { selectRows: unknown[]; onHandler: ((p: unknown) => void) | null } = {
+  const state: {
+    selectRows: unknown[];
+    count: number;
+    onHandler: ((p: unknown) => void) | null;
+  } = {
     selectRows: [],
+    count: 0,
     onHandler: null,
   };
   const query: Record<string, jest.Mock> & { then: unknown } = {
@@ -17,7 +22,10 @@ jest.mock('../../config/supabase', () => {
     update: jest.fn(() => query),
     single: jest.fn(() => Promise.resolve({ data: { id: 'new-session-id' }, error: null })),
     then: (resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) =>
-      Promise.resolve({ data: state.selectRows, error: null }).then(resolve, reject),
+      Promise.resolve({ data: state.selectRows, count: state.count, error: null }).then(
+        resolve,
+        reject,
+      ),
   };
   const channel = {
     on: jest.fn((_evt: unknown, _filter: unknown, handler: (p: unknown) => void) => {
@@ -46,6 +54,7 @@ jest.mock('../mediaPipeline', () => ({
 import {
   subscribeVideoSessions,
   subscribeVideoDrafts,
+  subscribePendingVideoReviewCount,
   createVideoSession,
   updateVideoSession,
   uploadVideo,
@@ -65,6 +74,7 @@ const flush = () => new Promise((resolve) => setImmediate(resolve));
 beforeEach(() => {
   jest.clearAllMocks();
   __state.selectRows = [];
+  __state.count = 0;
   __state.onHandler = null;
 });
 
@@ -391,5 +401,33 @@ describe('validateMediaConsent', () => {
 
   it('ignores IDs not found in swimmers list', () => {
     expect(validateMediaConsent(['s999'], swimmers)).toEqual([]);
+  });
+});
+
+// Phase J (the ratified D-J1 pendingDrafts rider): the dashboard's pending-
+// review count rides this service now — same status='review' count the
+// screen used to take from Firestore directly.
+describe('subscribePendingVideoReviewCount', () => {
+  it('counts review sessions team-wide and opens a realtime channel (the D-J1 rider)', () => {
+    const unsub = subscribePendingVideoReviewCount(jest.fn());
+
+    expect(supabase.from).toHaveBeenCalledWith('video_sessions');
+    expect(__query.select).toHaveBeenCalledWith('id', { count: 'exact', head: true });
+    expect(__query.eq).toHaveBeenCalledWith('status', 'review');
+    expect(supabase.channel).toHaveBeenCalled();
+    expect(typeof unsub).toBe('function');
+  });
+
+  it('emits the count immediately and again on each table change', async () => {
+    const cb = jest.fn();
+    __state.count = 2;
+    subscribePendingVideoReviewCount(cb);
+    await flush();
+    expect(cb).toHaveBeenCalledWith(2);
+
+    __state.count = 5;
+    __state.onHandler?.({});
+    await flush();
+    expect(cb).toHaveBeenCalledWith(5);
   });
 });

@@ -1,23 +1,24 @@
 /**
- * Dashboard data hook — owns every Firestore subscription, derived store
+ * Dashboard data hook — owns every data subscription, derived store
  * state, and chart-shaping computation that the dashboard needs.
  *
  * Extracted from app/(tabs)/index.tsx (790 lines, flagged as a god-screen
  * audit risk in .codex/status.md). The screen imports one hook and reads
  * fields off the returned object instead of orchestrating five useEffects
  * inline. The screen still owns its own UI-only state (uploadProgress,
- * refreshing).
+ * refreshing). Every subscription rides a service (Phase J closed the
+ * direct-Firestore pendingDrafts residual — the D-J1 rider).
  */
 
 import { useState, useEffect, useMemo } from 'react';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
-import { db } from '../config/firebase';
 import { useSwimmersStore } from '../stores/swimmersStore';
 import { useAttendanceStore } from '../stores/attendanceStore';
 import {
   subscribeDashboardActivityAggregation,
   subscribeDashboardAttendanceAggregation,
 } from '../services/aggregations';
+import { subscribePendingAudioReviewCount } from '../services/audio';
+import { subscribePendingVideoReviewCount } from '../services/video';
 import { subscribeUpcomingMeets } from '../services/meets';
 import { getUnreadCount } from '../services/notifications';
 import { getTodayString } from '../utils/time';
@@ -70,20 +71,14 @@ export function useDashboardData(coachUid: string | undefined): DashboardData {
     let videoCount = 0;
     const update = () => setPendingDrafts(audioCount + videoCount);
 
-    const unsubAudio = onSnapshot(
-      query(collection(db, 'audio_sessions'), where('status', '==', 'review')),
-      (snap) => {
-        audioCount = snap.size;
-        update();
-      },
-    );
-    const unsubVideo = onSnapshot(
-      query(collection(db, 'video_sessions'), where('status', '==', 'review')),
-      (snap) => {
-        videoCount = snap.size;
-        update();
-      },
-    );
+    const unsubAudio = subscribePendingAudioReviewCount((count) => {
+      audioCount = count;
+      update();
+    });
+    const unsubVideo = subscribePendingVideoReviewCount((count) => {
+      videoCount = count;
+      update();
+    });
     return () => {
       unsubAudio();
       unsubVideo();
