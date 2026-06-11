@@ -2,8 +2,6 @@ import React from 'react';
 import { render } from '@testing-library/react-native';
 import GoalCard from '../GoalCard';
 
-jest.mock('../../config/firebase', () => require('../../__mocks__/firebase'));
-
 jest.mock('../../data/timeStandards', () => ({
   formatTime: jest.fn((hundredths: number) => {
     const mins = Math.floor(hundredths / 6000);

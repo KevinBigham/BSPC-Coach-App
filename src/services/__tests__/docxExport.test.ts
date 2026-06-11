@@ -1,10 +1,3 @@
-jest.mock('../../config/firebase', () => ({
-  db: {},
-  auth: { currentUser: { uid: 'test-uid' } },
-  storage: {},
-  functions: {},
-}));
-
 jest.mock('docx', () => ({
   Document: jest.fn().mockImplementation(() => ({})),
   Packer: {

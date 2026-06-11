@@ -1,5 +1,3 @@
-jest.mock('../../config/firebase', () => require('../../__mocks__/firebase'));
-
 import { usePracticeStore } from '../practiceStore';
 import type { PracticePlan } from '../../types/firestore.types';
 import type { SetCategory } from '../../config/constants';

@@ -1,5 +1,3 @@
-jest.mock('../../config/firebase', () => require('../../__mocks__/firebase'));
-
 jest.mock('../../services/swimmers', () => ({
   subscribeSwimmers: jest.fn(
     (_activeOnly: boolean, callback: (swimmers: Array<{ id: string }>) => void) => {

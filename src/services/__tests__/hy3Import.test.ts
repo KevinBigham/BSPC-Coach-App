@@ -1,10 +1,3 @@
-jest.mock('../../config/firebase', () => ({
-  db: {},
-  auth: { currentUser: { uid: 'test-uid' } },
-  storage: {},
-  functions: {},
-}));
-
 import { parseHY3, detectFormat } from '../hy3Import';
 
 beforeEach(() => {

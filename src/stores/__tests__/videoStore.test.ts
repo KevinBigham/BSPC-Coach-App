@@ -1,5 +1,3 @@
-jest.mock('../../config/firebase', () => require('../../__mocks__/firebase'));
-
 import { useVideoStore } from '../videoStore';
 import type { VideoSession } from '../../types/firestore.types';
 import React from 'react';

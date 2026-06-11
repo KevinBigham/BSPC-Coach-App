@@ -1,13 +1,6 @@
 // Swimmer creation migrated Firestore -> canonical Postgres (UNIFY Phase B).
 // Phase H (D-H8): the import-job bookkeeping rides Supabase import_jobs now —
 // the jobs route below serves it; no firestore mock remains.
-jest.mock('../../config/firebase', () => ({
-  db: {},
-  auth: { currentUser: { uid: 'test-uid' } },
-  storage: {},
-  functions: {},
-}));
-
 jest.mock('../../config/supabase', () => {
   const state: { existingRows: unknown[]; insertedIds: string[] } = {
     existingRows: [],

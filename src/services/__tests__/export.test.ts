@@ -1,10 +1,3 @@
-jest.mock('../../config/firebase', () => ({
-  db: {},
-  auth: { currentUser: { uid: 'test-uid' } },
-  storage: {},
-  functions: {},
-}));
-
 jest.mock('expo-file-system', () => ({
   Paths: { cache: '/tmp/cache' },
   File: jest.fn().mockImplementation(() => ({

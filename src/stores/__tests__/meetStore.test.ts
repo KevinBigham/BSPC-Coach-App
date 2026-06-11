@@ -1,5 +1,3 @@
-jest.mock('../../config/firebase', () => require('../../__mocks__/firebase'));
-
 import { useMeetStore } from '../meetStore';
 import type { Meet, MeetEntry, Relay } from '../../types/meet.types';
 

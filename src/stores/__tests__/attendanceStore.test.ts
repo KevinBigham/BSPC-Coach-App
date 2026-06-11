@@ -1,5 +1,3 @@
-jest.mock('../../config/firebase', () => require('../../__mocks__/firebase'));
-
 jest.mock('../../services/attendance', () => ({
   subscribeTodayAttendance: jest.fn(
     (_date: string, callback: (records: Array<{ id: string }>) => void) => {

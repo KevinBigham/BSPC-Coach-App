@@ -1,5 +1,3 @@
-jest.mock('../../config/firebase', () => require('../../__mocks__/firebase'));
-
 import { useCalendarStore } from '../calendarStore';
 import type { CalendarEvent } from '../../types/firestore.types';
 
