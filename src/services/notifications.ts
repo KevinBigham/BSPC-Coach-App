@@ -187,3 +187,46 @@ export async function markNotificationRead(notificationId: string): Promise<void
     .eq('id', notificationId);
   if (error) throw error;
 }
+
+// src/services/notifications.ts — additions (D-CUT7, D-K4 addition class)
+export interface NotificationPreferences {
+  pushEnabled: boolean; // notification_preferences.push_enabled
+  digestEnabled: boolean; // notification_preferences.digest_enabled
+}
+
+/**
+ * Own-row read (notification_prefs_own RLS, user_id = auth.uid()) — like the
+ * notification list above, the wall IS the scope; no client-side user filter
+ * exists to get wrong.
+ */
+export async function getNotificationPreferences(): Promise<NotificationPreferences> {
+  const { data, error } = await supabase
+    .from('notification_preferences')
+    .select('push_enabled, digest_enabled')
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) {
+    // A missing row reads as both-true: schema defaults + the dailyDigest
+    // missing-row-means-included semantic (D-G3).
+    return { pushEnabled: true, digestEnabled: true };
+  }
+  const row = data as { push_enabled: boolean; digest_enabled: boolean };
+  return { pushEnabled: row.push_enabled, digestEnabled: row.digest_enabled };
+}
+
+export async function upsertNotificationPreferences(
+  patch: Partial<NotificationPreferences>,
+): Promise<void> {
+  const { data: userData } = await supabase.auth.getUser();
+  const userId = userData?.user?.id;
+  if (!userId) return;
+
+  const row: Record<string, unknown> = { user_id: userId };
+  if (patch.pushEnabled !== undefined) row.push_enabled = patch.pushEnabled;
+  if (patch.digestEnabled !== undefined) row.digest_enabled = patch.digestEnabled;
+
+  const { error } = await supabase
+    .from('notification_preferences')
+    .upsert(row, { onConflict: 'user_id' });
+  if (error) throw error;
+}

@@ -17,11 +17,15 @@ jest.mock('../../config/supabase', () => {
     count: number;
     user: { id: string } | null;
     onHandler: ((p: unknown) => void) | null;
+    maybeSingleRow: unknown | null;
+    error: Error | null;
   } = {
     selectRows: [],
     count: 0,
     user: { id: 'auth-user-1' },
     onHandler: null,
+    maybeSingleRow: null,
+    error: null,
   };
   const query: Record<string, jest.Mock> & { then: unknown } = {
     select: jest.fn(() => query),
@@ -32,8 +36,9 @@ jest.mock('../../config/supabase', () => {
     upsert: jest.fn(() => query),
     update: jest.fn(() => query),
     delete: jest.fn(() => query),
+    maybeSingle: jest.fn(() => Promise.resolve({ data: state.maybeSingleRow, error: state.error })),
     then: (resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) =>
-      Promise.resolve({ data: state.selectRows, count: state.count, error: null }).then(
+      Promise.resolve({ data: state.selectRows, count: state.count, error: state.error }).then(
         resolve,
         reject,
       ),
@@ -76,6 +81,8 @@ import {
   getUnreadCount,
   subscribeNotifications,
   markNotificationRead,
+  getNotificationPreferences,
+  upsertNotificationPreferences,
 } from '../notifications';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -103,6 +110,8 @@ beforeEach(() => {
   __state.count = 0;
   __state.user = { id: 'auth-user-1' };
   __state.onHandler = null;
+  __state.maybeSingleRow = null;
+  __state.error = null;
 });
 
 describe('registerForPushNotifications', () => {
@@ -242,5 +251,41 @@ describe('markNotificationRead', () => {
     expect(supabase.from).toHaveBeenCalledWith('in_app_notifications');
     expect(__query.update).toHaveBeenCalledWith({ is_read: true });
     expect(__query.eq).toHaveBeenCalledWith('id', 'notif-1');
+  });
+});
+
+describe('getNotificationPreferences (D-CUT7)', () => {
+  it('reads the own row with NO user filter (the RLS wall is the scope) and maps it to the frozen shape', async () => {
+    __state.maybeSingleRow = { push_enabled: false, digest_enabled: true };
+    const prefs = await getNotificationPreferences();
+    expect(supabase.from).toHaveBeenCalledWith('notification_preferences');
+    expect(__query.select).toHaveBeenCalledWith('push_enabled, digest_enabled');
+    expect(__query.eq).not.toHaveBeenCalled();
+    expect(prefs).toEqual({ pushEnabled: false, digestEnabled: true });
+  });
+
+  it('a missing row reads as both-true (schema defaults + the dailyDigest missing-row-means-included semantic)', async () => {
+    __state.maybeSingleRow = null;
+    const prefs = await getNotificationPreferences();
+    expect(prefs).toEqual({ pushEnabled: true, digestEnabled: true });
+  });
+});
+
+describe('upsertNotificationPreferences (D-CUT7)', () => {
+  it('upserts exactly the patched columns for the signed-in user, keyed ON CONFLICT (user_id)', async () => {
+    await upsertNotificationPreferences({ digestEnabled: false });
+    expect(supabase.from).toHaveBeenCalledWith('notification_preferences');
+    expect(__query.upsert).toHaveBeenCalledWith(
+      { user_id: 'auth-user-1', digest_enabled: false },
+      { onConflict: 'user_id' },
+    );
+    expect(__query.upsert).toHaveBeenCalledTimes(1);
+  });
+
+  it('propagates a database error to the caller', async () => {
+    __state.error = new Error('prefs boom');
+    await expect(upsertNotificationPreferences({ pushEnabled: false })).rejects.toThrow(
+      'prefs boom',
+    );
   });
 });
