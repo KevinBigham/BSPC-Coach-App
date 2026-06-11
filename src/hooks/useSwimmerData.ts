@@ -4,12 +4,15 @@
  *
  * The screen keeps UI-only state such as active tab, note composer fields, and
  * nested modal state. This hook mirrors the original loading behavior: loading
- * flips false when the swimmer document snapshot resolves.
+ * flips false when the swimmer subscription's first emission resolves. Phase K
+ * re-pointed the last three direct-Firestore arms onto the PG services; the
+ * hook holds ZERO direct Firestore.
  */
 
 import { useEffect, useMemo, useState } from 'react';
-import { collection, doc, limit, onSnapshot, orderBy, query } from 'firebase/firestore';
-import { db } from '../config/firebase';
+import { subscribeSwimmer } from '../services/swimmers';
+import { subscribeNotes } from '../services/notes';
+import { subscribeTimes } from '../services/times';
 import { subscribeSwimmerAttendance } from '../services/attendance';
 import { subscribeGoals } from '../services/goals';
 import { getTodayString } from '../utils/time';
@@ -46,43 +49,27 @@ export function useSwimmerData(swimmerId: string): SwimmerData {
 
   useEffect(() => {
     if (!swimmerId) return;
-    const unsubscribe = onSnapshot(doc(db, 'swimmers', swimmerId), (snap) => {
-      if (snap.exists()) {
-        setSwimmer({ id: snap.id, ...snap.data() } as Swimmer);
-      }
+    // Missing row emits null (like snap.exists() === false): swimmer stays
+    // null and loading still flips, mirroring the original behavior.
+    return subscribeSwimmer(swimmerId, (s) => {
+      if (s) setSwimmer(s as Swimmer);
       setLoading(false);
     });
-    return unsubscribe;
   }, [swimmerId]);
 
   useEffect(() => {
     if (!swimmerId) return;
-    const notesQuery = query(
-      collection(db, 'swimmers', swimmerId, 'notes'),
-      orderBy('createdAt', 'desc'),
-      limit(50),
+    // Same order (created_at desc) and bound (50) as the legacy query.
+    return subscribeNotes(
+      swimmerId,
+      (rows) => setNotes(rows as unknown as (SwimmerProfileNote & { id: string })[]),
+      50,
     );
-    return onSnapshot(notesQuery, (snapshot) => {
-      setNotes(
-        snapshot.docs.map(
-          (note) => ({ id: note.id, ...note.data() }) as SwimmerProfileNote & { id: string },
-        ),
-      );
-    });
   }, [swimmerId]);
 
   useEffect(() => {
     if (!swimmerId) return;
-    const timesQuery = query(
-      collection(db, 'swimmers', swimmerId, 'times'),
-      orderBy('createdAt', 'desc'),
-      limit(50),
-    );
-    return onSnapshot(timesQuery, (snapshot) => {
-      setTimes(
-        snapshot.docs.map((time) => ({ id: time.id, ...time.data() }) as SwimTime & { id: string }),
-      );
-    });
+    return subscribeTimes(swimmerId, (rows) => setTimes(rows), 50);
   }, [swimmerId]);
 
   useEffect(() => {

@@ -1,28 +1,14 @@
-jest.mock('../../config/firebase', () => ({
-  db: {},
-  auth: { currentUser: { uid: 'test-uid' } },
-  storage: {},
-  functions: {},
+// Phase K: the timeline's notes/times subscriptions re-pointed onto the PG
+// services — the mock moves with them. Subjects preserved 1:1.
+const mockSubscribeNotes = jest.fn();
+const mockSubscribeTimes = jest.fn();
+
+jest.mock('../../services/notes', () => ({
+  subscribeNotes: (...args: Parameters<typeof mockSubscribeNotes>) => mockSubscribeNotes(...args),
 }));
 
-jest.mock('firebase/firestore', () => ({
-  collection: jest.fn((_db: unknown, ...segments: string[]) => ({
-    path: segments.join('/'),
-  })),
-  collectionGroup: jest.fn((_db: unknown, id: string) => ({ path: id })),
-  query: jest.fn((ref: { path: string }) => ({ ...ref, _isQuery: true })),
-  where: jest.fn(() => ({ type: 'where' })),
-  orderBy: jest.fn(() => ({ type: 'orderBy' })),
-  limit: jest.fn(() => ({ type: 'limit' })),
-  onSnapshot: jest.fn((_queryRef: unknown, callback: (snap: unknown) => void) => {
-    // Immediately call back with empty snapshot
-    callback({
-      docs: [],
-      size: 0,
-      empty: true,
-    });
-    return jest.fn();
-  }),
+jest.mock('../../services/times', () => ({
+  subscribeTimes: (...args: Parameters<typeof mockSubscribeTimes>) => mockSubscribeTimes(...args),
 }));
 
 jest.mock('../../utils/time', () => ({
@@ -32,13 +18,16 @@ jest.mock('../../utils/time', () => ({
 import React from 'react';
 import { render } from '@testing-library/react-native';
 import SwimmerTimeline from '../SwimmerTimeline';
-const { onSnapshot } = require('firebase/firestore');
 
 beforeEach(() => {
   jest.clearAllMocks();
-  // Reset to empty snapshots
-  (onSnapshot as jest.Mock).mockImplementation((_q: unknown, cb: (s: unknown) => void) => {
-    cb({ docs: [], size: 0, empty: true });
+  // Reset to empty emissions
+  mockSubscribeNotes.mockImplementation((_id: string, cb: (rows: unknown[]) => void) => {
+    cb([]);
+    return jest.fn();
+  });
+  mockSubscribeTimes.mockImplementation((_id: string, cb: (rows: unknown[]) => void) => {
+    cb([]);
     return jest.fn();
   });
 });
@@ -47,6 +36,8 @@ describe('SwimmerTimeline', () => {
   it('shows empty message when no data', () => {
     const { getByText } = render(<SwimmerTimeline swimmerId="s1" />);
     expect(getByText('No timeline entries yet')).toBeTruthy();
+    expect(mockSubscribeNotes).toHaveBeenCalledWith('s1', expect.any(Function), 100);
+    expect(mockSubscribeTimes).toHaveBeenCalledWith('s1', expect.any(Function), 100);
   });
 
   it('renders filter chips', () => {
@@ -57,31 +48,17 @@ describe('SwimmerTimeline', () => {
   });
 
   it('renders note timeline items', () => {
-    let callCount = 0;
-    (onSnapshot as jest.Mock).mockImplementation((_q: unknown, cb: (s: unknown) => void) => {
-      callCount++;
-      if (callCount === 1) {
-        // notes subscription
-        cb({
-          docs: [
-            {
-              id: 'n1',
-              data: () => ({
-                content: 'Great kick improvement',
-                practiceDate: '2025-01-15',
-                source: 'manual',
-                coachName: 'Coach K',
-                tags: ['technique'],
-              }),
-            },
-          ],
-          size: 1,
-          empty: false,
-        });
-      } else {
-        // times subscription
-        cb({ docs: [], size: 0, empty: true });
-      }
+    mockSubscribeNotes.mockImplementation((_id: string, cb: (rows: unknown[]) => void) => {
+      cb([
+        {
+          id: 'n1',
+          content: 'Great kick improvement',
+          practiceDate: '2025-01-15',
+          source: 'manual',
+          coachName: 'Coach K',
+          tags: ['technique'],
+        },
+      ]);
       return jest.fn();
     });
 
@@ -90,32 +67,18 @@ describe('SwimmerTimeline', () => {
   });
 
   it('renders time entries', () => {
-    let callCount = 0;
-    (onSnapshot as jest.Mock).mockImplementation((_q: unknown, cb: (s: unknown) => void) => {
-      callCount++;
-      if (callCount === 1) {
-        // notes
-        cb({ docs: [], size: 0, empty: true });
-      } else {
-        // times
-        cb({
-          docs: [
-            {
-              id: 't1',
-              data: () => ({
-                event: '100 Free',
-                timeDisplay: '58.32',
-                meetName: 'Dual Meet',
-                meetDate: '2025-01-10',
-                isPR: false,
-                course: 'SCY',
-              }),
-            },
-          ],
-          size: 1,
-          empty: false,
-        });
-      }
+    mockSubscribeTimes.mockImplementation((_id: string, cb: (rows: unknown[]) => void) => {
+      cb([
+        {
+          id: 't1',
+          event: '100 Free',
+          timeDisplay: '58.32',
+          meetName: 'Dual Meet',
+          meetDate: '2025-01-10',
+          isPR: false,
+          course: 'SCY',
+        },
+      ]);
       return jest.fn();
     });
 

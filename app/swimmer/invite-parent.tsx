@@ -10,8 +10,7 @@ import {
   Share,
 } from 'react-native';
 import { useLocalSearchParams, Stack } from 'expo-router';
-import { doc, onSnapshot } from 'firebase/firestore';
-import { db } from '../../src/config/firebase';
+import { subscribeSwimmer } from '../../src/services/swimmers';
 import { useAuth } from '../../src/contexts/AuthContext';
 import {
   createParentInvite,
@@ -19,8 +18,7 @@ import {
   revokeInvite,
 } from '../../src/services/parentInvites';
 import { colors, spacing, fontSize, borderRadius, fontFamily } from '../../src/config/theme';
-import type { Swimmer, ParentInvite } from '../../src/types/firestore.types';
-import { Timestamp } from 'firebase/firestore';
+import type { ParentInvite } from '../../src/types/firestore.types';
 import { withScreenErrorBoundary } from '../../src/components/ScreenErrorBoundary';
 
 function InviteParentScreen() {
@@ -36,11 +34,8 @@ function InviteParentScreen() {
   // Fetch swimmer name if not passed
   useEffect(() => {
     if (swimmerName || !swimmerId) return;
-    return onSnapshot(doc(db, 'swimmers', swimmerId), (snap) => {
-      if (snap.exists()) {
-        const data = snap.data() as Swimmer;
-        setSwimmerName(`${data.firstName} ${data.lastName}`);
-      }
+    return subscribeSwimmer(swimmerId, (s) => {
+      if (s) setSwimmerName(`${s.firstName} ${s.lastName}`);
     });
   }, [swimmerId, swimmerName]);
 
@@ -88,16 +83,16 @@ function InviteParentScreen() {
     ]);
   }, []);
 
+  // The service emits a real Date for expiresAt (Phase I); the legacy
+  // Firestore-Timestamp branch left with the firebase import.
   const activeInvites = invites.filter((i) => {
     if (i.redeemed) return false;
-    const expires = i.expiresAt instanceof Timestamp ? i.expiresAt.toDate() : new Date(i.expiresAt);
-    return expires > new Date();
+    return new Date(i.expiresAt as unknown as Date) > new Date();
   });
 
   const pastInvites = invites.filter((i) => {
     if (i.redeemed) return true;
-    const expires = i.expiresAt instanceof Timestamp ? i.expiresAt.toDate() : new Date(i.expiresAt);
-    return expires <= new Date();
+    return new Date(i.expiresAt as unknown as Date) <= new Date();
   });
 
   return (
@@ -140,10 +135,7 @@ function InviteParentScreen() {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>ACTIVE CODES</Text>
             {activeInvites.map((invite) => {
-              const expires =
-                invite.expiresAt instanceof Timestamp
-                  ? invite.expiresAt.toDate()
-                  : new Date(invite.expiresAt);
+              const expires = new Date(invite.expiresAt as unknown as Date);
               const daysLeft = Math.max(0, Math.ceil((expires.getTime() - Date.now()) / 86400000));
               return (
                 <View key={invite.id} style={styles.inviteCard}>

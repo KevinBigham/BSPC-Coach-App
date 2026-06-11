@@ -13,17 +13,6 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, Stack, router } from 'expo-router';
 import { ArrowLeft, Plus } from 'lucide-react-native';
-import {
-  doc,
-  collection,
-  query,
-  addDoc,
-  deleteDoc,
-  getDocs,
-  where,
-  serverTimestamp,
-} from 'firebase/firestore';
-import { db } from '../../src/config/firebase';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { useToast } from '../../src/contexts/ToastContext';
 import {
@@ -37,7 +26,8 @@ import {
 import { NOTE_TAGS, EVENTS, COURSES, type NoteTag, type Course } from '../../src/config/constants';
 import { exportTimesCSV, shareCSV } from '../../src/services/export';
 import { exportSwimmerReportDocx } from '../../src/services/docxExport';
-import { addNote } from '../../src/services/notes';
+import { addNote, deleteNote } from '../../src/services/notes';
+import { addTime, deleteTime } from '../../src/services/times';
 import { getAchievedStandard, calculateAge, getAgeGroup } from '../../src/data/timeStandards';
 import StandardBadge from '../../src/components/StandardBadge';
 import GoalCard from '../../src/components/GoalCard';
@@ -113,7 +103,7 @@ function SwimmerProfileScreen() {
         style: 'destructive',
         onPress: async () => {
           try {
-            await deleteDoc(doc(db, 'swimmers', id!, 'notes', noteId));
+            await deleteNote(id!, noteId);
             showToast('Note deleted', 'success');
           } catch (err: unknown) {
             showToast(err instanceof Error ? err.message : 'Unable to delete note', 'error');
@@ -131,7 +121,7 @@ function SwimmerProfileScreen() {
         style: 'destructive',
         onPress: async () => {
           try {
-            await deleteDoc(doc(db, 'swimmers', id!, 'times', timeId));
+            await deleteTime(id!, timeId);
             showToast('Time deleted', 'success');
           } catch (err: unknown) {
             showToast(err instanceof Error ? err.message : 'Unable to delete time', 'error');
@@ -956,46 +946,17 @@ function AddTimeModal({
       return;
     }
 
-    const displayMin = min > 0 ? `${min}:` : '';
-    const displaySec = min > 0 ? String(sec).padStart(2, '0') : String(sec);
-    const displayHund = String(hund).padStart(2, '0');
-    const timeDisplay = `${displayMin}${displaySec}.${displayHund}`;
-
-    // Lower hundredths = faster swim, so a PR must beat every prior time for event+course.
-    const sameTimes = existingTimes.filter((t) => t.event === event && t.course === course);
-    const isPR = sameTimes.length === 0 || sameTimes.every((t) => totalHundredths < t.time);
-
     setSaving(true);
     try {
-      await addDoc(collection(db, 'swimmers', swimmerId, 'times'), {
-        event,
-        course,
-        time: totalHundredths,
-        timeDisplay,
-        isPR,
-        meetName: meetName.trim() || null,
-        meetDate: null,
-        source: 'manual',
-        createdAt: serverTimestamp(),
-        createdBy: coach?.uid || '',
-      });
-
-      if (isPR && sameTimes.length > 0) {
-        const timesRef = collection(db, 'swimmers', swimmerId, 'times');
-        const q = query(
-          timesRef,
-          where('event', '==', event),
-          where('course', '==', course),
-          where('isPR', '==', true),
-        );
-        const snap = await getDocs(q);
-        const { updateDoc: updateDocFn } = await import('firebase/firestore');
-        for (const d of snap.docs) {
-          if (d.id !== undefined) {
-            await updateDocFn(d.ref, { isPR: false });
-          }
-        }
-      }
+      // PR truth is the D-D5 maintain_personal_bests trigger now — the
+      // client-side isPR computation and the demotion sweep retired with the
+      // Phase K re-point; timeDisplay derives on read.
+      await addTime(
+        swimmerId,
+        { event, course, time: totalHundredths, meetName: meetName.trim() || undefined },
+        existingTimes,
+        coach?.uid || '',
+      );
 
       onClose();
     } catch (err: unknown) {

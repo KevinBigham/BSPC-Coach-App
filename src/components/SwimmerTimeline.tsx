@@ -7,8 +7,8 @@ import {
   StyleSheet,
   ActivityIndicator,
 } from 'react-native';
-import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
-import { db } from '../config/firebase';
+import { subscribeNotes } from '../services/notes';
+import { subscribeTimes } from '../services/times';
 import { colors, spacing, fontSize, borderRadius, fontFamily } from '../config/theme';
 import type { SwimmerNote, SwimTime } from '../types/firestore.types';
 import { toDateSafe, type FirestoreTimestampLike } from '../utils/date';
@@ -61,24 +61,20 @@ export default function SwimmerTimeline({ swimmerId }: Props) {
   const [filter, setFilter] = useState<FilterType>('all');
 
   useEffect(() => {
-    const unsubNotes = onSnapshot(
-      query(
-        collection(db, 'swimmers', swimmerId, 'notes'),
-        orderBy('createdAt', 'desc'),
-        limit(100),
-      ),
-      (snap) => setNotes(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as TimelineNote)),
+    // Same order (created_at desc) and bound (100) as the legacy queries;
+    // loading still flips on the times arm's first emission.
+    const unsubNotes = subscribeNotes(
+      swimmerId,
+      (rows) => setNotes(rows as unknown as TimelineNote[]),
+      100,
     );
-    const unsubTimes = onSnapshot(
-      query(
-        collection(db, 'swimmers', swimmerId, 'times'),
-        orderBy('createdAt', 'desc'),
-        limit(100),
-      ),
-      (snap) => {
-        setTimes(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as TimelineTime));
+    const unsubTimes = subscribeTimes(
+      swimmerId,
+      (rows) => {
+        setTimes(rows as unknown as TimelineTime[]);
         setLoading(false);
       },
+      100,
     );
     return () => {
       unsubNotes();

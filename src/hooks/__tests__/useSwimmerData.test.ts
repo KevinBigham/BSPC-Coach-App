@@ -8,26 +8,26 @@ import type {
 } from '../../types/firestore.types';
 import { useSwimmerData } from '../useSwimmerData';
 
-jest.mock('../../config/firebase', () => ({
-  db: {},
+// Phase K: the hook's last three direct-Firestore arms (swimmer doc, notes,
+// times) re-pointed onto the PG services — the mock moves with them. Subjects
+// preserved 1:1; the snapshot plumbing became service callbacks.
+const mockSubscribeSwimmer = jest.fn();
+
+jest.mock('../../services/swimmers', () => ({
+  subscribeSwimmer: (...args: Parameters<typeof mockSubscribeSwimmer>) =>
+    mockSubscribeSwimmer(...args),
 }));
 
-const mockDoc = jest.fn((_db: unknown, ...segments: string[]) => ({ path: segments.join('/') }));
-const mockCollection = jest.fn((_db: unknown, ...segments: string[]) => ({
-  path: segments.join('/'),
-}));
-const mockOrderBy = jest.fn((field: string, direction?: string) => ({ field, direction }));
-const mockLimit = jest.fn((count: number) => ({ count }));
-const mockQuery = jest.fn((ref: { path: string }, ...clauses: unknown[]) => ({ ...ref, clauses }));
-const mockOnSnapshot = jest.fn();
+const mockSubscribeNotes = jest.fn();
 
-jest.mock('firebase/firestore', () => ({
-  doc: (...args: Parameters<typeof mockDoc>) => mockDoc(...args),
-  collection: (...args: Parameters<typeof mockCollection>) => mockCollection(...args),
-  orderBy: (...args: Parameters<typeof mockOrderBy>) => mockOrderBy(...args),
-  limit: (...args: Parameters<typeof mockLimit>) => mockLimit(...args),
-  query: (...args: Parameters<typeof mockQuery>) => mockQuery(...args),
-  onSnapshot: (...args: Parameters<typeof mockOnSnapshot>) => mockOnSnapshot(...args),
+jest.mock('../../services/notes', () => ({
+  subscribeNotes: (...args: Parameters<typeof mockSubscribeNotes>) => mockSubscribeNotes(...args),
+}));
+
+const mockSubscribeTimes = jest.fn();
+
+jest.mock('../../services/times', () => ({
+  subscribeTimes: (...args: Parameters<typeof mockSubscribeTimes>) => mockSubscribeTimes(...args),
 }));
 
 const mockSubscribeSwimmerAttendance = jest.fn();
@@ -56,12 +56,10 @@ type NoteWithId = Omit<SwimmerNote, 'source'> & {
 type TimeWithId = SwimTime & { id: string };
 type AttendanceWithId = AttendanceRecord & { id: string };
 type GoalWithId = SwimmerGoal & { id: string };
-type SwimmerSnapshotCallback = (snap: {
-  id: string;
-  exists: () => boolean;
-  data: () => Partial<Swimmer>;
-}) => void;
-type CollectionSnapshotCallback<T> = (snap: { docs: Array<{ id: string; data: () => T }> }) => void;
+type SwimmerWithId = Swimmer & { id: string };
+type SwimmerCallback = (swimmer: SwimmerWithId | null) => void;
+type NotesCallback = (notes: NoteWithId[]) => void;
+type TimesCallback = (times: TimeWithId[]) => void;
 type AttendanceCallback = (records: AttendanceWithId[]) => void;
 type GoalsCallback = (goals: GoalWithId[]) => void;
 
@@ -71,9 +69,9 @@ const unsubTimes = jest.fn();
 const unsubAttendance = jest.fn();
 const unsubGoals = jest.fn();
 
-let swimmerCallback: SwimmerSnapshotCallback;
-let notesCallback: CollectionSnapshotCallback<Omit<NoteWithId, 'id'>>;
-let timesCallback: CollectionSnapshotCallback<Omit<TimeWithId, 'id'>>;
+let swimmerCallback: SwimmerCallback;
+let notesCallback: NotesCallback;
+let timesCallback: TimesCallback;
 let attendanceCallback: AttendanceCallback;
 let goalsCallback: GoalsCallback;
 
@@ -153,34 +151,26 @@ function makeGoal(id: string): GoalWithId {
   };
 }
 
-function makeSnapshotDocs<T extends { id: string }>(items: T[]) {
-  return {
-    docs: items.map(({ id, ...data }) => ({
-      id,
-      data: () => data as Omit<T, 'id'>,
-    })),
-  };
-}
-
 beforeEach(() => {
   jest.clearAllMocks();
   mockGetTodayString.mockReturnValue('2026-04-08');
 
-  mockOnSnapshot.mockImplementation((ref: { path: string }, callback: unknown) => {
-    if (ref.path === 'swimmers/swimmer-1') {
-      swimmerCallback = callback as SwimmerSnapshotCallback;
-      return unsubSwimmer;
-    }
-    if (ref.path === 'swimmers/swimmer-1/notes') {
-      notesCallback = callback as CollectionSnapshotCallback<Omit<NoteWithId, 'id'>>;
-      return unsubNotes;
-    }
-    if (ref.path === 'swimmers/swimmer-1/times') {
-      timesCallback = callback as CollectionSnapshotCallback<Omit<TimeWithId, 'id'>>;
-      return unsubTimes;
-    }
-    throw new Error(`Unexpected snapshot path: ${ref.path}`);
+  mockSubscribeSwimmer.mockImplementation((_swimmerId: string, callback: SwimmerCallback) => {
+    swimmerCallback = callback;
+    return unsubSwimmer;
   });
+  mockSubscribeNotes.mockImplementation(
+    (_swimmerId: string, callback: NotesCallback, _max: number) => {
+      notesCallback = callback;
+      return unsubNotes;
+    },
+  );
+  mockSubscribeTimes.mockImplementation(
+    (_swimmerId: string, callback: TimesCallback, _max: number) => {
+      timesCallback = callback;
+      return unsubTimes;
+    },
+  );
   mockSubscribeSwimmerAttendance.mockImplementation(
     (_swimmerId: string, callback: AttendanceCallback) => {
       attendanceCallback = callback;
@@ -194,63 +184,54 @@ beforeEach(() => {
 });
 
 describe('useSwimmerData', () => {
-  it('subscribes to the swimmer document and clears loading once it resolves', () => {
+  it('subscribes to the swimmer row and clears loading once it resolves', () => {
     const { result } = renderHook(() => useSwimmerData('swimmer-1'));
 
     expect(result.current.loading).toBe(true);
-    expect(mockDoc).toHaveBeenCalledWith({}, 'swimmers', 'swimmer-1');
+    expect(mockSubscribeSwimmer).toHaveBeenCalledWith('swimmer-1', expect.any(Function));
 
+    const swimmer = { id: 'swimmer-1', ...makeSwimmer() };
     act(() => {
-      swimmerCallback({
-        id: 'swimmer-1',
-        exists: () => true,
-        data: () => makeSwimmer(),
-      });
+      swimmerCallback(swimmer);
     });
 
-    expect(result.current.swimmer).toEqual({ id: 'swimmer-1', ...makeSwimmer() });
+    expect(result.current.swimmer).toEqual(swimmer);
     expect(result.current.loading).toBe(false);
   });
 
-  it('leaves swimmer null and still clears loading when the document is missing', () => {
+  it('leaves swimmer null and still clears loading when the row is missing', () => {
     const { result } = renderHook(() => useSwimmerData('swimmer-1'));
 
     act(() => {
-      swimmerCallback({
-        id: 'swimmer-1',
-        exists: () => false,
-        data: () => ({}),
-      });
+      swimmerCallback(null);
     });
 
     expect(result.current.swimmer).toBeNull();
     expect(result.current.loading).toBe(false);
   });
 
-  it('subscribes to the latest profile notes and maps document ids', () => {
+  it('subscribes to the latest profile notes with the existing 50-row bound', () => {
     const { result } = renderHook(() => useSwimmerData('swimmer-1'));
     const note = makeNote('note-1', 'Strong breakout');
 
     act(() => {
-      notesCallback(makeSnapshotDocs([note]));
+      notesCallback([note]);
     });
 
-    expect(mockCollection).toHaveBeenCalledWith({}, 'swimmers', 'swimmer-1', 'notes');
-    expect(mockOrderBy).toHaveBeenCalledWith('createdAt', 'desc');
-    expect(mockLimit).toHaveBeenCalledWith(50);
+    expect(mockSubscribeNotes).toHaveBeenCalledWith('swimmer-1', expect.any(Function), 50);
     expect(result.current.notes).toEqual([note]);
   });
 
-  it('subscribes to latest times and derives PR count', () => {
+  it('subscribes to latest times (50-row bound) and derives PR count', () => {
     const { result } = renderHook(() => useSwimmerData('swimmer-1'));
     const pr = makeTime('time-1', true);
     const nonPr = makeTime('time-2', false);
 
     act(() => {
-      timesCallback(makeSnapshotDocs([pr, nonPr]));
+      timesCallback([pr, nonPr]);
     });
 
-    expect(mockCollection).toHaveBeenCalledWith({}, 'swimmers', 'swimmer-1', 'times');
+    expect(mockSubscribeTimes).toHaveBeenCalledWith('swimmer-1', expect.any(Function), 50);
     expect(result.current.times).toEqual([pr, nonPr]);
     expect(result.current.prCount).toBe(1);
   });

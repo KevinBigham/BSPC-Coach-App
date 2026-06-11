@@ -1,16 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
-import {
-  doc,
-  onSnapshot,
-  collection,
-  query,
-  orderBy,
-  type QuerySnapshot,
-  type QueryDocumentSnapshot,
-} from 'firebase/firestore';
-import { db } from '../../src/config/firebase';
+import { subscribeSwimmer } from '../../src/services/swimmers';
+import { subscribeTimes } from '../../src/services/times';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { colors, spacing, fontSize, borderRadius, fontFamily } from '../../src/config/theme';
 import { STANDARD_LEVELS, COURSES, type Course } from '../../src/config/constants';
@@ -49,22 +41,17 @@ function StandardsScreen() {
 
   useEffect(() => {
     if (!id) return;
-    return onSnapshot(doc(db, 'swimmers', id), (snap) => {
-      if (snap.exists()) setSwimmer(snap.data() as Swimmer);
+    return subscribeSwimmer(id, (s) => {
+      if (s) setSwimmer(s);
     });
   }, [id]);
 
   useEffect(() => {
     if (!id) return;
-    const timesQuery = query(collection(db, 'swimmers', id, 'times'), orderBy('createdAt', 'desc'));
-    return onSnapshot(timesQuery, (snap: QuerySnapshot) => {
-      setTimes(
-        snap.docs.map((d: QueryDocumentSnapshot) => ({
-          id: d.id,
-          ...(d.data() as SwimTime),
-        })),
-      );
-    });
+    // FYI-6 (the phase's single named parity delta): the legacy read was
+    // UNBOUNDED; the service read is max-bounded — 1000 passed explicitly,
+    // far above any pre-launch volume, so best-per-event math is unchanged.
+    return subscribeTimes(id, setTimes, 1000);
   }, [id]);
 
   useEffect(() => {

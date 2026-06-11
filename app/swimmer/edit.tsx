@@ -11,8 +11,7 @@ import {
   Image,
 } from 'react-native';
 import { router, useLocalSearchParams, Stack } from 'expo-router';
-import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '../../src/config/firebase';
+import { subscribeSwimmer, updateSwimmer } from '../../src/services/swimmers';
 import { useAuth } from '../../src/contexts/AuthContext';
 import {
   colors,
@@ -24,7 +23,7 @@ import {
 } from '../../src/config/theme';
 import { GROUPS, type Group } from '../../src/config/constants';
 import * as ImagePicker from 'expo-image-picker';
-import type { Swimmer, ParentContact } from '../../src/types/firestore.types';
+import type { ParentContact } from '../../src/types/firestore.types';
 import { uploadProfilePhoto, deleteProfilePhoto } from '../../src/services/profilePhoto';
 import { grantConsent, revokeConsent } from '../../src/utils/mediaConsent';
 import { notifySuccess, selectionChanged } from '../../src/utils/haptics';
@@ -45,8 +44,9 @@ function EditSwimmerScreen() {
   const [usaSwimmingId, setUsaSwimmingId] = useState('');
   const [active, setActive] = useState(true);
 
-  // Array fields
-  const [goals, setGoals] = useState('');
+  // Array fields. The goals textarea retired with Phase K (D-K3): the legacy
+  // denormalized field is derived on read and never written — the goals
+  // feature owns goal lifecycle.
   const [strengths, setStrengths] = useState('');
   const [focusAreas, setFocusAreas] = useState('');
 
@@ -64,36 +64,38 @@ function EditSwimmerScreen() {
 
   useEffect(() => {
     if (!id) return;
-    (async () => {
-      try {
-        const snap = await getDoc(doc(db, 'swimmers', id));
-        if (snap.exists()) {
-          const s = snap.data() as Swimmer;
-          setFirstName(s.firstName || '');
-          setLastName(s.lastName || '');
-          setGroup(s.group || 'Bronze');
-          setGender(s.gender || 'F');
-          setDateOfBirth(s.dateOfBirth ? String(s.dateOfBirth) : '');
-          setUsaSwimmingId(s.usaSwimmingId || '');
-          setActive(s.active !== false);
-          setGoals((s.goals || []).join('\n'));
-          setStrengths((s.strengths || []).join('\n'));
-          setFocusAreas((s.techniqueFocusAreas || []).join('\n'));
-          setParentContacts(
-            s.parentContacts?.length
-              ? s.parentContacts
-              : [{ name: '', phone: '', email: '', relationship: 'Parent' }],
-          );
-          setConsentGranted(s.mediaConsent?.granted === true);
-          setConsentGrantedBy(s.mediaConsent?.grantedBy || '');
-          setConsentNotes(s.mediaConsent?.notes || '');
-          setPhotoUrl(s.profilePhotoUrl || null);
-        }
-      } catch (err: unknown) {
-        Alert.alert('Error', err instanceof Error ? err.message : String(err));
+    // One-shot prefill (the legacy read was a getDoc): fill on the first
+    // emission only, so a remote change never clobbers an in-progress edit.
+    let filled = false;
+    const unsubscribe = subscribeSwimmer(id, (s) => {
+      if (s && !filled) {
+        filled = true;
+        setFirstName(s.firstName || '');
+        setLastName(s.lastName || '');
+        setGroup(s.group || 'Bronze');
+        setGender(s.gender || 'F');
+        setDateOfBirth(
+          s.dateOfBirth
+            ? new Date(s.dateOfBirth as unknown as string).toISOString().slice(0, 10)
+            : '',
+        );
+        setUsaSwimmingId(s.usaSwimmingId || '');
+        setActive(s.active !== false);
+        setStrengths((s.strengths || []).join('\n'));
+        setFocusAreas((s.techniqueFocusAreas || []).join('\n'));
+        setParentContacts(
+          s.parentContacts?.length
+            ? s.parentContacts
+            : [{ name: '', phone: '', email: '', relationship: 'Parent' }],
+        );
+        setConsentGranted(s.mediaConsent?.granted === true);
+        setConsentGrantedBy(s.mediaConsent?.grantedBy || '');
+        setConsentNotes(s.mediaConsent?.notes || '');
+        setPhotoUrl(s.profilePhotoUrl || null);
       }
       setLoading(false);
-    })();
+    });
+    return unsubscribe;
   }, [id]);
 
   const handleSave = async () => {
@@ -114,21 +116,21 @@ function EditSwimmerScreen() {
         ? grantConsent(consentGrantedBy.trim() || 'Unknown', consentNotes.trim() || undefined)
         : revokeConsent(consentNotes.trim() || undefined);
 
-      await updateDoc(doc(db, 'swimmers', id!), {
+      // updated_at is DB-owned; goals dropped from the patch (D-K3 — derived
+      // on read, never written).
+      await updateSwimmer(id!, {
         firstName: firstName.trim(),
         lastName: lastName.trim(),
         displayName: `${firstName.trim()} ${lastName.trim()}`,
         group,
         gender,
-        dateOfBirth: dateOfBirth.trim() || null,
-        usaSwimmingId: usaSwimmingId.trim() || null,
+        dateOfBirth: (dateOfBirth.trim() || null) as unknown as Date,
+        usaSwimmingId: usaSwimmingId.trim() || undefined,
         active,
-        goals: toArray(goals),
         strengths: toArray(strengths),
         techniqueFocusAreas: toArray(focusAreas),
         parentContacts: parentContacts.filter((pc) => pc.name.trim()),
         mediaConsent,
-        updatedAt: serverTimestamp(),
       });
 
       notifySuccess();
@@ -393,19 +395,10 @@ function EditSwimmerScreen() {
           />
         </View>
 
-        {/* Goals, Strengths, Focus Areas */}
+        {/* Strengths, Focus Areas (the goals textarea retired under D-K3 —
+            goals are first-class rows owned by the goals feature) */}
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>DEVELOPMENT</Text>
-
-          <Text style={styles.label}>GOALS (one per line)</Text>
-          <TextInput
-            style={[styles.input, styles.multiline]}
-            value={goals}
-            onChangeText={setGoals}
-            placeholder="e.g. Drop 2s in 100 Free"
-            placeholderTextColor={colors.textSecondary}
-            multiline
-          />
 
           <Text style={styles.label}>STRENGTHS (one per line)</Text>
           <TextInput

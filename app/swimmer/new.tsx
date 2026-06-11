@@ -9,8 +9,7 @@ import {
   Alert,
 } from 'react-native';
 import { router } from 'expo-router';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '../../src/config/firebase';
+import { addSwimmer } from '../../src/services/swimmers';
 import { useAuth } from '../../src/contexts/AuthContext';
 import {
   colors,
@@ -44,14 +43,16 @@ function AddSwimmerScreen() {
 
     setSaving(true);
     try {
+      // Phase K re-point: the data layer owns timestamps/created_by now; the
+      // legacy denormalized goals field is derived on read, never written.
       const swimmerData = {
         firstName: firstName.trim(),
         lastName: lastName.trim(),
         displayName: `${firstName.trim()} ${lastName.trim()}`,
         group,
         gender,
-        dateOfBirth: dateOfBirth.trim() || null,
-        usaSwimmingId: usaSwimmingId.trim() || null,
+        dateOfBirth: (dateOfBirth.trim() || null) as unknown as Date,
+        usaSwimmingId: usaSwimmingId.trim() || undefined,
         active: true,
         strengths: [],
         weaknesses: [],
@@ -68,13 +69,10 @@ function AddSwimmerScreen() {
             ]
           : [],
         meetSchedule: [],
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-        createdBy: coach?.uid || '',
       };
 
-      const docRef = await addDoc(collection(db, 'swimmers'), swimmerData);
-      router.replace(`/swimmer/${docRef.id}`);
+      const newId = await addSwimmer(swimmerData, coach?.uid || '');
+      router.replace(`/swimmer/${newId}`);
     } catch (err: unknown) {
       Alert.alert('Error', err instanceof Error ? err.message : String(err));
     }
