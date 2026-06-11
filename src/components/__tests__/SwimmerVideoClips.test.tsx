@@ -1,11 +1,11 @@
-jest.mock('../../config/firebase', () => ({
-  db: {},
-  auth: { currentUser: { uid: 'test-uid' } },
-  storage: {},
-  functions: {},
-}));
+// Phase K: the tagged-swimmer sessions query re-pointed onto the
+// junction-filtered service read — the mock moves with it. Subjects
+// preserved 1:1.
+const mockSubscribeSwimmerVideoSessions = jest.fn();
 
 jest.mock('../../services/video', () => ({
+  subscribeSwimmerVideoSessions: (...args: Parameters<typeof mockSubscribeSwimmerVideoSessions>) =>
+    mockSubscribeSwimmerVideoSessions(...args),
   getVideoStatusLabel: (status: string) => {
     const map: Record<string, string> = {
       uploading: 'UPLOADING',
@@ -26,112 +26,90 @@ jest.mock('../../services/video', () => ({
   },
 }));
 
-jest.mock('firebase/firestore', () => ({
-  collection: jest.fn((_db: unknown, ...segments: string[]) => ({
-    path: segments.join('/'),
-  })),
-  query: jest.fn((ref: { path: string }) => ({ ...ref, _isQuery: true })),
-  where: jest.fn(() => ({ type: 'where' })),
-  orderBy: jest.fn(() => ({ type: 'orderBy' })),
-  limit: jest.fn(() => ({ type: 'limit' })),
-  onSnapshot: jest.fn((_queryRef: unknown, callback: (snap: unknown) => void) => {
-    callback({ docs: [], size: 0, empty: true });
-    return jest.fn();
-  }),
-}));
-
 import React from 'react';
 import { render, fireEvent } from '@testing-library/react-native';
 import { router } from 'expo-router';
 import SwimmerVideoClips from '../SwimmerVideoClips';
-const { onSnapshot } = require('firebase/firestore');
 
 beforeEach(() => {
   jest.clearAllMocks();
-  (onSnapshot as jest.Mock).mockImplementation((_q: unknown, cb: (s: unknown) => void) => {
-    cb({ docs: [], size: 0, empty: true });
-    return jest.fn();
-  });
+  mockSubscribeSwimmerVideoSessions.mockImplementation(
+    (_id: string, cb: (rows: unknown[]) => void) => {
+      cb([]);
+      return jest.fn();
+    },
+  );
 });
 
-function makeDoc(id: string, data: Record<string, unknown>) {
-  return { id, data: () => data };
+function makeSession(id: string, data: Record<string, unknown>) {
+  return { id, taggedSwimmerIds: ['s1'], selectedSwimmerIds: [], ...data };
 }
 
 describe('SwimmerVideoClips', () => {
   it('renders nothing when no sessions', () => {
     const { toJSON } = render(<SwimmerVideoClips swimmerId="s1" />);
     expect(toJSON()).toBeNull();
+    expect(mockSubscribeSwimmerVideoSessions).toHaveBeenCalledWith('s1', expect.any(Function));
   });
 
   it('renders video session cards', () => {
-    (onSnapshot as jest.Mock).mockImplementation((_q: unknown, cb: (s: unknown) => void) => {
-      cb({
-        docs: [
-          makeDoc('vs1', {
-            taggedSwimmerIds: ['s1'],
+    mockSubscribeSwimmerVideoSessions.mockImplementation(
+      (_id: string, cb: (rows: unknown[]) => void) => {
+        cb([
+          makeSession('vs1', {
             status: 'posted',
             duration: 30,
             practiceDate: '2025-01-15',
             createdAt: new Date(),
           }),
-          makeDoc('vs2', {
-            taggedSwimmerIds: ['s1'],
+          makeSession('vs2', {
             status: 'review',
             duration: 45,
             practiceDate: '2025-01-20',
             createdAt: new Date(),
           }),
-        ],
-        size: 2,
-        empty: false,
-      });
-      return jest.fn();
-    });
+        ]);
+        return jest.fn();
+      },
+    );
 
     const { getByText } = render(<SwimmerVideoClips swimmerId="s1" />);
     expect(getByText('VIDEO CLIPS (2)')).toBeTruthy();
   });
 
   it('renders status badges', () => {
-    (onSnapshot as jest.Mock).mockImplementation((_q: unknown, cb: (s: unknown) => void) => {
-      cb({
-        docs: [
-          makeDoc('vs1', {
-            taggedSwimmerIds: ['s1'],
+    mockSubscribeSwimmerVideoSessions.mockImplementation(
+      (_id: string, cb: (rows: unknown[]) => void) => {
+        cb([
+          makeSession('vs1', {
             status: 'posted',
             duration: 30,
             practiceDate: '2025-01-15',
             createdAt: new Date(),
           }),
-        ],
-        size: 1,
-        empty: false,
-      });
-      return jest.fn();
-    });
+        ]);
+        return jest.fn();
+      },
+    );
 
     const { getByText } = render(<SwimmerVideoClips swimmerId="s1" />);
     expect(getByText('POSTED')).toBeTruthy();
   });
 
   it('navigates to video detail on press', () => {
-    (onSnapshot as jest.Mock).mockImplementation((_q: unknown, cb: (s: unknown) => void) => {
-      cb({
-        docs: [
-          makeDoc('vs1', {
-            taggedSwimmerIds: ['s1'],
+    mockSubscribeSwimmerVideoSessions.mockImplementation(
+      (_id: string, cb: (rows: unknown[]) => void) => {
+        cb([
+          makeSession('vs1', {
             status: 'posted',
             duration: 30,
             practiceDate: '2025-01-15',
             createdAt: new Date(),
           }),
-        ],
-        size: 1,
-        empty: false,
-      });
-      return jest.fn();
-    });
+        ]);
+        return jest.fn();
+      },
+    );
 
     const { getByText } = render(<SwimmerVideoClips swimmerId="s1" />);
     fireEvent.press(getByText('2025-01-15'));

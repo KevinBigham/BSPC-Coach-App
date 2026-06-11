@@ -1,21 +1,11 @@
 import { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-} from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
 import {
-  collection,
-  query,
-  where,
-  orderBy,
-  limit,
-  onSnapshot,
-} from 'firebase/firestore';
-import { db } from '../config/firebase';
-import { getVideoStatusLabel, getVideoStatusColor } from '../services/video';
+  subscribeSwimmerVideoSessions,
+  getVideoStatusLabel,
+  getVideoStatusColor,
+} from '../services/video';
 import { colors, spacing, fontSize, borderRadius, fontFamily } from '../config/theme';
 import type { VideoSession } from '../types/firestore.types';
 
@@ -29,15 +19,11 @@ export default function SwimmerVideoClips({ swimmerId }: Props) {
   const [sessions, setSessions] = useState<VideoSessionWithId[]>([]);
 
   useEffect(() => {
-    const q = query(
-      collection(db, 'video_sessions'),
-      where('taggedSwimmerIds', 'array-contains', swimmerId),
-      orderBy('createdAt', 'desc'),
-      limit(10)
+    // Same axis as the legacy taggedSwimmerIds array-contains query — now the
+    // junction-filtered service read (all statuses, newest 10).
+    return subscribeSwimmerVideoSessions(swimmerId, (rows) =>
+      setSessions(rows as VideoSessionWithId[]),
     );
-    return onSnapshot(q, (snap) => {
-      setSessions(snap.docs.map((d) => ({ id: d.id, ...d.data() } as VideoSessionWithId)));
-    });
   }, [swimmerId]);
 
   if (sessions.length === 0) return null;

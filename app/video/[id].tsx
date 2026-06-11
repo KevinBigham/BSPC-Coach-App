@@ -9,9 +9,8 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useLocalSearchParams, Stack, useRouter } from 'expo-router';
-import { doc, onSnapshot } from 'firebase/firestore';
-import { db } from '../../src/config/firebase';
 import {
+  subscribeVideoSession,
   subscribeVideoDrafts,
   getVideoStatusLabel,
   getVideoStatusColor,
@@ -54,9 +53,11 @@ function VideoDetailScreen() {
 
   useEffect(() => {
     if (!id) return;
-    const unsubSession = onSnapshot(doc(db, 'video_sessions', id), (snap) => {
-      if (snap.exists()) {
-        setSelectedSession({ id: snap.id, ...snap.data() } as VideoSession & { id: string });
+    // The AI pipeline flips this row's status live — the subscription carries
+    // that through, like the legacy doc listener.
+    const unsubSession = subscribeVideoSession(id, (session) => {
+      if (session) {
+        setSelectedSession(session as VideoSession & { id: string });
       }
       setLoading(false);
     });

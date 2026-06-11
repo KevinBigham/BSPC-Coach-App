@@ -1,21 +1,6 @@
 import { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  ScrollView,
-  StyleSheet,
-} from 'react-native';
-import {
-  collection,
-  query,
-  where,
-  orderBy,
-  limit,
-  onSnapshot,
-  getDocs,
-} from 'firebase/firestore';
-import { db } from '../config/firebase';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
+import { subscribeSwimmerVideoSessions, subscribeVideoDrafts } from '../services/video';
 import { colors, spacing, fontSize, borderRadius, fontFamily } from '../config/theme';
 import type { VideoSession } from '../types/firestore.types';
 
@@ -41,36 +26,29 @@ export default function VideoComparison({ swimmerId }: Props) {
   const [rightDrafts, setRightDrafts] = useState<Draft[]>([]);
 
   useEffect(() => {
-    const q = query(
-      collection(db, 'video_sessions'),
-      where('taggedSwimmerIds', 'array-contains', swimmerId),
-      where('status', '==', 'posted'),
-      orderBy('createdAt', 'desc'),
-      limit(10)
+    // Same axis as the legacy taggedSwimmerIds + status=='posted' query — now
+    // the junction-filtered service read (posted only, newest 10).
+    return subscribeSwimmerVideoSessions(
+      swimmerId,
+      (rows) => setSessions(rows as VideoSessionWithId[]),
+      { postedOnly: true },
     );
-    return onSnapshot(q, (snap) => {
-      const data = snap.docs.map((d) => ({ id: d.id, ...d.data() } as VideoSessionWithId));
-      setSessions(data);
-    });
   }, [swimmerId]);
 
-  // Load drafts for selected sessions
+  // Load drafts for selected sessions (the drafts subcollection became the
+  // video_session_drafts table behind the existing service read, Phase F)
   useEffect(() => {
     if (!sessions[leftIndex]) return;
-    const unsub = onSnapshot(
-      collection(db, 'video_sessions', sessions[leftIndex].id, 'drafts'),
-      (snap) => setLeftDrafts(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Draft)))
+    return subscribeVideoDrafts(sessions[leftIndex].id, (rows) =>
+      setLeftDrafts(rows as unknown as Draft[]),
     );
-    return unsub;
   }, [sessions, leftIndex]);
 
   useEffect(() => {
     if (!sessions[rightIndex]) return;
-    const unsub = onSnapshot(
-      collection(db, 'video_sessions', sessions[rightIndex].id, 'drafts'),
-      (snap) => setRightDrafts(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Draft)))
+    return subscribeVideoDrafts(sessions[rightIndex].id, (rows) =>
+      setRightDrafts(rows as unknown as Draft[]),
     );
-    return unsub;
   }, [sessions, rightIndex]);
 
   if (sessions.length < 2) {
@@ -97,29 +75,36 @@ export default function VideoComparison({ swimmerId }: Props) {
           <Text style={styles.sideLabel}>EARLIER</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             <View style={styles.chipRow}>
-              {sessions.map((s, i) => i !== rightIndex && (
-                <TouchableOpacity
-                  key={s.id}
-                  style={[styles.dateChip, leftIndex === i && styles.dateChipActive]}
-                  onPress={() => setLeftIndex(i)}
-                >
-                  <Text style={[styles.dateChipText, leftIndex === i && styles.dateChipTextActive]}>
-                    {s.practiceDate}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+              {sessions.map(
+                (s, i) =>
+                  i !== rightIndex && (
+                    <TouchableOpacity
+                      key={s.id}
+                      style={[styles.dateChip, leftIndex === i && styles.dateChipActive]}
+                      onPress={() => setLeftIndex(i)}
+                    >
+                      <Text
+                        style={[styles.dateChipText, leftIndex === i && styles.dateChipTextActive]}
+                      >
+                        {s.practiceDate}
+                      </Text>
+                    </TouchableOpacity>
+                  ),
+              )}
             </View>
           </ScrollView>
-          {leftDrafts.filter((d) => d.observation).map((draft) => (
-            <View key={draft.id} style={styles.draftItem}>
-              <Text style={styles.draftPhase}>{draft.phase?.toUpperCase()}</Text>
-              <Text style={styles.draftText}>{draft.observation}</Text>
-              {draft.diagnosis ? <Text style={styles.draftDiagnosis}>{draft.diagnosis}</Text> : null}
-            </View>
-          ))}
-          {leftDrafts.length === 0 && (
-            <Text style={styles.noDrafts}>No observations</Text>
-          )}
+          {leftDrafts
+            .filter((d) => d.observation)
+            .map((draft) => (
+              <View key={draft.id} style={styles.draftItem}>
+                <Text style={styles.draftPhase}>{draft.phase?.toUpperCase()}</Text>
+                <Text style={styles.draftText}>{draft.observation}</Text>
+                {draft.diagnosis ? (
+                  <Text style={styles.draftDiagnosis}>{draft.diagnosis}</Text>
+                ) : null}
+              </View>
+            ))}
+          {leftDrafts.length === 0 && <Text style={styles.noDrafts}>No observations</Text>}
         </View>
 
         {/* Divider */}
@@ -132,29 +117,36 @@ export default function VideoComparison({ swimmerId }: Props) {
           <Text style={styles.sideLabel}>LATER</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             <View style={styles.chipRow}>
-              {sessions.map((s, i) => i !== leftIndex && (
-                <TouchableOpacity
-                  key={s.id}
-                  style={[styles.dateChip, rightIndex === i && styles.dateChipActive]}
-                  onPress={() => setRightIndex(i)}
-                >
-                  <Text style={[styles.dateChipText, rightIndex === i && styles.dateChipTextActive]}>
-                    {s.practiceDate}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+              {sessions.map(
+                (s, i) =>
+                  i !== leftIndex && (
+                    <TouchableOpacity
+                      key={s.id}
+                      style={[styles.dateChip, rightIndex === i && styles.dateChipActive]}
+                      onPress={() => setRightIndex(i)}
+                    >
+                      <Text
+                        style={[styles.dateChipText, rightIndex === i && styles.dateChipTextActive]}
+                      >
+                        {s.practiceDate}
+                      </Text>
+                    </TouchableOpacity>
+                  ),
+              )}
             </View>
           </ScrollView>
-          {rightDrafts.filter((d) => d.observation).map((draft) => (
-            <View key={draft.id} style={styles.draftItem}>
-              <Text style={styles.draftPhase}>{draft.phase?.toUpperCase()}</Text>
-              <Text style={styles.draftText}>{draft.observation}</Text>
-              {draft.diagnosis ? <Text style={styles.draftDiagnosis}>{draft.diagnosis}</Text> : null}
-            </View>
-          ))}
-          {rightDrafts.length === 0 && (
-            <Text style={styles.noDrafts}>No observations</Text>
-          )}
+          {rightDrafts
+            .filter((d) => d.observation)
+            .map((draft) => (
+              <View key={draft.id} style={styles.draftItem}>
+                <Text style={styles.draftPhase}>{draft.phase?.toUpperCase()}</Text>
+                <Text style={styles.draftText}>{draft.observation}</Text>
+                {draft.diagnosis ? (
+                  <Text style={styles.draftDiagnosis}>{draft.diagnosis}</Text>
+                ) : null}
+              </View>
+            ))}
+          {rightDrafts.length === 0 && <Text style={styles.noDrafts}>No observations</Text>}
         </View>
       </View>
     </View>
@@ -203,7 +195,11 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   dateChipActive: { borderColor: colors.accent, backgroundColor: 'rgba(179, 136, 255, 0.15)' },
-  dateChipText: { fontFamily: fontFamily.statMono, fontSize: fontSize.xs, color: colors.textSecondary },
+  dateChipText: {
+    fontFamily: fontFamily.statMono,
+    fontSize: fontSize.xs,
+    color: colors.textSecondary,
+  },
   dateChipTextActive: { color: colors.accent },
 
   divider: {
