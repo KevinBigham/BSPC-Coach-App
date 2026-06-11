@@ -9,9 +9,13 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { router } from 'expo-router';
-import { collection, onSnapshot, updateDoc, doc, serverTimestamp } from 'firebase/firestore';
-import { db } from '../src/config/firebase';
 import { useAuth } from '../src/contexts/AuthContext';
+import {
+  subscribeStaffProfiles,
+  setStaffRole,
+  setStaffGroups,
+  type StaffProfile,
+} from '../src/services/staff';
 import {
   colors,
   spacing,
@@ -21,14 +25,13 @@ import {
   groupColors,
 } from '../src/config/theme';
 import { GROUPS, type Group } from '../src/config/constants';
-import type { Coach } from '../src/types/firestore.types';
 import { withScreenErrorBoundary } from '../src/components/ScreenErrorBoundary';
 
 function AdminScreen() {
   const { isAdmin, coach: currentCoach } = useAuth();
-  const [coaches, setCoaches] = useState<(Coach & { uid: string })[]>([]);
+  const [staff, setStaff] = useState<StaffProfile[]>([]);
   const [loading, setLoading] = useState(true);
-  const [editingUid, setEditingUid] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isAdmin) {
@@ -36,44 +39,42 @@ function AdminScreen() {
       router.back();
       return;
     }
-    return onSnapshot(collection(db, 'coaches'), (snapshot) => {
-      setCoaches(snapshot.docs.map((d) => ({ uid: d.id, ...d.data() }) as Coach & { uid: string }));
+    // D-CUT8: the staff.ts surface replaces the coaches onSnapshot. No
+    // client-side authority pre-check rides the writers below —
+    // enforce_profile_self_update is the wall (A-STRICT); this screen is
+    // Kevin-only via isAdmin (= super_admin post-map).
+    return subscribeStaffProfiles((profiles) => {
+      setStaff(profiles);
       setLoading(false);
     });
   }, [isAdmin]);
 
-  const toggleRole = (coach: Coach & { uid: string }) => {
-    if (coach.uid === currentCoach?.uid) {
+  const toggleRole = (member: StaffProfile) => {
+    if (member.userId === currentCoach?.uid) {
       Alert.alert('Cannot Change', "You can't change your own role.");
       return;
     }
-    const newRole = coach.role === 'admin' ? 'coach' : 'admin';
+    const newRole = member.role === 'super_admin' ? 'coach_admin' : 'super_admin';
     Alert.alert(
       'Change Role',
-      `Make ${coach.displayName} a${newRole === 'admin' ? 'n admin' : ' coach'}?`,
+      `Make ${member.displayName} a${newRole === 'super_admin' ? 'n admin' : ' coach'}?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Confirm',
           onPress: async () => {
-            await updateDoc(doc(db, 'coaches', coach.uid), {
-              role: newRole,
-              updatedAt: serverTimestamp(),
-            });
+            await setStaffRole(member.profileId, newRole);
           },
         },
       ],
     );
   };
 
-  const toggleGroup = async (coachUid: string, currentGroups: Group[], group: Group) => {
+  const toggleGroup = async (profileId: string, currentGroups: Group[], group: Group) => {
     const newGroups = currentGroups.includes(group)
       ? currentGroups.filter((g) => g !== group)
       : [...currentGroups, group];
-    await updateDoc(doc(db, 'coaches', coachUid), {
-      groups: newGroups,
-      updatedAt: serverTimestamp(),
-    });
+    await setStaffGroups(profileId, newGroups);
   };
 
   if (loading) {
@@ -89,25 +90,25 @@ function AdminScreen() {
       {/* Scorebug */}
       <View style={styles.statRow}>
         <View style={styles.statBox}>
-          <Text style={styles.statNum}>{coaches.length}</Text>
+          <Text style={styles.statNum}>{staff.length}</Text>
           <Text style={styles.statLabel}>COACHES</Text>
         </View>
         <View style={styles.statBox}>
-          <Text style={styles.statNum}>{coaches.filter((c) => c.role === 'admin').length}</Text>
+          <Text style={styles.statNum}>{staff.filter((c) => c.role === 'super_admin').length}</Text>
           <Text style={styles.statLabel}>ADMINS</Text>
         </View>
       </View>
 
-      {/* Coach List */}
-      {coaches.map((c) => {
-        const isEditing = editingUid === c.uid;
-        const isMe = c.uid === currentCoach?.uid;
+      {/* Staff List — PG truth; the screen renders its own labels */}
+      {staff.map((c) => {
+        const isEditing = editingId === c.profileId;
+        const isMe = c.userId === currentCoach?.uid;
 
         return (
-          <View key={c.uid} style={styles.coachCard}>
+          <View key={c.profileId} style={styles.coachCard}>
             <TouchableOpacity
               style={styles.coachHeader}
-              onPress={() => setEditingUid(isEditing ? null : c.uid)}
+              onPress={() => setEditingId(isEditing ? null : c.profileId)}
             >
               <View style={styles.coachAvatar}>
                 <Text style={styles.coachAvatarText}>
@@ -122,11 +123,11 @@ function AdminScreen() {
                 <Text style={styles.coachEmail}>{c.email}</Text>
               </View>
               <TouchableOpacity
-                style={[styles.roleBadge, c.role === 'admin' && styles.roleBadgeAdmin]}
+                style={[styles.roleBadge, c.role === 'super_admin' && styles.roleBadgeAdmin]}
                 onPress={() => toggleRole(c)}
               >
-                <Text style={[styles.roleText, c.role === 'admin' && styles.roleTextAdmin]}>
-                  {c.role === 'admin' ? 'ADMIN' : 'COACH'}
+                <Text style={[styles.roleText, c.role === 'super_admin' && styles.roleTextAdmin]}>
+                  {c.role === 'super_admin' ? 'ADMIN' : 'COACH'}
                 </Text>
               </TouchableOpacity>
             </TouchableOpacity>
@@ -150,7 +151,7 @@ function AdminScreen() {
                             borderColor: groupColors[g] || colors.border,
                           },
                         ]}
-                        onPress={() => toggleGroup(c.uid, c.groups || [], g)}
+                        onPress={() => toggleGroup(c.profileId, c.groups || [], g)}
                       >
                         <Text
                           style={[

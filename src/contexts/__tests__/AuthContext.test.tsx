@@ -19,7 +19,7 @@ jest.mock('../../config/supabase', () => {
     tokenRows: [],
     authCallback: null,
   };
-  const profilesQuery = {
+  const profilesQuery: Record<string, jest.Mock> = {
     select: jest.fn(() => profilesQuery),
     eq: jest.fn(() => profilesQuery),
     maybeSingle: jest.fn(() => Promise.resolve({ data: state.profileRow, error: null })),
