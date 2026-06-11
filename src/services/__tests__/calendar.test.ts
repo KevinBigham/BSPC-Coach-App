@@ -4,8 +4,13 @@
 // (February named), the D-H4 RSVP upsert key, the coachName/swimmerName
 // denorm drops (derived on read), and trigger-owned updated_at on events.
 jest.mock('../../config/supabase', () => {
-  const state: { selectRows: unknown[]; onHandler: ((p: unknown) => void) | null } = {
+  const state: {
+    selectRows: unknown[];
+    singleRow: unknown;
+    onHandler: ((p: unknown) => void) | null;
+  } = {
     selectRows: [],
+    singleRow: null,
     onHandler: null,
   };
   const query: Record<string, jest.Mock> & { then: unknown } = {
@@ -20,6 +25,7 @@ jest.mock('../../config/supabase', () => {
     upsert: jest.fn(() => query),
     delete: jest.fn(() => query),
     single: jest.fn(() => Promise.resolve({ data: { id: 'new-row-id' }, error: null })),
+    maybeSingle: jest.fn(() => Promise.resolve({ data: state.singleRow, error: null })),
     then: (resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) =>
       Promise.resolve({ data: state.selectRows, error: null }).then(resolve, reject),
   };
@@ -42,6 +48,7 @@ import {
   subscribeEvents,
   subscribeEventsRange,
   subscribeEventsForDate,
+  subscribeEvent,
   addEvent,
   updateEvent,
   deleteEvent,
@@ -81,7 +88,41 @@ const makeEventRow = (over: Record<string, unknown> = {}) => ({
 beforeEach(() => {
   jest.clearAllMocks();
   __state.selectRows = [];
+  __state.singleRow = null;
   __state.onHandler = null;
+});
+
+// Phase K (D-K4 addition #3): single-event subscription pins.
+describe('subscribeEvent', () => {
+  it('queries the one row by id with an id-filtered channel and maps it', async () => {
+    __state.singleRow = makeEventRow();
+    const cb = jest.fn();
+    subscribeEvent('ev-1', cb);
+    await flush();
+
+    expect(supabase.from).toHaveBeenCalledWith('calendar_events');
+    expect(__query.eq).toHaveBeenCalledWith('id', 'ev-1');
+    expect(__query.maybeSingle).toHaveBeenCalled();
+    expect(__channel.on.mock.calls[0][1]).toMatchObject({
+      table: 'calendar_events',
+      filter: 'id=eq.ev-1',
+    });
+    expect(cb).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'ev-1', title: 'Gold Practice', coachName: 'Coach K' }),
+    );
+  });
+
+  it('emits null for a missing row and re-fetches on channel events', async () => {
+    const cb = jest.fn();
+    subscribeEvent('ev-1', cb);
+    await flush();
+    expect(cb).toHaveBeenLastCalledWith(null);
+
+    __state.singleRow = makeEventRow({ title: 'Moved Practice' });
+    __state.onHandler?.({ eventType: 'UPDATE' });
+    await flush();
+    expect(cb).toHaveBeenLastCalledWith(expect.objectContaining({ title: 'Moved Practice' }));
+  });
 });
 
 describe('subscribeEvents', () => {

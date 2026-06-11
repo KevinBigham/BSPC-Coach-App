@@ -149,6 +149,49 @@ export function subscribeMeets(callback: (meets: MeetWithId[]) => void, max = 50
   };
 }
 
+// Phase K (D-K4 addition #2): the single-meet subscription meet/[id]'s
+// doc-read re-points onto. A narrower projection of the same rows
+// subscribeMeets already reads. Missing row emits null, like
+// snap.exists() === false.
+export function subscribeMeet(
+  id: string,
+  callback: (meet: MeetWithId | null) => void,
+): Unsubscribe {
+  let live = true;
+
+  const emit = async (): Promise<void> => {
+    const { data, error } = await supabase
+      .from('meets')
+      .select(MEET_SELECT)
+      .eq('id', id)
+      .maybeSingle();
+    if (!live) return;
+    if (error || !data) {
+      callback(null);
+      return;
+    }
+    callback(rowToMeet(data as unknown as MeetRow));
+  };
+
+  void emit(); // immediate first fire, like onSnapshot
+
+  const channel = supabase
+    .channel(`meets:one:${id}:${channelSeq++}`)
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'meets', filter: `id=eq.${id}` },
+      () => {
+        void emit();
+      },
+    )
+    .subscribe();
+
+  return () => {
+    live = false;
+    void supabase.removeChannel(channel);
+  };
+}
+
 export function subscribeUpcomingMeets(callback: (meets: MeetWithId[]) => void): Unsubscribe {
   const today = new Date().toISOString().split('T')[0];
   let live = true;

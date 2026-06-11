@@ -4,8 +4,13 @@
 // derived display strings on entries (RD-5), swimmerName derived from the
 // swimmers embed, trigger-owned updated_at.
 jest.mock('../../config/supabase', () => {
-  const state: { selectRows: unknown[]; onHandler: ((p: unknown) => void) | null } = {
+  const state: {
+    selectRows: unknown[];
+    singleRow: unknown;
+    onHandler: ((p: unknown) => void) | null;
+  } = {
     selectRows: [],
+    singleRow: null,
     onHandler: null,
   };
   const query: Record<string, jest.Mock> & { then: unknown } = {
@@ -16,6 +21,7 @@ jest.mock('../../config/supabase', () => {
     limit: jest.fn(() => query),
     update: jest.fn(() => query),
     delete: jest.fn(() => query),
+    maybeSingle: jest.fn(() => Promise.resolve({ data: state.singleRow, error: null })),
     then: (resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) =>
       Promise.resolve({ data: state.selectRows, error: null }).then(resolve, reject),
   };
@@ -40,6 +46,7 @@ jest.mock('../../data/timeStandards', () => ({
 
 import {
   subscribeMeets,
+  subscribeMeet,
   subscribeUpcomingMeets,
   updateMeet,
   deleteMeet,
@@ -78,6 +85,7 @@ const makeMeetRow = (over: Record<string, unknown> = {}) => ({
 beforeEach(() => {
   jest.clearAllMocks();
   __state.selectRows = [];
+  __state.singleRow = null;
   __state.onHandler = null;
 });
 
@@ -159,6 +167,36 @@ describe('subscribeMeets', () => {
     __state.onHandler?.({ eventType: 'UPDATE' });
     await flush();
     expect(cb).not.toHaveBeenCalled();
+  });
+});
+
+// Phase K (D-K4 addition #2): single-meet subscription pins.
+describe('subscribeMeet', () => {
+  it('queries the one row by id with an id-filtered channel and maps it', async () => {
+    __state.singleRow = makeMeetRow();
+    const cb = jest.fn();
+    subscribeMeet('m-1', cb);
+    await flush();
+
+    expect(supabase.from).toHaveBeenCalledWith('meets');
+    expect(__query.eq).toHaveBeenCalledWith('id', 'm-1');
+    expect(__query.maybeSingle).toHaveBeenCalled();
+    expect(__channel.on.mock.calls[0][1]).toMatchObject({ table: 'meets', filter: 'id=eq.m-1' });
+    expect(cb).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'm-1', name: 'Coach Classic', coachName: 'Coach K' }),
+    );
+  });
+
+  it('emits null for a missing row and re-fetches on channel events', async () => {
+    const cb = jest.fn();
+    subscribeMeet('m-1', cb);
+    await flush();
+    expect(cb).toHaveBeenLastCalledWith(null);
+
+    __state.singleRow = makeMeetRow({ status: 'completed' });
+    __state.onHandler?.({ eventType: 'UPDATE' });
+    await flush();
+    expect(cb).toHaveBeenLastCalledWith(expect.objectContaining({ status: 'completed' }));
   });
 });
 

@@ -6,10 +6,12 @@
 jest.mock('../../config/supabase', () => {
   const state: {
     selectRows: unknown[];
+    singleRow: unknown;
     count: number;
     onHandler: ((p: unknown) => void) | null;
   } = {
     selectRows: [],
+    singleRow: null,
     count: 0,
     onHandler: null,
   };
@@ -21,6 +23,7 @@ jest.mock('../../config/supabase', () => {
     insert: jest.fn(() => query),
     update: jest.fn(() => query),
     single: jest.fn(() => Promise.resolve({ data: { id: 'new-session-id' }, error: null })),
+    maybeSingle: jest.fn(() => Promise.resolve({ data: state.singleRow, error: null })),
     then: (resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) =>
       Promise.resolve({ data: state.selectRows, count: state.count, error: null }).then(
         resolve,
@@ -53,6 +56,8 @@ jest.mock('../mediaPipeline', () => ({
 
 import {
   subscribeVideoSessions,
+  subscribeVideoSession,
+  subscribeSwimmerVideoSessions,
   subscribeVideoDrafts,
   subscribePendingVideoReviewCount,
   createVideoSession,
@@ -74,6 +79,7 @@ const flush = () => new Promise((resolve) => setImmediate(resolve));
 beforeEach(() => {
   jest.clearAllMocks();
   __state.selectRows = [];
+  __state.singleRow = null;
   __state.count = 0;
   __state.onHandler = null;
 });
@@ -175,6 +181,109 @@ describe('subscribeVideoSessions', () => {
       status: 'review',
       practiceDate: '2026-06-09',
     });
+  });
+});
+
+// Phase K (D-K4 addition #4): single-session subscription pins.
+describe('subscribeVideoSession', () => {
+  it('queries the one row by id and watches BOTH projection sources, id-filtered', async () => {
+    __state.singleRow = makeSessionRow();
+    const cb = jest.fn();
+    subscribeVideoSession('v-1', cb);
+    await flush();
+
+    expect(supabase.from).toHaveBeenCalledWith('video_sessions');
+    expect(__query.eq).toHaveBeenCalledWith('id', 'v-1');
+    expect(__query.maybeSingle).toHaveBeenCalled();
+    expect(__channel.on).toHaveBeenCalledTimes(2);
+    expect(__channel.on.mock.calls[0][1]).toMatchObject({
+      table: 'video_sessions',
+      filter: 'id=eq.v-1',
+    });
+    expect(__channel.on.mock.calls[1][1]).toMatchObject({
+      table: 'video_session_swimmers',
+      filter: 'session_id=eq.v-1',
+    });
+    expect(cb).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'v-1', taggedSwimmerIds: ['sw-1'], status: 'review' }),
+    );
+  });
+
+  it('emits null for a missing row and re-emits the status flip on channel events', async () => {
+    const cb = jest.fn();
+    subscribeVideoSession('v-1', cb);
+    await flush();
+    expect(cb).toHaveBeenLastCalledWith(null);
+
+    __state.singleRow = makeSessionRow({ status: 'posted' });
+    __state.onHandler?.({ eventType: 'UPDATE' });
+    await flush();
+    expect(cb).toHaveBeenLastCalledWith(expect.objectContaining({ status: 'posted' }));
+  });
+
+  it('stops emitting after unsubscribe', async () => {
+    __state.singleRow = makeSessionRow();
+    const cb = jest.fn();
+    const unsub = subscribeVideoSession('v-1', cb);
+    await flush();
+    cb.mockClear();
+    unsub();
+    expect(supabase.removeChannel).toHaveBeenCalledWith(__channel);
+    __state.onHandler?.({ eventType: 'UPDATE' });
+    await flush();
+    expect(cb).not.toHaveBeenCalled();
+  });
+});
+
+// Phase K (D-K4 addition #5): tagged-swimmer sessions subscription pins.
+describe('subscribeSwimmerVideoSessions', () => {
+  it('inner-join filters by the tagged junction, newest first, default limit 10 — mapper arrays stay intact', async () => {
+    __state.selectRows = [makeSessionRow()];
+    const cb = jest.fn();
+    subscribeSwimmerVideoSessions('sw-1', cb);
+    await flush();
+
+    expect(supabase.from).toHaveBeenCalledWith('video_sessions');
+    const selectArg = __query.select.mock.calls[0][0] as string;
+    expect(selectArg).toContain('tag_filter:video_session_swimmers!inner(swimmer_id, kind)');
+    expect(selectArg).toContain('swimmers:video_session_swimmers(swimmer_id, kind)');
+    expect(__query.eq).toHaveBeenCalledWith('tag_filter.swimmer_id', 'sw-1');
+    expect(__query.eq).toHaveBeenCalledWith('tag_filter.kind', 'tagged');
+    expect(__query.eq).not.toHaveBeenCalledWith('status', 'posted');
+    expect(__query.order).toHaveBeenCalledWith('created_at', { ascending: false });
+    expect(__query.limit).toHaveBeenCalledWith(10);
+    // the UNFILTERED embed still serves the full tagged/selected arrays
+    expect(cb.mock.calls[0][0][0]).toMatchObject({
+      id: 'v-1',
+      taggedSwimmerIds: ['sw-1'],
+      selectedSwimmerIds: ['sw-1', 'sw-2'],
+    });
+  });
+
+  it('postedOnly adds the status filter and max overrides the limit', () => {
+    subscribeSwimmerVideoSessions('sw-1', jest.fn(), { postedOnly: true, max: 25 });
+
+    expect(__query.eq).toHaveBeenCalledWith('status', 'posted');
+    expect(__query.limit).toHaveBeenCalledWith(25);
+  });
+
+  it('watches both source tables (sessions table-wide, junction swimmer-filtered) and re-fetches', async () => {
+    const cb = jest.fn();
+    subscribeSwimmerVideoSessions('sw-1', cb);
+    await flush();
+
+    expect(__channel.on).toHaveBeenCalledTimes(2);
+    expect(__channel.on.mock.calls[0][1]).toMatchObject({ table: 'video_sessions' });
+    expect(__channel.on.mock.calls[0][1]).not.toHaveProperty('filter');
+    expect(__channel.on.mock.calls[1][1]).toMatchObject({
+      table: 'video_session_swimmers',
+      filter: 'swimmer_id=eq.sw-1',
+    });
+    cb.mockClear();
+    __state.selectRows = [makeSessionRow()];
+    __state.onHandler?.({ eventType: 'INSERT' });
+    await flush();
+    expect(cb).toHaveBeenCalledWith([expect.objectContaining({ id: 'v-1' })]);
   });
 });
 

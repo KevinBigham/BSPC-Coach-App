@@ -137,6 +137,64 @@ export function subscribeSwimmers(
   };
 }
 
+// Phase K (D-K4 addition #1): the single-swimmer subscription the profile/
+// edit/standards/invite-parent doc-reads re-point onto. A narrower projection
+// of the same rows subscribeSwimmers already reads — active OR inactive (the
+// store holds active rows only, and inactive swimmers are reachable from the
+// roster toggle). Missing row emits null, like snap.exists() === false.
+export function subscribeSwimmer(
+  id: string,
+  callback: (swimmer: SwimmerWithId | null) => void,
+): Unsubscribe {
+  let live = true;
+
+  const emit = async (): Promise<void> => {
+    const { data, error } = await supabase
+      .from('swimmers')
+      .select(SWIMMER_SELECT)
+      .eq('id', id)
+      .maybeSingle();
+    if (!live) return;
+    if (error || !data) {
+      callback(null);
+      return;
+    }
+    callback(rowToSwimmer(data as unknown as SwimmerRow));
+  };
+
+  void emit(); // immediate first fire, like onSnapshot
+
+  // Same watch-set as the list subscription (the coach-eyes companion used to
+  // be part of the same Firestore doc), narrowed to this row.
+  const channel = supabase
+    .channel(`swimmers:one:${id}:${channelSeq++}`)
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'swimmers', filter: `id=eq.${id}` },
+      () => {
+        void emit();
+      },
+    )
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'swimmer_coach_profile',
+        filter: `swimmer_id=eq.${id}`,
+      },
+      () => {
+        void emit();
+      },
+    )
+    .subscribe();
+
+  return () => {
+    live = false;
+    void supabase.removeChannel(channel);
+  };
+}
+
 export async function addSwimmer(
   data: Omit<Swimmer, 'id' | 'createdAt' | 'updatedAt' | 'createdBy'>,
   coachUid: string,

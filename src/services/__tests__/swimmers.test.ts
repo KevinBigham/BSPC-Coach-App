@@ -4,8 +4,14 @@
 // meet schedule/parent contacts) live on the staff-only companion table; legacy
 // goals strings are derived on read from the goals table.
 jest.mock('../../config/supabase', () => {
-  const state: { rows: unknown[]; insertedId: string; handlers: ((p: unknown) => void)[] } = {
+  const state: {
+    rows: unknown[];
+    singleRow: unknown;
+    insertedId: string;
+    handlers: ((p: unknown) => void)[];
+  } = {
     rows: [],
+    singleRow: null,
     insertedId: 'new-swimmer-id',
     handlers: [],
   };
@@ -18,6 +24,7 @@ jest.mock('../../config/supabase', () => {
       update: jest.fn(() => q),
       upsert: jest.fn(() => q),
       single: jest.fn(() => Promise.resolve({ data: { id: state.insertedId }, error: null })),
+      maybeSingle: jest.fn(() => Promise.resolve({ data: state.singleRow, error: null })),
       then: (resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) =>
         Promise.resolve({ data: state.rows, error: null }).then(resolve, reject),
     };
@@ -48,7 +55,7 @@ jest.mock('../../config/supabase', () => {
   };
 });
 
-import { subscribeSwimmers, addSwimmer, updateSwimmer } from '../swimmers';
+import { subscribeSwimmers, subscribeSwimmer, addSwimmer, updateSwimmer } from '../swimmers';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const mock = require('../../config/supabase');
@@ -91,6 +98,7 @@ const makeRow = (over: Record<string, unknown> = {}) => ({
 beforeEach(() => {
   jest.clearAllMocks();
   __state.rows = [];
+  __state.singleRow = null;
   __state.insertedId = 'new-swimmer-id';
   __state.handlers = [];
 });
@@ -303,5 +311,55 @@ describe('updateSwimmer', () => {
   it('resolves to void', async () => {
     const result = await updateSwimmer('sw-1', {});
     expect(result).toBeUndefined();
+  });
+});
+
+// Phase K (D-K4 addition #1): single-swimmer subscription pins.
+describe('subscribeSwimmer', () => {
+  it('queries the one row by id and opens an id-filtered two-table channel', () => {
+    subscribeSwimmer('sw-1', jest.fn());
+
+    expect(supabase.from).toHaveBeenCalledWith('swimmers');
+    expect(__swimmersQuery.eq).toHaveBeenCalledWith('id', 'sw-1');
+    expect(__swimmersQuery.maybeSingle).toHaveBeenCalled();
+    expect(__channel.on).toHaveBeenCalledTimes(2);
+    expect(__channel.on.mock.calls[0][1]).toMatchObject({
+      table: 'swimmers',
+      filter: 'id=eq.sw-1',
+    });
+    expect(__channel.on.mock.calls[1][1]).toMatchObject({
+      table: 'swimmer_coach_profile',
+      filter: 'swimmer_id=eq.sw-1',
+    });
+    expect(__channel.subscribe).toHaveBeenCalled();
+  });
+
+  it('maps the row into the callback — inactive rows included (the store cannot serve these)', async () => {
+    __state.singleRow = makeRow({ is_active: false });
+    const callback = jest.fn();
+    subscribeSwimmer('sw-1', callback);
+    await flush();
+
+    expect(callback).toHaveBeenCalledTimes(1);
+    expect(callback.mock.calls[0][0]).toMatchObject({
+      id: 'sw-1',
+      firstName: 'Jane',
+      active: false,
+      strengths: ['underwaters'],
+      goals: ['100 Free'],
+    });
+  });
+
+  it('emits null for a missing row and re-fetches on channel events', async () => {
+    const callback = jest.fn();
+    subscribeSwimmer('sw-1', callback);
+    await flush();
+    expect(callback).toHaveBeenLastCalledWith(null);
+
+    __state.singleRow = makeRow();
+    __state.handlers.forEach((h: (p: unknown) => void) => h({}));
+    await flush();
+    expect(callback.mock.calls.length).toBeGreaterThanOrEqual(2);
+    expect(callback.mock.calls[callback.mock.calls.length - 1][0]).toMatchObject({ id: 'sw-1' });
   });
 });

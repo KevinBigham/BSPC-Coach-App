@@ -121,6 +121,118 @@ export function subscribeVideoSessions(
   };
 }
 
+// Phase K (D-K4 addition #4): the single-session subscription video/[id]'s
+// doc-read re-points onto — the AI pipeline flips this row's status live, so
+// a real subscription is required (the coach-scoped list is the wrong axis
+// for an arbitrary session by id). Watches both projection sources (the
+// session row + its swimmer junction). Missing row emits null, like
+// snap.exists() === false.
+export function subscribeVideoSession(
+  id: string,
+  callback: (session: VideoSessionWithId | null) => void,
+): Unsubscribe {
+  let live = true;
+
+  const emit = async (): Promise<void> => {
+    const { data, error } = await supabase
+      .from('video_sessions')
+      .select(VIDEO_SESSION_SELECT)
+      .eq('id', id)
+      .maybeSingle();
+    if (!live) return;
+    if (error || !data) {
+      callback(null);
+      return;
+    }
+    callback(rowToVideoSession(data as unknown as VideoSessionRow));
+  };
+
+  void emit(); // immediate first fire, like onSnapshot
+
+  const channel = supabase
+    .channel(`video_sessions:one:${id}:${channelSeq++}`)
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'video_sessions', filter: `id=eq.${id}` },
+      () => {
+        void emit();
+      },
+    )
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'video_session_swimmers',
+        filter: `session_id=eq.${id}`,
+      },
+      () => {
+        void emit();
+      },
+    )
+    .subscribe();
+
+  return () => {
+    live = false;
+    void supabase.removeChannel(channel);
+  };
+}
+
+// Phase K (D-K4 addition #5): sessions a swimmer is TAGGED in — the
+// SwimmerVideoClips/VideoComparison query axis (legacy `taggedSwimmerIds
+// array-contains`, now the kind-discriminated P1-4 junction). tag_filter is a
+// SECOND embed of the junction used purely as the inner-join filter; the
+// unfiltered `swimmers` embed keeps the full tagged/selected arrays intact
+// for the mapper (a filtered embed would truncate them). Channel on BOTH
+// source tables with re-fetch (the J idiom): a status flip must re-emit and
+// the sessions table carries no swimmer axis to filter on.
+export function subscribeSwimmerVideoSessions(
+  swimmerId: string,
+  callback: (sessions: VideoSessionWithId[]) => void,
+  opts: { postedOnly?: boolean; max?: number } = {},
+): Unsubscribe {
+  const { postedOnly = false, max = 10 } = opts;
+  let live = true;
+
+  const emit = async (): Promise<void> => {
+    let q = supabase
+      .from('video_sessions')
+      .select(`${VIDEO_SESSION_SELECT}, tag_filter:video_session_swimmers!inner(swimmer_id, kind)`)
+      .eq('tag_filter.swimmer_id', swimmerId)
+      .eq('tag_filter.kind', 'tagged');
+    if (postedOnly) q = q.eq('status', 'posted');
+    const { data, error } = await q.order('created_at', { ascending: false }).limit(max);
+    if (!live || error || !data) return;
+    callback((data as unknown as VideoSessionRow[]).map(rowToVideoSession));
+  };
+
+  void emit(); // immediate first fire, like onSnapshot
+
+  const channel = supabase
+    .channel(`video_sessions:swimmer:${swimmerId}:${channelSeq++}`)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'video_sessions' }, () => {
+      void emit();
+    })
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'video_session_swimmers',
+        filter: `swimmer_id=eq.${swimmerId}`,
+      },
+      () => {
+        void emit();
+      },
+    )
+    .subscribe();
+
+  return () => {
+    live = false;
+    void supabase.removeChannel(channel);
+  };
+}
+
 // Phase J (the ratified D-J1 pendingDrafts rider): the dashboard's pending-
 // review count — the exact status='review' count the screen used to take
 // from Firestore directly; landed in this service so the hook stays out of

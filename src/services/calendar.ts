@@ -171,6 +171,50 @@ export function subscribeEventsForDate(date: string, callback: (events: EventWit
   );
 }
 
+// Phase K (D-K4 addition #3): the single-event subscription
+// calendar/event/[id]'s doc-read re-points onto. A narrower projection of the
+// same rows the window subscriptions already read (a single row IS a stable
+// row key, so the channel filters by id instead of going table-wide).
+// Missing row emits null, like snap.exists() === false.
+export function subscribeEvent(
+  id: string,
+  callback: (event: EventWithId | null) => void,
+): Unsubscribe {
+  let live = true;
+
+  const emit = async (): Promise<void> => {
+    const { data, error } = await supabase
+      .from('calendar_events')
+      .select(EVENT_SELECT)
+      .eq('id', id)
+      .maybeSingle();
+    if (!live) return;
+    if (error || !data) {
+      callback(null);
+      return;
+    }
+    callback(rowToEvent(data as unknown as EventRow));
+  };
+
+  void emit(); // immediate first fire, like onSnapshot
+
+  const channel = supabase
+    .channel(`calendar_events:one:${id}:${channelSeq++}`)
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'calendar_events', filter: `id=eq.${id}` },
+      () => {
+        void emit();
+      },
+    )
+    .subscribe();
+
+  return () => {
+    live = false;
+    void supabase.removeChannel(channel);
+  };
+}
+
 export async function addEvent(
   data: Omit<CalendarEvent, 'id' | 'createdAt' | 'updatedAt'>,
   coachUid: string,
