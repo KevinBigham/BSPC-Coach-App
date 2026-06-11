@@ -1,8 +1,6 @@
 import { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
-import { doc, onSnapshot } from 'firebase/firestore';
-import { db } from '../../../src/config/firebase';
 import { useAuth } from '../../../src/contexts/AuthContext';
 import {
   colors,
@@ -13,6 +11,7 @@ import {
   groupColors,
 } from '../../../src/config/theme';
 import {
+  subscribeEvent,
   deleteEvent,
   subscribeRSVPs,
   getEventTypeColor,
@@ -32,8 +31,8 @@ function EventDetailScreen() {
 
   useEffect(() => {
     if (!id) return;
-    return onSnapshot(doc(db, 'calendar_events', id), (snap) => {
-      if (snap.exists()) setEvent({ id: snap.id, ...snap.data() } as EventWithId);
+    return subscribeEvent(id, (e) => {
+      if (e) setEvent(e as EventWithId);
     });
   }, [id]);
 

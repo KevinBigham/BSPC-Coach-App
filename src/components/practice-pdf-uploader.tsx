@@ -2,11 +2,11 @@ import { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Linking } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import { Eye, FileUp } from 'lucide-react-native';
-import { getDownloadURL, ref } from 'firebase/storage';
-import { storage } from '../config/firebase';
+import { getSignedFileUrl } from '../services/mediaUpload';
 import { useToast } from '../contexts/ToastContext';
 import { colors, spacing, fontSize, borderRadius, fontFamily } from '../config/theme';
 import {
+  PRACTICE_PLANS_BUCKET,
   subscribeTodayPracticePlan,
   uploadDashboardPracticePlanPdf,
   createDashboardPracticePlanPdf,
@@ -136,7 +136,15 @@ export default function PracticePdfUploader({ coachId }: PracticePdfUploaderProp
               style={styles.primaryButton}
               onPress={async () => {
                 try {
-                  const url = await getDownloadURL(ref(storage, todayPlan.storagePath));
+                  // D-K2: the view arm reads the SAME store the upload arm
+                  // writes (Supabase practice-plans bucket, fresh signed URL —
+                  // the F pattern). The Firebase getDownloadURL read was a
+                  // split-brain bug since Phase H.
+                  const url = await getSignedFileUrl(
+                    PRACTICE_PLANS_BUCKET,
+                    todayPlan.storagePath,
+                    3600,
+                  );
                   await Linking.openURL(url);
                 } catch (error) {
                   showToast(

@@ -1,8 +1,6 @@
 import { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
-import { doc, onSnapshot } from 'firebase/firestore';
-import { db } from '../../src/config/firebase';
 import {
   colors,
   spacing,
@@ -12,6 +10,7 @@ import {
   groupColors,
 } from '../../src/config/theme';
 import {
+  subscribeMeet,
   subscribeEntries,
   deleteMeet,
   updateMeet,
@@ -35,8 +34,8 @@ function MeetDetailScreen() {
 
   useEffect(() => {
     if (!id) return;
-    return onSnapshot(doc(db, 'meets', id), (snap) => {
-      if (snap.exists()) setMeet({ id: snap.id, ...snap.data() } as MeetWithId);
+    return subscribeMeet(id, (m) => {
+      if (m) setMeet(m as MeetWithId);
     });
   }, [id]);
 

@@ -22,7 +22,9 @@ type DashboardPracticePlanPdfWithId = DashboardPracticePlanPdf & { id: string };
 // no longer imports firebase, but the public return type is unchanged.
 type Unsubscribe = () => void;
 
-const PRACTICE_PLANS_BUCKET = 'practice-plans';
+// Exported for the dashboard PDF viewer (Phase K, D-K2 — the named one-line
+// contract addition; no behavior change).
+export const PRACTICE_PLANS_BUCKET = 'practice-plans';
 
 interface PlanRow {
   id: string;
