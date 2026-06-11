@@ -1,7 +1,10 @@
 import { create } from 'zustand';
 import { subscribeTodayAttendance } from '../services/attendance';
 import type { AttendanceRecord } from '../types/firestore.types';
-import type { Unsubscribe } from 'firebase/firestore';
+
+// Structurally identical to firebase's Unsubscribe (() => void); the stores
+// no longer import firebase for a type alias (Phase J dead-code sweep, D-J6).
+type Unsubscribe = () => void;
 
 type AttendanceWithId = AttendanceRecord & { id: string };
 

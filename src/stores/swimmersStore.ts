@@ -2,7 +2,10 @@ import { create } from 'zustand';
 import { subscribeSwimmers } from '../services/swimmers';
 import type { Swimmer } from '../types/firestore.types';
 import type { Group } from '../config/constants';
-import type { Unsubscribe } from 'firebase/firestore';
+
+// Structurally identical to firebase's Unsubscribe (() => void); the stores
+// no longer import firebase for a type alias (Phase J dead-code sweep, D-J6).
+type Unsubscribe = () => void;
 
 type SwimmerWithId = Swimmer & { id: string };
 
