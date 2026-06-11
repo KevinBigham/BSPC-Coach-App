@@ -9,8 +9,8 @@ export interface ParentProfile {
 
 // Identity resolves from the canonical profiles + guardianships tables
 // (UNIFY/05 §3). `uid` is the caller's Supabase auth user id (auth.users.id);
-// the session provider in auth.ts stays on Firebase until the coordinated
-// identity-cluster cutover, so this read goes live at that cutover.
+// auth.ts has ridden Supabase sessions since the CUT-4+ swap (SWAP-9), so
+// this read is LIVE.
 export async function getParentProfile(uid: string): Promise<ParentProfile | null> {
   const { data: profile, error } = await supabase
     .from('profiles')
