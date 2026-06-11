@@ -20,6 +20,13 @@ jest.mock('expo-router', () => ({
   Tabs: { Screen: 'Screen' },
 }));
 
+// Mock @react-native-async-storage/async-storage (the package's official jest
+// mock, exported at ./jest in v3) — the supabase client wires it as the auth
+// session store (05 §6.2(i))
+jest.mock('@react-native-async-storage/async-storage', () =>
+  require('@react-native-async-storage/async-storage/jest'),
+);
+
 // Mock expo-font
 jest.mock('expo-font', () => ({
   useFonts: () => [true, null],

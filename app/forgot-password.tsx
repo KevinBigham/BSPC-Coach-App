@@ -10,8 +10,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { router } from 'expo-router';
-import { sendPasswordResetEmail } from 'firebase/auth';
-import { auth } from '../src/config/firebase';
+import { supabase } from '../src/config/supabase';
 import { colors, spacing, fontSize, borderRadius, fontFamily } from '../src/config/theme';
 
 export default function ForgotPasswordScreen() {
@@ -27,18 +26,20 @@ export default function ForgotPasswordScreen() {
     }
     setLoading(true);
     setError(null);
-    try {
-      await sendPasswordResetEmail(auth, email.trim());
-      setSent(true);
-    } catch (err: unknown) {
-      const code = err instanceof Error && 'code' in err ? (err as { code: string }).code : '';
-      if (code === 'auth/user-not-found') {
-        setError('No account found with this email');
-      } else if (code === 'auth/invalid-email') {
+    // The D-K1 decline expires HERE by design (05 §6.2(iii)): the swap is the
+    // moment this stops being a mixed-auth surface. Supabase never reveals
+    // whether the email has an account (anti-enumeration), so an unknown
+    // address reads as sent — the old user-not-found branch has no successor.
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(email.trim());
+    if (resetError) {
+      const code = 'code' in resetError ? ((resetError as { code?: string }).code ?? '') : '';
+      if (code === 'validation_failed' || code === 'invalid_email') {
         setError('Invalid email address');
       } else {
         setError('Failed to send reset email. Try again.');
       }
+    } else {
+      setSent(true);
     }
     setLoading(false);
   };
