@@ -87,7 +87,9 @@ export interface ExistingPairs {
   guardianshipPairs: { guardian_profile_id: string; swimmer_id: string }[];
 }
 
-// The 00002 coach_groups CHECK domain, re-stated (the DDL is the contract).
+// The coach_groups CHECK domain END-STATE, re-stated (the DDL chain's
+// end-state is the contract — RD-D5 meta-lesson): 00002 created the CHECK,
+// 00003:50-52 widened it to the ratified 8, adding 'Masters'.
 export const PRACTICE_GROUP_DOMAIN = [
   'Diamond',
   'Platinum',
@@ -95,6 +97,7 @@ export const PRACTICE_GROUP_DOMAIN = [
   'Gold',
   'Silver',
   'Bronze',
+  'Masters',
   'Swim Lessons',
 ] as const;
 
@@ -123,7 +126,7 @@ export interface CoachGroupPlan {
   profileId: string | null; // null until step 4 creates the profile
   groupsToCreate: string[];
   skippedExisting: string[];
-  outOfDomain: string[]; // outside the 00002 CHECK domain — reported, never planned
+  outOfDomain: string[]; // outside the 00003 CHECK domain — reported, never planned
 }
 
 export interface ParentLinkPlan {
@@ -500,7 +503,7 @@ export function renderGraphPlan(
   if (outOfDomain.length > 0) {
     lines.push(
       '',
-      `WARNING — practice group(s) outside the 00002 CHECK domain (REPORT to Kevin; never planned): ${outOfDomain.join(', ')}`,
+      `WARNING — practice group(s) outside the 00003 CHECK domain (REPORT to Kevin; never planned): ${outOfDomain.join(', ')}`,
     );
   }
   if (plan.counts.danglingReported > 0) {

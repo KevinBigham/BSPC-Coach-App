@@ -17,7 +17,7 @@
  *           roles follow the 05 §6.1 SETTLED NM-1 rule — see below);
  *           each CREATE records profile_id back into
  *           migration_identity_map.
- *   step 5: coach_groups rows from coaches.groups[] (00002 CHECK domain;
+ *   step 5: coach_groups rows from coaches.groups[] (00003 CHECK domain;
  *           out-of-domain groups are reported, never written).
  *   step 6: guardianships — 6a Coach parents.linkedSwimmerIds[] resolved
  *           via migration_swimmer_map (COPPA NM-6: dangling ids are

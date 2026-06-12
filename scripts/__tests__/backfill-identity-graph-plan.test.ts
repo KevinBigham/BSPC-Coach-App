@@ -133,6 +133,9 @@ describe('deriveGraphPlan', () => {
     const inputs = baseInputs();
     inputs.mapRows![0] = { ...inputs.mapRows![0], profile_id: 'prof-kevin' };
     inputs.existing.coachGroupPairs = [{ profile_id: 'prof-kevin', practice_group: 'Gold' }];
+    // RD-D5: 'Masters' is IN the committed 00003 end-state domain; 'Sharks'
+    // is the genuinely-out-of-domain probe.
+    inputs.coaches[1].groups.push('Sharks');
     const plan = deriveGraphPlan(inputs);
     const kevin = plan.coachGroups.find((groupPlan) => groupPlan.uid === 'coach-kevin');
     expect(kevin).toMatchObject({
@@ -141,8 +144,8 @@ describe('deriveGraphPlan', () => {
       outOfDomain: [],
     });
     const amy = plan.coachGroups.find((groupPlan) => groupPlan.uid === 'coach-amy');
-    expect(amy).toMatchObject({ groupsToCreate: ['Bronze'], outOfDomain: ['Masters'] });
-    expect(plan.counts.groupRowsToCreate).toBe(2);
+    expect(amy).toMatchObject({ groupsToCreate: ['Bronze', 'Masters'], outOfDomain: ['Sharks'] });
+    expect(plan.counts.groupRowsToCreate).toBe(3);
   });
 
   it('step 6a: resolves linkedSwimmerIds via the swimmer map, drops + reports dangling ids (COPPA NM-6), dedupes, and skips existing pairs', () => {
@@ -246,7 +249,7 @@ describe('renderGraphPlan', () => {
     expect(output).toContain('== §6.1 STEPS 4-6 IDENTITY-GRAPH BACKFILL PLAN');
     expect(output).toContain('HARD STOP: executing this plan is a Kevin-live OPERATION');
     expect(output).toContain('STEP 4 — profiles: 5 CREATE, 0 already-built');
-    expect(output).toContain('STEP 5 — coach_groups: 3 row(s) to create.');
+    expect(output).toContain('STEP 5 — coach_groups: 4 row(s) to create.');
     expect(output).toContain(
       'STEP 6a — guardianships (Coach parents via migration_swimmer_map): 2 row(s) to create.',
     );
@@ -281,12 +284,15 @@ describe('renderGraphPlan', () => {
       displayName: 'Dup',
       linkedSwimmerIds: [],
     });
+    // RD-D5: 'Masters' is in-domain under the 00003 end-state; 'Sharks' probes
+    // the warning path.
+    inputs.coaches[1].groups.push('Sharks');
     const output = renderGraphPlan(deriveGraphPlan(inputs), okGate, { planOnly: true });
     expect(output).toContain('WARNING — 1 identit(ies) NOT provisioned by step 3');
     expect(output).toContain('parent-3');
     expect(output).toContain('WARNING — duplicate uid(s) appearing in BOTH coaches and parents');
-    expect(output).toContain('WARNING — practice group(s) outside the 00002 CHECK domain');
-    expect(output).toContain('coach-amy:Masters');
+    expect(output).toContain('WARNING — practice group(s) outside the 00003 CHECK domain');
+    expect(output).toContain('coach-amy:Sharks');
   });
 
   it('renders the COPPA dangling report and the step-6a deferral line quoting roster README step 7', () => {
