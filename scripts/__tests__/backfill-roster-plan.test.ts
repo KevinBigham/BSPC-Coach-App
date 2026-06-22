@@ -5,6 +5,11 @@
  * toRows ×2 / goals ×2 / audit ×4) + gate ×6 + derive ×8 + render-plan ×6
  * + refusal renders ×2 + summary ×2. SYNTHETIC fixtures only — never real
  * swimmer/family data.
+ *
+ * + SITTING-1 dry-run regression (2026-06-22): isoStringOrNull ×3 +
+ * normalizeExportedConsent ×5 — a live Coach mediaConsent stores date/expiresAt
+ * as Firestore Timestamps; coercing them to the bound STRING contract is what
+ * the original 43 pins missed (28/30 demo swimmers failed the swimmer INSERT).
  */
 
 import {
@@ -13,7 +18,9 @@ import {
   coachSwimmerToRows,
   collisionDigest,
   deriveRosterPlan,
+  isoStringOrNull,
   legacyGoalsToGoalRows,
+  normalizeExportedConsent,
   reconcileRoster,
   renderAmbiguousRefusal,
   renderCollisionRefusal,
@@ -675,5 +682,79 @@ describe('renderRosterSummary', () => {
       'fs-1: doc "Jane Doe" (dob none, group Gold) vs 1 candidate(s) [uuid-1]',
     );
     expect(output).toContain('confirmed DIFFERENT kids; created as new');
+  });
+});
+
+// SITTING-1 dry-run finding (2026-06-22): a live Coach mediaConsent stores
+// date/expiresAt as Firestore Timestamps; without coercion they reach the
+// timestamptz columns RAW and abort the swimmer INSERT (28/30 demo swimmers
+// failed). isoStringOrNull + normalizeExportedConsent bridge them to the bound
+// STRING contract — the gap the original 43 pins missed.
+const fakeTimestamp = (iso: string) => ({ toDate: () => new Date(iso) });
+
+describe('isoStringOrNull (export date coercion)', () => {
+  it('passes a string through unchanged', () => {
+    expect(isoStringOrNull('2014-02-02')).toBe('2014-02-02');
+  });
+
+  it('coerces a Firestore Timestamp to an ISO string', () => {
+    expect(isoStringOrNull(fakeTimestamp('2026-04-01T00:00:00.000Z'))).toBe(
+      '2026-04-01T00:00:00.000Z',
+    );
+  });
+
+  it('returns null for null, undefined, and non-date values', () => {
+    expect(isoStringOrNull(null)).toBeNull();
+    expect(isoStringOrNull(undefined)).toBeNull();
+    expect(isoStringOrNull(1775001600)).toBeNull();
+    expect(isoStringOrNull({})).toBeNull();
+  });
+});
+
+describe('normalizeExportedConsent (the cutover-blocker regression)', () => {
+  it('coerces a Timestamp consent date to an ISO string (the failing case)', () => {
+    const out = normalizeExportedConsent({
+      granted: true,
+      date: fakeTimestamp('2026-04-01T00:00:00.000Z'),
+      grantedBy: 'Demo Parent',
+    });
+    expect(out).toEqual({
+      granted: true,
+      date: '2026-04-01T00:00:00.000Z',
+      expiresAt: null,
+      grantedBy: 'Demo Parent',
+      notes: null,
+    });
+  });
+
+  it('coerces a Timestamp expiresAt too', () => {
+    const out = normalizeExportedConsent({
+      granted: true,
+      date: fakeTimestamp('2026-04-01T00:00:00.000Z'),
+      expiresAt: fakeTimestamp('2027-04-01T00:00:00.000Z'),
+    });
+    expect(out?.expiresAt).toBe('2027-04-01T00:00:00.000Z');
+  });
+
+  it('passes a string consent date through (the bound contract shape)', () => {
+    expect(normalizeExportedConsent({ granted: true, date: '2026-04-01' })?.date).toBe(
+      '2026-04-01',
+    );
+  });
+
+  it('returns null when there is no consent map', () => {
+    expect(normalizeExportedConsent(null)).toBeNull();
+    expect(normalizeExportedConsent(undefined)).toBeNull();
+  });
+
+  it('coerces granted to a strict boolean and preserves grantedBy/notes', () => {
+    expect(normalizeExportedConsent({ granted: false })?.granted).toBe(false);
+    expect(normalizeExportedConsent({})?.granted).toBe(false);
+    expect(normalizeExportedConsent({ granted: true, notes: 'ok', grantedBy: 'P' })).toMatchObject({
+      granted: true,
+      notes: 'ok',
+      grantedBy: 'P',
+      date: null,
+    });
   });
 });

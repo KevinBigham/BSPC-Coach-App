@@ -105,7 +105,9 @@ import {
   auditSwimmerMap,
   collisionDigest,
   deriveRosterPlan,
+  isoStringOrNull,
   legacyGoalsToGoalRows,
+  normalizeExportedConsent,
   renderAmbiguousRefusal,
   renderCollisionRefusal,
   renderRosterPlan,
@@ -151,20 +153,6 @@ function parseReviewedCollisions(): string[] {
     .filter((value) => value.length > 0);
 }
 
-// The bound export shape is a STRING dateOfBirth; a legacy Timestamp field
-// coerces to its ISO string rather than silently dropping the DOB.
-function isoStringOrNull(value: unknown): string | null {
-  if (typeof value === 'string') return value;
-  if (
-    value &&
-    typeof value === 'object' &&
-    typeof (value as { toDate?: () => Date }).toDate === 'function'
-  ) {
-    return (value as { toDate: () => Date }).toDate().toISOString();
-  }
-  return null;
-}
-
 // Read-only. An unreadable export returns null so the GATE aborts as
 // MISSING — roster README step 2 has no input without it.
 async function readSwimmerExport(): Promise<ExportedSwimmerDoc[] | null> {
@@ -185,7 +173,7 @@ async function readSwimmerExport(): Promise<ExportedSwimmerDoc[] | null> {
         profilePhotoUrl: (data.profilePhotoUrl as string | undefined) ?? null,
         active: (data.active ?? true) === true,
         doNotPhotograph: data.doNotPhotograph === true,
-        mediaConsent: (data.mediaConsent as ExportedSwimmerDoc['mediaConsent'] | undefined) ?? null,
+        mediaConsent: normalizeExportedConsent(data.mediaConsent),
         strengths: Array.isArray(data.strengths) ? data.strengths.map(String) : [],
         weaknesses: Array.isArray(data.weaknesses) ? data.weaknesses.map(String) : [],
         techniqueFocusAreas: Array.isArray(data.techniqueFocusAreas)

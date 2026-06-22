@@ -67,6 +67,41 @@ export interface ExportedSwimmerDoc extends CoachSwimmerDoc {
   createdBy: string | null;
 }
 
+/**
+ * Coerce a bound STRING date — or a live Firestore Timestamp (carries
+ * .toDate()) — to an ISO string; anything else -> null. The export contract is
+ * a string, but a live Coach doc stores dates as Firestore Timestamps.
+ */
+export function isoStringOrNull(value: unknown): string | null {
+  if (typeof value === 'string') return value;
+  if (
+    value &&
+    typeof value === 'object' &&
+    typeof (value as { toDate?: () => Date }).toDate === 'function'
+  ) {
+    return (value as { toDate: () => Date }).toDate().toISOString();
+  }
+  return null;
+}
+
+/**
+ * Normalize a live Coach `mediaConsent` map to the bound CoachMediaConsent
+ * shape: `date`/`expiresAt` are coerced to ISO strings (the same rule as
+ * dateOfBirth) so a raw Firestore Timestamp never reaches the timestamptz
+ * columns and aborts the swimmer INSERT. Missing consent -> null.
+ */
+export function normalizeExportedConsent(value: unknown): CoachMediaConsent | null {
+  if (!value || typeof value !== 'object') return null;
+  const consent = value as Record<string, unknown>;
+  return {
+    granted: consent.granted === true,
+    date: isoStringOrNull(consent.date),
+    expiresAt: isoStringOrNull(consent.expiresAt),
+    grantedBy: (consent.grantedBy as string | undefined) ?? null,
+    notes: (consent.notes as string | undefined) ?? null,
+  };
+}
+
 /** The frozen reconcile contract columns, re-stated. */
 export interface BspcSwimmerRow {
   id: string;
