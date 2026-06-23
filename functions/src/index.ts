@@ -12,11 +12,14 @@
 // C/D/E/F), the shared dashboardAggregations recompute module, and the
 // 4 AM scheduled rebuildAggregations. The Phase J views (00011) compute
 // the same aggregates at read time; nothing is scheduled or dispatched.
-export { processAudioSession, processVideoSession } from './https/processSession';
-export { sweepStuckSessions } from './scheduled/sweepStuckSessions';
-export { evaluateAttendanceRules } from './https/evaluateAttendance';
+//
+// Launch export surface (Proposal A — Director Ruling 09): the initial v1
+// deploy exports EXACTLY the two scheduled functions below. The eight other
+// functions — processAudioSession, processVideoSession, sweepStuckSessions,
+// evaluateAttendanceRules, redeemInvite, getParentPortalDashboard,
+// getParentSwimmerPortalData, and syncCalendar — remain in the source tree,
+// fully built and tested, but are intentionally NOT exported here, so they
+// are not provisioned at launch. They return only by an explicit later
+// ruling. This export set is pinned by __tests__/launchExportSurface.test.ts.
 export { sweepAttendanceEvaluations } from './scheduled/sweepAttendanceEvaluations';
 export { dailyDigest } from './scheduled/dailyDigest';
-export { redeemInvite } from './callable/redeemInvite';
-export { getParentPortalDashboard, getParentSwimmerPortalData } from './callable/parentPortal';
-export { syncCalendar } from './scheduled/syncCalendar';
