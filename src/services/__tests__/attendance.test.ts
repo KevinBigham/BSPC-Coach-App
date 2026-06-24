@@ -54,13 +54,6 @@ jest.mock('../../config/supabase', () => {
   };
 });
 
-// Phase G (D-G1): the data layer kicks rule evaluation after a write commits.
-// Fire-and-forget — the real function never rejects (pinned in its own suite).
-const mockRequestAttendanceEvaluation = jest.fn().mockResolvedValue(undefined);
-jest.mock('../attendancePipeline', () => ({
-  requestAttendanceEvaluation: (ids: string[]) => mockRequestAttendanceEvaluation(ids),
-}));
-
 import {
   subscribeTodayAttendance,
   subscribeSwimmerAttendance,
@@ -218,23 +211,27 @@ describe('checkIn', () => {
     expect(id).toBe('new-att-id');
   });
 
-  it('fires exactly one evaluation kick with the committed row id (D-G1)', async () => {
+  it('issues exactly one check-in RPC and returns the committed row id', async () => {
     const swimmer = { id: 'sw-1', firstName: 'Jane', lastName: 'Doe', group: 'varsity' } as any;
 
-    await checkIn(swimmer, { uid: 'coach-1', displayName: 'Coach K' }, '2026-04-04');
+    const id = await checkIn(swimmer, { uid: 'coach-1', displayName: 'Coach K' }, '2026-04-04');
 
-    expect(mockRequestAttendanceEvaluation).toHaveBeenCalledTimes(1);
-    expect(mockRequestAttendanceEvaluation).toHaveBeenCalledWith(['new-att-id']);
+    expect(supabase.rpc).toHaveBeenCalledTimes(1);
+    expect(supabase.rpc).toHaveBeenCalledWith(
+      'attendance_check_in',
+      expect.objectContaining({ p_swimmer_ids: ['sw-1'] }),
+    );
+    expect(id).toBe('new-att-id');
   });
 
-  it('fires no kick when the check-in itself fails', async () => {
+  it('attempts the check-in RPC then rejects when it fails', async () => {
     __state.rpcResult = { data: null, error: { message: 'staff only' } };
     const swimmer = { id: 'sw-1', firstName: 'A', lastName: 'B', group: 'jv' } as any;
 
     await expect(
       checkIn(swimmer, { uid: 'c', displayName: '' }, '2026-04-04'),
     ).rejects.toBeTruthy();
-    expect(mockRequestAttendanceEvaluation).not.toHaveBeenCalled();
+    expect(supabase.rpc).toHaveBeenCalledTimes(1);
   });
 
   it('persists no denormalized names — identity is server-side, names derive on read', async () => {
@@ -301,11 +298,14 @@ describe('checkOut', () => {
     expect(payload).not.toHaveProperty('note');
   });
 
-  it('fires exactly one evaluation kick (the Firestore trigger fired on every write)', async () => {
+  it('issues exactly one departed_at update for the record', async () => {
     await checkOut('att-1');
 
-    expect(mockRequestAttendanceEvaluation).toHaveBeenCalledTimes(1);
-    expect(mockRequestAttendanceEvaluation).toHaveBeenCalledWith(['att-1']);
+    expect(__attendanceQuery.update).toHaveBeenCalledTimes(1);
+    expect(__attendanceQuery.update).toHaveBeenCalledWith(
+      expect.objectContaining({ departed_at: expect.any(String) }),
+    );
+    expect(__attendanceQuery.eq).toHaveBeenCalledWith('id', 'att-1');
   });
 });
 
@@ -348,7 +348,7 @@ describe('batchCheckIn', () => {
     expect((supabase.rpc as jest.Mock).mock.calls[1][1].p_swimmer_ids).toHaveLength(1);
   });
 
-  it('fires one batched kick per committed chunk with the returned row ids (D-G1)', async () => {
+  it('issues exactly one check-in RPC for a committed chunk with the chunk swimmer ids', async () => {
     const swimmers = [
       { id: 'sw-1', firstName: 'Jane', lastName: 'Doe', group: 'varsity' },
       { id: 'sw-2', firstName: 'John', lastName: 'Smith', group: 'varsity' },
@@ -363,11 +363,14 @@ describe('batchCheckIn', () => {
 
     await batchCheckIn(swimmers, { uid: 'coach-1', displayName: 'Coach K' }, '2026-04-04');
 
-    expect(mockRequestAttendanceEvaluation).toHaveBeenCalledTimes(1);
-    expect(mockRequestAttendanceEvaluation).toHaveBeenCalledWith(['att-a', 'att-b']);
+    expect(supabase.rpc).toHaveBeenCalledTimes(1);
+    expect(supabase.rpc).toHaveBeenCalledWith(
+      'attendance_check_in',
+      expect.objectContaining({ p_swimmer_ids: ['sw-1', 'sw-2'] }),
+    );
   });
 
-  it('kicks for committed chunks survive a later chunk failure (the sweeper covers the rest)', async () => {
+  it('commits the first chunk then throws BatchPartialFailureError when a later chunk fails', async () => {
     (supabase.rpc as jest.Mock)
       .mockResolvedValueOnce({
         data: [{ swimmer_id: 'sw-0', attendance_id: 'att-0', created: true }],
@@ -386,8 +389,7 @@ describe('batchCheckIn', () => {
       batchCheckIn(swimmers, { uid: 'coach-1', displayName: 'Coach K' }, '2026-04-04'),
     ).rejects.toBeInstanceOf(BatchPartialFailureError);
 
-    expect(mockRequestAttendanceEvaluation).toHaveBeenCalledTimes(1);
-    expect(mockRequestAttendanceEvaluation).toHaveBeenCalledWith(['att-0']);
+    expect(supabase.rpc).toHaveBeenCalledTimes(2);
   });
 
   it('mid-batch failure throws BatchPartialFailureError with the committed count', async () => {

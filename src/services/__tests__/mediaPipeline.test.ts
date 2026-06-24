@@ -1,11 +1,7 @@
 // Proposal C (Director Ruling 28/29): media AI processing is disabled in v1.
 // requestSessionProcessing is retained as an unconditional no-op — for either
-// kind it must perform no network fetch and emit no processing-error log. The
-// functions config is mocked only so this suite never imports real config.
-jest.mock('../../config/functions', () => ({
-  PROCESS_FUNCTIONS_BASE_URL: 'https://functions.test',
-  PROCESS_SHARED_SECRET: 'test-secret',
-}));
+// kind it must perform no network fetch, read no Functions config, and emit no
+// processing-error log.
 
 import { requestSessionProcessing } from '../mediaPipeline';
 import { logger } from '../../utils/logger';
