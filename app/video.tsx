@@ -97,7 +97,7 @@ function VideoScreen() {
     tapMedium();
 
     if (selectedSwimmerIds.length === 0) {
-      Alert.alert('Tag Swimmers', 'Select at least one swimmer to analyze');
+      Alert.alert('Tag Swimmers', 'Select at least one swimmer before uploading.');
       return;
     }
 
@@ -168,7 +168,7 @@ function VideoScreen() {
 
       setUploadProgress(1);
       notifySuccess();
-      showToast('Video uploaded — AI analysis starting', 'success');
+      Alert.alert('Video uploaded', 'Your video is saved and available for playback.');
       setVideoUri(null);
       setSelectedSwimmerIds([]);
       setSelectedGroup('');
@@ -183,7 +183,7 @@ function VideoScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: 'VIDEO ANALYSIS' }} />
+      <Stack.Screen options={{ title: 'VIDEO' }} />
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
         {/* Pre-flight swimmer selection */}
         {selectedSwimmerIds.length === 0 && uploadState === 'idle' && (
@@ -238,14 +238,13 @@ function VideoScreen() {
 
             <View style={styles.selectionSummary}>
               <Text style={styles.selectionText}>
-                Analyzing {selectedSwimmerIds.length} selected swimmer
-                {selectedSwimmerIds.length !== 1 ? 's' : ''}
+                Selected swimmers: {selectedSwimmerIds.length}
               </Text>
             </View>
 
             {/* Upload Button */}
             <TouchableOpacity style={styles.uploadBtn} onPress={handleUpload}>
-              <Text style={styles.uploadBtnText}>UPLOAD & ANALYZE</Text>
+              <Text style={styles.uploadBtnText}>UPLOAD VIDEO</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.cancelBtn}

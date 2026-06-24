@@ -209,9 +209,9 @@ describe('updateAudioSession', () => {
     expect(__query.eq).toHaveBeenCalledWith('id', 'a-1');
   });
 
-  it("kicks the pipeline when the patch flips status to 'uploaded' (D-F2)", async () => {
+  it("does not call requestSessionProcessing when the patch flips status to 'uploaded' (v1 AI-disabled)", async () => {
     await updateAudioSession('a-1', { status: 'uploaded' });
-    expect(requestSessionProcessing).toHaveBeenCalledWith('audio', 'a-1');
+    expect(requestSessionProcessing).not.toHaveBeenCalled();
   });
 
   it('does NOT kick the pipeline on other status writes', async () => {

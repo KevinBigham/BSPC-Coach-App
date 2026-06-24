@@ -38,7 +38,6 @@ function DashboardScreen() {
     todayAttendance,
     recentActivity,
     weekAttendance,
-    pendingDrafts,
     unreadCount,
     nextMeet,
     sparkData,
@@ -85,16 +84,6 @@ function DashboardScreen() {
           </Text>
           <Text style={styles.uploadProgressValue}>QUEUED / ACTIVE</Text>
         </View>
-      )}
-
-      {/* Pending AI Drafts Banner */}
-      {pendingDrafts > 0 && (
-        <TouchableOpacity style={styles.draftsBanner} onPress={() => router.push('/ai-review')}>
-          <Text style={styles.draftsBannerText}>
-            {pendingDrafts} AI DRAFT{pendingDrafts > 1 ? 'S' : ''} READY FOR REVIEW
-          </Text>
-          <Text style={styles.draftsBannerArrow}>›</Text>
-        </TouchableOpacity>
       )}
 
       {/* Meet Countdown */}
