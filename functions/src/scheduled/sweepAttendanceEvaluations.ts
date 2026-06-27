@@ -6,7 +6,7 @@
 // so a checkout AFTER the window whose kick was lost is not re-swept — the
 // rule inputs a checkout can change are nil; see UNIFY/11).
 import { onSchedule } from 'firebase-functions/v2/scheduler';
-import { supabase } from '../config/supabase';
+import { supabase, SUPABASE_SERVICE_ROLE_KEY } from '../config/supabase';
 import { evaluateAttendanceRowIds } from '../notifications/evaluator';
 
 const SWEEP_WINDOW_MS = 10 * 60 * 1000;
@@ -23,6 +23,9 @@ export async function sweepAttendanceEvaluationsOnce(): Promise<number> {
   return ids.length;
 }
 
-export const sweepAttendanceEvaluations = onSchedule('every 5 minutes', async () => {
-  await sweepAttendanceEvaluationsOnce();
-});
+export const sweepAttendanceEvaluations = onSchedule(
+  { schedule: 'every 5 minutes', secrets: [SUPABASE_SERVICE_ROLE_KEY] },
+  async () => {
+    await sweepAttendanceEvaluationsOnce();
+  },
+);
