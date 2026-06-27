@@ -12,11 +12,9 @@
 // C/D/E/F), the shared dashboardAggregations recompute module, and the
 // 4 AM scheduled rebuildAggregations. The Phase J views (00011) compute
 // the same aggregates at read time; nothing is scheduled or dispatched.
-export { processAudioSession, processVideoSession } from './https/processSession';
-export { sweepStuckSessions } from './scheduled/sweepStuckSessions';
-export { evaluateAttendanceRules } from './https/evaluateAttendance';
+//
+// Initial v1 launch surface: exactly the two ratified schedulers below.
+// Deferred Functions remain in source and tests, but are not exported for
+// deployment until a later explicit launch decision.
 export { sweepAttendanceEvaluations } from './scheduled/sweepAttendanceEvaluations';
 export { dailyDigest } from './scheduled/dailyDigest';
-export { redeemInvite } from './callable/redeemInvite';
-export { getParentPortalDashboard, getParentSwimmerPortalData } from './callable/parentPortal';
-export { syncCalendar } from './scheduled/syncCalendar';
