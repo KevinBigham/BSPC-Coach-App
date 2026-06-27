@@ -1,3 +1,57 @@
+// Jest runs in Node, not React Native. Supabase Realtime needs a WebSocket
+// constructor at import time, so provide a no-op test transport before app
+// modules import src/config/supabase.
+class JestWebSocket {
+  static readonly CONNECTING = 0;
+  static readonly OPEN = 1;
+  static readonly CLOSING = 2;
+  static readonly CLOSED = 3;
+
+  readonly CONNECTING = JestWebSocket.CONNECTING;
+  readonly OPEN = JestWebSocket.OPEN;
+  readonly CLOSING = JestWebSocket.CLOSING;
+  readonly CLOSED = JestWebSocket.CLOSED;
+  readonly url: string;
+  readonly protocol: string;
+  readyState = JestWebSocket.OPEN;
+  binaryType = 'blob';
+  bufferedAmount = 0;
+  extensions = '';
+  onopen: ((event: Event) => void) | null = null;
+  onmessage: ((event: MessageEvent) => void) | null = null;
+  onclose: ((event: CloseEvent) => void) | null = null;
+  onerror: ((event: Event) => void) | null = null;
+  private readonly listeners: Record<string, Set<EventListener>> = {};
+
+  constructor(url: string, protocols?: string | string[]) {
+    this.url = url;
+    this.protocol = Array.isArray(protocols) ? (protocols[0] ?? '') : (protocols ?? '');
+  }
+
+  send(): void {}
+
+  close(): void {
+    this.readyState = JestWebSocket.CLOSED;
+  }
+
+  addEventListener(type: string, listener: EventListener): void {
+    this.listeners[type] ??= new Set<EventListener>();
+    this.listeners[type].add(listener);
+  }
+
+  removeEventListener(type: string, listener: EventListener): void {
+    this.listeners[type]?.delete(listener);
+  }
+
+  dispatchEvent(event: Event): boolean {
+    this.listeners[event.type]?.forEach((listener) => listener(event));
+    return true;
+  }
+}
+
+(globalThis as typeof globalThis & { WebSocket: typeof WebSocket }).WebSocket =
+  JestWebSocket as unknown as typeof WebSocket;
+
 // Mock expo-router
 jest.mock('expo-router', () => ({
   router: {
