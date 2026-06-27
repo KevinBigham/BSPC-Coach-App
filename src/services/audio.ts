@@ -2,15 +2,13 @@
 // Same behavioral contract. selectedSwimmerIds UUID[] becomes the
 // audio_session_swimmers junction (P1-4, derived back into the array on
 // read); coachName is derived through the profiles embed. Recording FILES
-// live in the 'media-audio' bucket (D-F1). The Firestore status-flip trigger
-// is gone: updateAudioSession kicks the HTTPS pipeline itself when it flips a
-// session to 'uploaded' (D-F2 client-invoke; the scheduled sweeper catches
-// drops, so a failed kick never fails the update).
+// live in the 'media-audio' bucket (D-F1). Proposal C (v1): media AI
+// processing is disabled, so updateAudioSession no longer kicks any processing
+// pipeline on the flip to 'uploaded' — it only persists the status change.
 import { supabase } from '../config/supabase';
 import type { AudioSession } from '../types/firestore.types';
 import type { Group } from '../config/constants';
 import { uploadFileToBucket, getSignedFileUrl } from './mediaUpload';
-import { requestSessionProcessing } from './mediaPipeline';
 
 type AudioSessionWithId = AudioSession & { id: string };
 
@@ -201,13 +199,6 @@ export async function updateAudioSession(
 
   const { error } = await supabase.from('audio_sessions').update(patch).eq('id', sessionId);
   if (error) throw error;
-
-  // D-F2: flipping to 'uploaded' is the pipeline's start signal — the data
-  // layer kicks it so screens stay untouched. Fire-and-forget: the sweeper
-  // owns retries, and a kick failure must never fail the upload flow.
-  if (data.status === 'uploaded') {
-    void requestSessionProcessing('audio', sessionId);
-  }
 }
 
 export async function uploadAudio(

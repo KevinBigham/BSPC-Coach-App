@@ -228,14 +228,13 @@ describe('video.validateMediaConsent (critical op)', () => {
 });
 
 describe('video.updateVideoSession (lifecycle)', () => {
-  it('happy path: status transitions write through; timestamps are DB-owned; uploaded kicks the pipeline once', async () => {
+  it('happy path: status transitions write through; timestamps are DB-owned; uploaded does not call requestSessionProcessing (v1)', async () => {
     await updateVideoSession('sess-VID-001', { status: 'posted' });
     expect(__query.update).toHaveBeenCalledWith({ status: 'posted' });
     expect(__query.eq).toHaveBeenCalledWith('id', 'sess-VID-001');
     expect(requestSessionProcessing).not.toHaveBeenCalled();
 
     await updateVideoSession('sess-VID-001', { status: 'uploaded' });
-    expect(requestSessionProcessing).toHaveBeenCalledTimes(1);
-    expect(requestSessionProcessing).toHaveBeenCalledWith('video', 'sess-VID-001');
+    expect(requestSessionProcessing).not.toHaveBeenCalled();
   });
 });

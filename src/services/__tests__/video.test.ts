@@ -419,9 +419,9 @@ describe('updateVideoSession', () => {
     expect(__query.eq).toHaveBeenCalledWith('id', 's1');
   });
 
-  it("kicks the pipeline when the patch flips status to 'uploaded' (D-F2)", async () => {
+  it("does not call requestSessionProcessing when the patch flips status to 'uploaded' (v1 AI-disabled)", async () => {
     await updateVideoSession('s1', { storagePath: 'video/x.mp4', status: 'uploaded' });
-    expect(requestSessionProcessing).toHaveBeenCalledWith('video', 's1');
+    expect(requestSessionProcessing).not.toHaveBeenCalled();
   });
 
   it('does NOT kick the pipeline on other status writes', async () => {
@@ -449,11 +449,23 @@ describe('getVideoStatusLabel', () => {
   it('returns correct labels for each status', () => {
     expect(getVideoStatusLabel('uploading')).toBe('UPLOADING');
     expect(getVideoStatusLabel('uploaded')).toBe('UPLOADED');
-    expect(getVideoStatusLabel('extracting_frames')).toBe('PROCESSING');
-    expect(getVideoStatusLabel('analyzing')).toBe('ANALYZING');
-    expect(getVideoStatusLabel('review')).toBe('READY FOR REVIEW');
+    expect(getVideoStatusLabel('extracting_frames')).toBe('UPLOADED');
+    expect(getVideoStatusLabel('analyzing')).toBe('UPLOADED');
+    expect(getVideoStatusLabel('review')).toBe('UPLOADED');
     expect(getVideoStatusLabel('posted')).toBe('POSTED');
     expect(getVideoStatusLabel('failed')).toBe('FAILED');
+  });
+
+  it('presents legacy AI-only video statuses as uploaded in v1', () => {
+    expect(getVideoStatusLabel('extracting_frames')).toBe(getVideoStatusLabel('uploaded'));
+    expect(getVideoStatusLabel('analyzing')).toBe(getVideoStatusLabel('uploaded'));
+    expect(getVideoStatusLabel('review')).toBe(getVideoStatusLabel('uploaded'));
+    expect(getVideoStatusColor('extracting_frames')).toBe(getVideoStatusColor('uploaded'));
+    expect(getVideoStatusColor('analyzing')).toBe(getVideoStatusColor('uploaded'));
+    expect(getVideoStatusColor('review')).toBe(getVideoStatusColor('uploaded'));
+    expect(getVideoStatusLabel('extracting_frames')).toBe('UPLOADED');
+    expect(getVideoStatusLabel('analyzing')).toBe('UPLOADED');
+    expect(getVideoStatusLabel('review')).toBe('UPLOADED');
   });
 });
 

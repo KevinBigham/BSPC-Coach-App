@@ -79,7 +79,7 @@ describe('audio.createAudioSession (critical op)', () => {
 });
 
 describe('audio session lifecycle', () => {
-  it('walks the documented status sequence and kicks the pipeline exactly once — on uploaded (D-F2)', async () => {
+  it('walks the documented status sequence and reaches uploaded without calling requestSessionProcessing (v1 AI-disabled)', async () => {
     const session = buildAudioSession({ index: 1, status: 'uploading' });
     const sequence: Array<typeof session.status> = [
       'uploaded',
@@ -97,7 +97,6 @@ describe('audio session lifecycle', () => {
     sequence.forEach((status, i) => {
       expect(__query.update.mock.calls[i][0]).toEqual({ status });
     });
-    expect(requestSessionProcessing).toHaveBeenCalledTimes(1);
-    expect(requestSessionProcessing).toHaveBeenCalledWith('audio', session.id);
+    expect(requestSessionProcessing).not.toHaveBeenCalled();
   });
 });

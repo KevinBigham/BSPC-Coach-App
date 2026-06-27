@@ -1,11 +1,14 @@
-// Phase F (D-F2): client-invoke + sweeper. The kick is fire-and-forget by
-// design — a failure is the sweeper's job, never the caller's.
+// Proposal C (Director Ruling 28/29): media AI processing is disabled in v1.
+// requestSessionProcessing is retained as an unconditional no-op — for either
+// kind it must perform no network fetch and emit no processing-error log. The
+// functions config is mocked only so this suite never imports real config.
 jest.mock('../../config/functions', () => ({
   PROCESS_FUNCTIONS_BASE_URL: 'https://functions.test',
   PROCESS_SHARED_SECRET: 'test-secret',
 }));
 
 import { requestSessionProcessing } from '../mediaPipeline';
+import { logger } from '../../utils/logger';
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -13,28 +16,27 @@ beforeEach(() => {
 });
 
 describe('requestSessionProcessing', () => {
-  it('POSTs the audio session id to processAudioSession with the shared secret', async () => {
-    await requestSessionProcessing('audio', 'a-1');
-    expect(global.fetch).toHaveBeenCalledWith('https://functions.test/processAudioSession', {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'x-process-secret': 'test-secret',
-      },
-      body: JSON.stringify({ sessionId: 'a-1' }),
-    });
-  });
-
-  it('routes video sessions to processVideoSession', async () => {
-    await requestSessionProcessing('video', 'v-1');
-    expect(global.fetch).toHaveBeenCalledWith(
-      'https://functions.test/processVideoSession',
-      expect.anything(),
-    );
-  });
-
-  it('swallows endpoint failures — the sweeper owns retries', async () => {
-    (global.fetch as jest.Mock).mockRejectedValueOnce(new Error('down'));
+  it('performs no fetch and resolves for an audio request', async () => {
     await expect(requestSessionProcessing('audio', 'a-1')).resolves.toBeUndefined();
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it('performs no fetch and resolves for a video request', async () => {
+    await expect(requestSessionProcessing('video', 'v-1')).resolves.toBeUndefined();
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it('performs no fetch and emits no processing-error log across repeated audio/video calls', async () => {
+    const warnSpy = jest.spyOn(logger, 'warn').mockImplementation(() => {});
+    const errorSpy = jest.spyOn(logger, 'error').mockImplementation(() => {});
+    (global.fetch as jest.Mock).mockRejectedValue(new Error('endpoint should never be contacted'));
+
+    await expect(requestSessionProcessing('audio', 'a-1')).resolves.toBeUndefined();
+    await expect(requestSessionProcessing('video', 'v-1')).resolves.toBeUndefined();
+    await expect(requestSessionProcessing('audio', 'a-2')).resolves.toBeUndefined();
+
+    expect(global.fetch).not.toHaveBeenCalled();
+    expect(warnSpy).not.toHaveBeenCalled();
+    expect(errorSpy).not.toHaveBeenCalled();
   });
 });

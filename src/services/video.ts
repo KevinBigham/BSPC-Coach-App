@@ -4,9 +4,10 @@
 // is the consent-gated set, derived back into the arrays on read). Drafts
 // live in video_session_drafts (the Firestore subcollection is gone);
 // swimmerName/coachName are derived on read. Video FILES live in the
-// 'media-video' bucket (D-F1); updateVideoSession kicks the HTTPS pipeline on
-// the flip to 'uploaded' (D-F2). The BUG #4 media-consent assertions at
-// session create are UNCHANGED.
+// 'media-video' bucket (D-F1). Proposal C (v1): media AI processing is
+// disabled, so updateVideoSession no longer kicks any processing pipeline on
+// the flip to 'uploaded'. The BUG #4 media-consent assertions at session
+// create are UNCHANGED.
 import { supabase } from '../config/supabase';
 import type {
   VideoSession,
@@ -17,7 +18,6 @@ import type {
 import type { Group, NoteTag } from '../config/constants';
 import { canTagOrUploadMedia, assertCanTagSwimmers } from '../utils/mediaConsent';
 import { uploadFileToBucket, getSignedFileUrl } from './mediaUpload';
-import { requestSessionProcessing } from './mediaPipeline';
 
 type VideoSessionWithId = VideoSession & { id: string };
 
@@ -431,12 +431,6 @@ export async function updateVideoSession(
 
   const { error } = await supabase.from('video_sessions').update(patch).eq('id', sessionId);
   if (error) throw error;
-
-  // D-F2: the 'uploaded' flip starts the pipeline (fire-and-forget; the
-  // sweeper owns retries).
-  if (data.status === 'uploaded') {
-    void requestSessionProcessing('video', sessionId);
-  }
 }
 
 export async function uploadVideo(
@@ -459,14 +453,13 @@ export function getVideoStatusLabel(status: VideoSessionStatus): string {
       return 'QUEUED';
     case 'uploading':
       return 'UPLOADING';
+    // Proposal C (v1): the AI pipeline statuses are presented as 'uploaded' —
+    // the terminal state a coach sees when AI analysis is disabled.
     case 'uploaded':
-      return 'UPLOADED';
     case 'extracting_frames':
-      return 'PROCESSING';
     case 'analyzing':
-      return 'ANALYZING';
     case 'review':
-      return 'READY FOR REVIEW';
+      return 'UPLOADED';
     case 'posted':
       return 'POSTED';
     case 'failed':
@@ -480,14 +473,12 @@ export function getVideoStatusColor(status: VideoSessionStatus): string {
       return '#FFD700';
     case 'uploading':
       return '#7a7a8e';
+    // Proposal C (v1): AI pipeline statuses share the 'uploaded' color.
     case 'uploaded':
-      return '#f5a623';
     case 'extracting_frames':
-      return '#f5a623';
     case 'analyzing':
-      return '#FFD700';
     case 'review':
-      return '#FFD700';
+      return '#f5a623';
     case 'posted':
       return '#CCB000';
     case 'failed':
