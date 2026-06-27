@@ -10,7 +10,7 @@ import type { AIDraft, Swimmer } from '../types/firestore.types';
 import type { NoteTag } from '../config/constants';
 import { assertCanTagSwimmer } from '../utils/mediaConsent';
 
-export type DraftWithContext = AIDraft & {
+type DraftWithContext = AIDraft & {
   id: string;
   sessionId: string;
   sessionGroup?: string;

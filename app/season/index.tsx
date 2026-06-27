@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
 import { Plus, Calendar, TrendingUp } from 'lucide-react-native';
@@ -21,15 +21,15 @@ const PHASE_LABELS: Record<string, string> = {
 };
 
 function SeasonIndexScreen() {
-  const { user } = useAuth();
+  const { coach } = useAuth();
   const { plans, loading, subscribePlans, setActivePlan } = useSeasonStore();
   const today = new Date().toISOString().split('T')[0];
 
   useEffect(() => {
-    if (!user) return;
-    const unsub = subscribePlans(user.uid);
+    if (!coach) return;
+    const unsub = subscribePlans(coach.uid);
     return unsub;
-  }, [user]);
+  }, [coach]);
 
   const handlePlanPress = (plan: (typeof plans)[0]) => {
     setActivePlan(plan);

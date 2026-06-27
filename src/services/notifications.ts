@@ -189,7 +189,7 @@ export async function markNotificationRead(notificationId: string): Promise<void
 }
 
 // src/services/notifications.ts — additions (D-CUT7, D-K4 addition class)
-export interface NotificationPreferences {
+interface NotificationPreferences {
   pushEnabled: boolean; // notification_preferences.push_enabled
   digestEnabled: boolean; // notification_preferences.digest_enabled
 }
