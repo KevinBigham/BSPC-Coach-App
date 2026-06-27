@@ -7,7 +7,7 @@
 // ratified D-G3 edge flip: signup always wrote default-true, and the column
 // default replaces that write at cutover).
 import { onSchedule } from 'firebase-functions/v2/scheduler';
-import { supabase } from '../config/supabase';
+import { supabase, SUPABASE_SERVICE_ROLE_KEY } from '../config/supabase';
 
 // [D-C5] presence-meaning read: BSPC-marked absences never count as attended.
 const NOT_ABSENT = 'status.is.null,status.neq.absent';
@@ -80,6 +80,9 @@ export async function runDailyDigestOnce(): Promise<number> {
   return rows.length;
 }
 
-export const dailyDigest = onSchedule('every day 20:00', async () => {
-  await runDailyDigestOnce();
-});
+export const dailyDigest = onSchedule(
+  { schedule: 'every day 20:00', secrets: [SUPABASE_SERVICE_ROLE_KEY] },
+  async () => {
+    await runDailyDigestOnce();
+  },
+);
