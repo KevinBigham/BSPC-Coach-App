@@ -101,7 +101,7 @@ export interface SwimmerNote {
   sourceRefId?: string;
   coachId: string;
   coachName: string;
-  practiceDate: FirebaseTimestamp;
+  practiceDate: string;
   createdAt: FirebaseTimestamp;
 }
 

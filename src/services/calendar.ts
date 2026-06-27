@@ -46,6 +46,16 @@ interface RSVPRow {
   swimmer: { first_name: string; last_name: string } | null;
 }
 
+type EventWindowResult = PromiseLike<{ data: EventRow[] | null; error: unknown }>;
+
+interface EventWindowQuery {
+  gte(column: string, value: string): EventWindowQuery;
+  lt(column: string, value: string): EventWindowQuery;
+  lte(column: string, value: string): EventWindowQuery;
+  eq(column: string, value: string): EventWindowQuery;
+  order(column: string, options: { ascending: boolean }): EventWindowResult;
+}
+
 const EVENT_SELECT =
   'id, title, description, type, start_date, start_time, end_date, end_time, ' +
   'location, groups, recurring, coach_id, created_at, updated_at, coach:profiles(full_name)';
@@ -93,7 +103,7 @@ let channelSeq = 0;
 
 function subscribeEventWindow(
   channelKey: string,
-  applyWindow: (q: ReturnType<ReturnType<typeof supabase.from>['select']>) => unknown,
+  applyWindow: (q: EventWindowQuery) => EventWindowResult,
   callback: (events: EventWithId[]) => void,
 ): Unsubscribe {
   let live = true;
@@ -101,11 +111,10 @@ function subscribeEventWindow(
   // Fetch the full current window and emit it — mirrors onSnapshot, which
   // always hands the callback the whole ordered snapshot rather than deltas.
   const emit = async (): Promise<void> => {
-    const base = supabase.from('calendar_events').select(EVENT_SELECT);
-    const { data, error } = (await applyWindow(base)) as {
-      data: EventRow[] | null;
-      error: unknown;
-    };
+    const base = supabase
+      .from('calendar_events')
+      .select(EVENT_SELECT) as unknown as EventWindowQuery;
+    const { data, error } = await applyWindow(base);
     if (!live || error || !data) return;
     callback(data.map(rowToEvent));
   };

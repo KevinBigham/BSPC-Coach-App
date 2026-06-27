@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import {
   View,
   Text,
@@ -9,11 +9,11 @@ import {
   Alert,
 } from 'react-native';
 import { router } from 'expo-router';
-import { Save, Trash2, Plus, ChevronDown } from 'lucide-react-native';
+import { Save, Trash2, Plus } from 'lucide-react-native';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { useSeasonStore } from '../../src/stores/seasonStore';
 import { SeasonTimeline } from '../../src/components/SeasonTimeline';
-import { generateWeekPlans, calculateSeasonYardage } from '../../src/services/seasonPlanning';
+import { calculateSeasonYardage } from '../../src/services/seasonPlanning';
 import { GROUPS } from '../../src/config/constants';
 import type { SeasonPhase, SeasonPhaseType } from '../../src/types/firestore.types';
 import type { Group } from '../../src/config/constants';
@@ -40,7 +40,7 @@ const DEFAULT_PHASE: SeasonPhase = {
 };
 
 function SeasonPlanScreen() {
-  const { user } = useAuth();
+  const { coach } = useAuth();
   const { activePlan, create, update, remove } = useSeasonStore();
   const isEditing = !!activePlan;
 
@@ -65,7 +65,7 @@ function SeasonPlanScreen() {
   };
 
   const handleSave = async () => {
-    if (!user || !name || !startDate || !endDate) return;
+    if (!coach || !name || !startDate || !endDate) return;
 
     const totalWeeks = Math.ceil(
       (new Date(endDate).getTime() - new Date(startDate).getTime()) / (7 * 24 * 60 * 60 * 1000),
@@ -78,8 +78,8 @@ function SeasonPlanScreen() {
       endDate,
       phases,
       totalWeeks,
-      coachId: user.uid,
-      coachName: user.displayName || user.email || 'Coach',
+      coachId: coach.uid,
+      coachName: coach.displayName || 'Coach',
     };
 
     if (isEditing && activePlan) {

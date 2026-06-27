@@ -30,10 +30,7 @@ import { ErrorBoundary } from '../src/components/ErrorBoundary';
 import { setGlobalToast } from '../src/utils/errorHandler';
 import { useSwimmersStore } from '../src/stores/swimmersStore';
 import { useAttendanceStore } from '../src/stores/attendanceStore';
-import {
-  registerForPushNotifications,
-  subscribeToGroupTopics,
-} from '../src/services/notifications';
+import { registerForPushNotifications } from '../src/services/notifications';
 import { getTodayString } from '../src/utils/time';
 import NetInfo from '@react-native-community/netinfo';
 import { colors, fontFamily } from '../src/config/theme';
@@ -55,7 +52,7 @@ function GlobalToastWire() {
 }
 
 function RootNavigator() {
-  const { user, coach, loading } = useAuth();
+  const { user, loading } = useAuth();
   const router = useRouter();
   const segments = useSegments();
   const subscribeSwimmers = useSwimmersStore((s) => s.subscribe);
@@ -66,14 +63,7 @@ function RootNavigator() {
     if (!user) return;
     const unsubSwimmers = subscribeSwimmers();
     const unsubAttendance = subscribeAttendance(getTodayString());
-    // Register for push notifications and subscribe to group topics
-    registerForPushNotifications(user.uid)
-      .then((token) => {
-        if (token && coach?.groups?.length) {
-          subscribeToGroupTopics(token, coach.groups).catch(() => {});
-        }
-      })
-      .catch(() => {});
+    void registerForPushNotifications(user.id).catch(() => {});
     return () => {
       unsubSwimmers();
       unsubAttendance();
@@ -89,7 +79,7 @@ function RootNavigator() {
           async (item) => {
             const { storagePath } = await uploadAudio(
               item.uri,
-              user.uid,
+              user.id,
               item.metadata.date as string,
             );
             if (item.metadata.sessionId) {
@@ -102,7 +92,7 @@ function RootNavigator() {
           async (item) => {
             const { storagePath } = await uploadVideo(
               item.uri,
-              user.uid,
+              user.id,
               item.metadata.date as string,
             );
             if (item.metadata.sessionId) {

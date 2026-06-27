@@ -3,5 +3,5 @@
   "compilerOptions": {
     "strict": true
   },
-  "exclude": ["functions", "parent-portal"]
+  "exclude": ["functions", "parent-portal", "scripts", "test", "**/__tests__"]
 }
