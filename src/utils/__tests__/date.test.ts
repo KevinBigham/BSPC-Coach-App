@@ -8,6 +8,15 @@ import {
 import { subDays, format } from 'date-fns';
 
 describe('formatRelativeTime', () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date('2026-06-30T12:00:00.000Z'));
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
   it('returns relative time for a date today', () => {
     const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
     const result = formatRelativeTime(twoHoursAgo);
